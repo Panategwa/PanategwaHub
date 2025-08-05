@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Panategwa d Maps</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;800&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="map-styles.css" />
+  <script src="menu-loader.js" defer></script>
+</head>
+<body>
+
+  <div id="menu-container"></div>
+
+  <h1>Map views of Panategwa d</h1>
+
+  <div class="navbar">
+    <button onclick="showMap('panategwa-d-map.jpg')">Map</button>
+    <button onclick="showMap('panategwa-d-tectonic-plates-map.jpg')">Tectonic Plates</button>
+    <button onclick="showMap('panategwa-d-tectonic-plates-movement-map.jpg')">Plate Movement</button>
+    <button onclick="showNations()">Nations</button>
+  </div>
+
+  <div class="container">
+    <img id="map-image" src="panategwa-d-map.jpg" alt="Shlank III Map" />
+
+    <div id="nation-section" class="nation-buttons" style="display: none;">
+      <a href="empire-of-pitosia-page.html">The Empire of Pitosia</a><br>
+      <a href="jamuhairi-kingdom-page.html">Jamuhairi Kingdom</a><br>
+      <a href="arifalum-empire-page.html">Arifalum Empire</a><br>
+      <a href="rayajamadar-kingdom-page.html">RayajAmadar Kingdom</a><br>
+      <a href="omar-sultanate-page.html">Omar Sultanate</a><br>
+      <a href="jamadan-kingdom-page.html">Jamadan Kingdom</a><br>
+      <a href="fouadezeines-empire-page.html">Fouadezeines Empire</a><br>
+      <a href="hatunghags-kingdom-page.html">Hatunghags Kingdom</a><br>
+      <a href="ivaprokhovon-kingdom-page.html">IvaProkhovon Kingdom</a>
+    </div>
+  </div>
+
+  <script>
+    function showMap(filename) {
+      document.getElementById('map-image').src = filename;
+      document.getElementById('map-image').style.display = 'block';
+      document.getElementById('nation-section').style.display = 'none';
+    }
+
+    function showNations() {
+      document.getElementById('map-image').style.display = 'none';
+      document.getElementById('nation-section').style.display = 'block';
+    }
+  </script>
+
+</body>
+</html>

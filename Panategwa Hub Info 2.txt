@@ -1,22 +1,22 @@
-📛 PROJECT NAME:
-Shlank Hub
+PROJECT NAME:
+Panategwa Hub
+-
+PURPOSE:
+The Panategwa Hub is a fictional worldbuilding website centered around the alien planet Panategwa d and its civilizations, races, languages, maps, and political systems. It serves as a hub for exploring a custom sci-fi universe created by me (the user). The goal is to organize all the lore about Shlank III and other parts of the Shlank star system into a professional-looking, functional, and interactive website.
+-
+MAIN FOCUS:
 
-📌 PURPOSE:
-Shlank Hub is a fictional worldbuilding website centered around the alien planet Shlank III and its civilizations, races, languages, maps, and political systems. It serves as a hub for exploring a custom sci-fi universe created by me (the user). The goal is to organize all the lore about Shlank III and other parts of the Shlank star system into a professional-looking, functional, and interactive website.
-
-🌍 MAIN FOCUS:
-
-Shlank III: A diverse planet with continents, empires, and unique species
+Panategwa d: A diverse planet with continents, empires, and unique species
 
 Worldbuilding: Civilizations, cultures, wars, alliances, technology, and geography
 
 Maps: Interactive map pages showing the political layout, tectonic plates, etc.
 
 Nation Pages: Each major nation has its own webpage with structured info
-
+-
 MY SKILL LEVEL (IMPORTANT):
 I do not know much about coding yet, especially JavaScript and CSS positioning. I'm learning as I build this project. I can copy, paste, and slightly modify code, but I often need help writing or fixing full sections.
-
+-
 TECHNOLOGIES USED:
 
 HTML: Basic page layout and content
@@ -28,7 +28,7 @@ JavaScript: menu-loader.js (used to insert the menu)
 Hosting: GitHub Pages
 
 Editor: Visual Studio Code
-
+-
 FILE STRUCTURE OVERVIEW:
 
 index.html — homepage
@@ -39,15 +39,13 @@ map-styles.css — used only for map pages, for positioning buttons and dark bac
 
 menu-loader.js — JavaScript that loads the site’s top menu into every page
 
-shlank3-map.html — main map page of Shlank III
-
-tectonic-map.html — tectonic reference map, used for scaling and design
+panategwa-d-map.jpg — main map image of Panategwa d
 
 pitosian-empire-page.html — nation profile for Empire of Pitosia
 
-Other nation pages — each nation will have its own HTML page
-
-MENU SYSTEM (TOP NAVIGATION):
+Other nation pages — each nation will have its own HTML page (e.g.: empire-of-pitosia-page.html)
+-
+MENU SYSTEM:
 
 The menu is dynamically added to every page using a <div id="menu-container">
 
@@ -58,7 +56,7 @@ The menu links to:
 Home
 The shlank celestial bodies (shlank (star) shlank i, shlank ii, etc)
 
-🗺 MAP PAGES (e.g., shlank3-map.html):
+MAP PAGES (e.g., shlank3-map.html):
 
 Use map-styles.css (not styles.css)
 
@@ -73,8 +71,8 @@ Buttons are spaced using <br> tags
 When clicked, buttons open nation pages (e.g., panategwa-empire-page.html)
 
 Example map image: shlank3-political.jpg
-
-📖 NATION PAGES (e.g., Pitosian Empire):
+-
+NATION PAGES (e.g., Pitosian Empire):
 
 Use styles.css for layout
 
@@ -105,60 +103,6 @@ Origins
 Each section uses <h2> or <h3> with bullet points or paragraphs
 
 Pages can include relevant images (concept art, aliens, maps, etc.)
-
-💀 PITOSIAN EMPIRE – CURRENT STATUS (EXAMPLE PAGE):
-
-File: pitosian-empire-page.html
-
-Power Rank: #1 on Shlank III
-
-Race: Pitosians
-
-Language: Papadese (simple grammar, unique alphabet)
-
-Capital: Papadopolis
-
-Population: ~1.1 Billion
-
-Leadership: Absolute monarchy, monarch is Pitos
-
-Stability: Very high, laws are harsh but effective
-
-Society: Structured in 3 classes (Upper 10%, Middle 60%, Lower 30%)
-
-Religion: None — loyalty replaces faith
-
-Economy: Strongest on the planet, focused on timber, agriculture, and trade
-
-Military: ~2 billion troops, mandatory service unless paid out
-
-Technology: Efficient, advanced; minimal interest in arts
-
-Education: Universal, free, math and combat focused
-
-Healthcare: Herbal medicine + basic surgery; facilities are efficient
-
-Enemies: None currently
-
-Allies: Rashooties, Jamuhairies, Prokhivnians
-
-Origin: Founded by Yan Shlanker to restore the Empire of Fategwa
-
-PAPADESE LANGUAGE
-
-Origin: Core language of Pitosians
-
-Structure: Simple grammar, invented script
-
-Influence: Widely spoken; has impacted nearby civilizations
-
-KNOWN LORE ELEMENTS:
-
-The Empire of Fategwa fell, leading to the creation of the Pitosian Empire
-
-The world has tectonic activity (earthquakes, volcanic zones, fault lines)
-
-There are many other civilisations
 
 STYLE NOTES:
 

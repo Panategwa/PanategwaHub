@@ -1,176 +1,112 @@
+/* ====== General Styles ====== */
 body {
-background: linear-gradient(to right, rgb(0, 0, 50), rgb(0, 50, 0));
-margin: 0;
-font-family: 'Rubik', sans-serif;
-color: white;
-padding: 20px;
-min-height: 100vh;
-box-sizing: border-box;
-text-shadow: 0 0 3px black;
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #111;
+  color: #eee;
+  line-height: 1.6;
 }
 
-h1 {
-text-align: center;
-text-shadow: 0 0 5px black;
-margin-bottom: 1em;
-font-size: 36px;
+h1, h2, h3 {
+  color: #fff;
 }
 
-h2 {
-text-align: center;
-text-shadow: 0 0 5px black;
-margin-bottom: 1em;
-font-size: 24px;
+a {
+  color: #4ea3ff;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
 }
 
-h3 {
-text-align: center;
-text-shadow: 0 0 5px black;
-margin-bottom: 1em;
-font-size: 20px;
+main {
+  padding: 1rem;
+  max-width: 1000px;
+  margin: auto;
 }
 
-p {
-text-align: center;
-font-size: 18px;
-line-height: 1.6;
-text-shadow: 0 0 3px black;
-margin-bottom: 2em;
+blockquote {
+  font-style: italic;
+  color: #aaa;
+  border-left: 4px solid #444;
+  padding-left: 0.5rem;
+  margin: 0.5rem 0 1rem;
 }
 
-ul {
-list-style-position: inside;
-text-align: center;
-padding: 0;
-}
-
-ul li {
-display: list-item;
-text-align: center;
-}
-
+/* ====== Menu ====== */
 #menu-container {
-position: fixed;
-top: 50%;
-right: 20px;
-transform: translateY(-50%);
-display: flex;
-flex-direction: column;
-z-index: 1000;
+  background-color: #222;
+  padding: 0.5rem;
+  border-bottom: 1px solid #333;
 }
 
-.menu-button {
-background-color: #2e8b57;
-color: white;
-padding: 10px 20px;
-margin: 5px 0;
-border: none;
-border-radius: 8px;
-cursor: pointer;
-font-size: 16px;
-box-shadow: 0 3px 5px rgba(0,0,0,0.3);
-transition: background-color 0.3s ease;
+#menu-container a {
+  margin-right: 1rem;
+  font-weight: bold;
 }
 
-.menu-button:hover {
-background-color: #246b46;
+/* ====== Fact Tables ====== */
+.fact-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.5rem;
+}
+.fact-table th,
+.fact-table td {
+  padding: 0.5rem;
+  border: 1px solid #333;
+}
+.fact-table th {
+  background-color: #222;
+  text-align: left;
+  color: #ddd;
+}
+.fact-table td {
+  background-color: #181818;
+  color: #ccc;
 }
 
-.menu-button.active {
-background-color: gray;
-cursor: default;
+/* ====== Bullet Lists for Facts ====== */
+.fact-bullets {
+  margin-top: 0.5rem;
+  padding-left: 1.2rem;
+  list-style-type: disc;
+  color: #ccc;
+}
+.fact-bullets li {
+  margin: 0.25rem 0;
 }
 
-div img {
-display: block;
-margin: 20px auto;
-box-shadow: 0 3px 5px rgba(0,0,0,0.5);
-border-radius: 10px;
+/* ====== Page Intro ====== */
+.page-intro {
+  text-align: center;
+  padding: 1rem;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+}
+.page-intro h1 {
+  margin: 0;
+}
+.page-intro blockquote {
+  margin: 0.5rem 0 0;
 }
 
-.button-container {
-display: flex;
-justify-content: center;
-align-items: center;
-margin-top: 40px;
+/* ====== Sections ====== */
+section {
+  margin-bottom: 2rem;
+}
+section h2 {
+  border-bottom: 2px solid #333;
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.5rem;
 }
 
-.map-button:hover {
-background: linear-gradient(to right, #0093e9, #0054b4);
-transform: scale(1.05);
-}
-
-@media (max-width: 1000px) {
-#menu-container {
-right: 10px;
-}
-
-.menu-button {
-padding: 8px 16px;
-font-size: 14px;
-}
-}
-
-@media (max-width: 768px) {
-body {
-padding: 10px;
-}
-
-div img {
-width: 90%;
-}
-
-#menu-container {
-right: 5px;
-}
-
-.menu-button {
-padding: 6px 12px;
-font-size: 12px;
-}
-}
-
-.info-text {
-max-width: 900px;
-margin: 0 auto;
-padding: 20px;
-text-align: left; 
-font-size: 18px;
-line-height: 1.6;
-text-shadow: 0 0 2px black;
-}
-
-
-.info-text h2,
-.info-text h3,
-.info-text ul,
-.info-text ul li,
-.info-text p {
-text-align: left;
-}
-
-.sigma-button {
-  background: linear-gradient(135deg, #00ffe7, #005f6a);
-  color: #004040; 
-  border: none;
-  border-radius: 12px;
-  padding: 14px 28px;
-  font-size: 18px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 0 12px #00ffe7aa;
-  text-shadow: 0 0 5px #00fff7cc;
-  transition: background 0.4s ease, box-shadow 0.4s ease, transform 0.2s ease;
-}
-
-.sigma-button:hover {
-  background: linear-gradient(135deg, #00fff7, #003f44);
-  box-shadow: 0 0 25px #00fff7ee, 0 0 40px #00fff7cc;
-  color: #d0ffff;
-  transform: scale(1.1);
-}
-
-.sigma-button:active {
-  transform: scale(0.95);
-  box-shadow: 0 0 10px #00c4b1cc;
+/* ====== Footer ====== */
+footer {
+  text-align: center;
+  padding: 1rem;
+  background-color: #222;
+  color: #aaa;
+  font-size: 0.9rem;
+  border-top: 1px solid #333;
 }

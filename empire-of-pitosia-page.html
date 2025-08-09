@@ -1,72 +1,106 @@
-/* Base Reset */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Empire of Pitosia | Shlank Hub</title>
+  <link rel="stylesheet" href="styles.css">
+  <meta name="description" content="Learn about the Empire of Pitosia: its government, society, economy, military, and history on Shlank III.">
+  <meta property="og:title" content="Empire of Pitosia | Shlank Hub">
+  <meta property="og:description" content="A powerful and stable empire on Shlank III with 1.1 billion citizens, a strong military, and no religion.">
+</head>
+<body>
+  <div id="menu-container"></div>
 
-body {
-  font-family: Arial, sans-serif;
-  line-height: 1.6;
-  background: #111;
-  color: #eee;
-  padding: 0 1rem;
-}
+  <header class="page-intro">
+    <h1>Empire of Pitosia</h1>
+    <blockquote>“Play nice, and we'll give you a good life”</blockquote>
+  </header>
 
-/* Page Header */
-.page-intro {
-  text-align: center;
-  padding: 2rem 0;
-  border-bottom: 2px solid #444;
-}
-.page-intro h1 {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-}
-.page-intro blockquote {
-  font-style: italic;
-  color: #ccc;
-}
+  <main>
+    <!-- Overview -->
+    <section id="overview">
+      <h2>Overview</h2>
+      <table class="fact-table">
+        <tr><th>Race</th><td>Pitosians</td></tr>
+        <tr><th>Rank</th><td>#1 Global Power</td></tr>
+        <tr><th>Capital</th><td>Pitosia City</td></tr>
+        <tr><th>Language</th><td>Papadese</td></tr>
+        <tr><th>Population</th><td>1,100,000,000</td></tr>
+        <tr><th>Government</th><td>Absolute Monarchy</td></tr>
+      </table>
+      <ul class="fact-bullets">
+        <li>Most powerful and stable nation on Shlank III.</li>
+        <li>Homeworld race: Pitosians.</li>
+        <li>Official language: Papadese.</li>
+      </ul>
+    </section>
 
-/* Section Titles */
-h2 {
-  margin-top: 2rem;
-  margin-bottom: 0.5rem;
-  border-bottom: 1px solid #555;
-  padding-bottom: 0.25rem;
-}
+    <!-- Government -->
+    <section id="government">
+      <h2>Government</h2>
+      <p>The Empire of Pitosia is ruled by Monarch Pitos, who has absolute control over laws, military, and foreign policy.</p>
+      <ul class="fact-bullets">
+        <li>Absolute monarchy led by Monarch Pitos.</li>
+        <li>Centralized decision-making.</li>
+        <li>Focus on stability and prosperity.</li>
+      </ul>
+    </section>
 
-/* Fact Tables */
-.fact-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 0.5rem;
-}
-.fact-table th {
-  text-align: left;
-  background: #222;
-  padding: 0.5rem;
-  width: 40%;
-}
-.fact-table td {
-  background: #1a1a1a;
-  padding: 0.5rem;
-}
+    <!-- Society -->
+    <section id="society">
+      <h2>Society</h2>
+      <p>Pitosian society values discipline, loyalty, and productivity. No official religion exists, and education is highly encouraged.</p>
+      <ul class="fact-bullets">
+        <li>No religion — purely secular state.</li>
+        <li>Education is mandatory for all children.</li>
+        <li>Quality of life tied to loyalty.</li>
+      </ul>
+    </section>
 
-/* Footer */
-footer {
-  text-align: center;
-  padding: 1rem 0;
-  margin-top: 2rem;
-  border-top: 2px solid #444;
-  font-size: 0.9rem;
-  color: #aaa;
-}
+    <!-- Economy -->
+    <section id="economy">
+      <h2>Economy</h2>
+      <p>The Pitosian economy is highly industrialized, producing advanced technology, weapons, and luxury goods.</p>
+      <ul class="fact-bullets">
+        <li>Industrial and technological powerhouse.</li>
+        <li>Exports luxury goods and weaponry.</li>
+        <li>Trade is heavily regulated.</li>
+      </ul>
+    </section>
 
-/* Responsive */
-@media (max-width: 600px) {
-  .fact-table th, .fact-table td {
-    display: block;
-    width: 100%;
-  }
-}
+    <!-- Military -->
+    <section id="military">
+      <h2>Military</h2>
+      <table class="fact-table">
+        <tr><th>Total Military</th><td>60,000,000</td></tr>
+        <tr><th>Percent of Population</th><td>2%</td></tr>
+        <tr><th>Strengths</th><td>Highly trained, disciplined, technologically advanced</td></tr>
+        <tr><th>Weaknesses</th><td>High maintenance costs</td></tr>
+      </table>
+      <ul class="fact-bullets">
+        <li>60 million active personnel.</li>
+        <li>Advanced weapons and armor tech.</li>
+        <li>Feared across Shlank III.</li>
+      </ul>
+    </section>
+
+    <!-- History -->
+    <section id="history">
+      <h2>History</h2>
+      <p>The Pitosian Empire rose to dominance through military conquest and strategic alliances.</p>
+      <ul class="fact-bullets">
+        <li>Founded through conquest.</li>
+        <li>Maintained dominance under Monarch Pitos.</li>
+        <li>Uses alliances to secure influence.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Shlank Hub | Empire of Pitosia</p>
+  </footer>
+
+  <script src="menu-loader.js"></script>
+</body>
+</html>

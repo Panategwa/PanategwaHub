@@ -42,15 +42,38 @@ blockquote {
 
 /* ====== Menu ====== */
 #menu-container {
-  background-color: #222;
-  padding: 0.5rem;
-  border-bottom: 1px solid #333;
+  position: fixed;        /* stays in place when scrolling */
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 200px;           /* adjust if you want bigger/smaller */
+  background-color: #181818;
+  border-left: 2px solid #333;
+  padding: 1rem 0.5rem;
+  overflow-y: auto;       /* scroll if menu is long */
+  text-align: left;       /* keep menu items aligned neatly */
 }
 
 #menu-container a {
-  margin-right: 1rem;
+  display: block;
+  color: #4ea3ff;
+  padding: 0.5rem 0.75rem;
+  margin: 0.2rem 0;
+  border-radius: 6px;
   font-weight: bold;
 }
+
+#menu-container a:hover {
+  background-color: #222;
+  color: #fff;
+  text-decoration: none;
+}
+
+/* Make main content leave space for the right menu */
+main {
+  margin-right: 220px; /* matches menu width + padding */
+}
+
 
 /* ====== Fact Tables ====== */
 .fact-table {

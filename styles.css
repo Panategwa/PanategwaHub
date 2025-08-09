@@ -1,144 +1,137 @@
-/* ====== General Styles ====== */
-body {
-  margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background-color: #111;
-  color: #eee;
-  line-height: 1.75; /* slightly more spread out */
-  text-align: center; /* center text by default */
+/* General resets */
+* {
+  box-sizing: border-box;
 }
 
-h1, h2, h3 {
-  color: #fff;
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #121212;
+  color: #eee;
+  margin: 0;
+  padding: 0;
+  line-height: 1.5;
   text-align: center;
 }
 
-/* Links */
+/* Menu container default style */
+#menu-container {
+  background-color: #181818;
+  padding: 1rem;
+  border-bottom: 2px solid #333;
+  box-shadow: 0 0 10px #000;
+  position: static;
+  width: 100%;
+  text-align: center;
+  overflow: visible;
+  z-index: 10;
+}
+
+#menu-container a {
+  color: #4ea3ff;
+  font-weight: bold;
+  text-decoration: none;
+  margin: 0 0.75rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  display: inline-block;
+}
+
+#menu-container a:hover {
+  background-color: #222;
+  color: #fff;
+}
+
+/* Main content */
+main {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* Headings */
+h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.25rem;
+  color: #61dafb;
+  text-shadow: 0 0 8px #4ea3ff;
+}
+
+h2 {
+  font-size: 1.75rem;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  color: #4ea3ff;
+  text-shadow: 0 0 6px #4ea3ff;
+}
+
+/* Blockquote styling */
+blockquote {
+  font-style: italic;
+  color: #bbb;
+  border-left: 5px solid #4ea3ff;
+  margin: 1rem auto 3rem;
+  padding-left: 1rem;
+  max-width: 700px;
+  text-align: center;
+}
+
+/* Definition list styling */
+dl {
+  text-align: left;
+  max-width: 650px;
+  margin: 0 auto;
+}
+
+dt {
+  font-weight: 700;
+  margin-top: 1rem;
+  color: #a0cfff;
+}
+
+dd {
+  margin-left: 1.25rem;
+  margin-bottom: 0.7rem;
+  color: #ccc;
+}
+
+/* Links inside content */
 a {
   color: #4ea3ff;
   text-decoration: none;
+  font-weight: bold;
 }
+
 a:hover {
   text-decoration: underline;
 }
 
-/* Main Container */
-main {
-  padding: 1rem;
-  max-width: 1000px;
-  margin: auto;
-  text-align: center; /* center normal text */
-}
-
-/* Blockquotes */
-blockquote {
-  font-style: italic;
-  color: #aaa;
-  border-left: 4px solid #444;
-  padding-left: 0.5rem;
-  margin: 0.5rem 0 1rem;
-  text-align: left; /* keep quotes left aligned */
-}
-
-/* ====== Menu (default for other pages) ====== */
-#menu-container {
-  background-color: #222;
-  padding: 0.5rem;
-  border-bottom: 1px solid #333;
-  text-align: center;
-}
-
-#menu-container a {
-  margin-right: 1rem;
-  font-weight: bold;
-  color: #4ea3ff;
-  text-decoration: none;
-}
-#menu-container a:hover {
-  text-decoration: underline;
-}
-
-/* ====== Fact Tables ====== */
-.fact-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 0.5rem;
-  text-align: left;
-}
-.fact-table th,
-.fact-table td {
-  padding: 0.5rem;
-  border: 1px solid #333;
-}
-.fact-table th {
-  background-color: #222;
-  color: #ddd;
-}
-.fact-table td {
-  background-color: #181818;
-  color: #ccc;
-}
-
-/* ====== Bullet Lists for Facts ====== */
-.fact-bullets {
-  margin-top: 0.5rem;
-  padding-left: 1.2rem;
-  list-style-type: disc;
-  color: #ccc;
-  text-align: left;
-}
-.fact-bullets li {
-  margin: 0.25rem 0;
-}
-
-/* ====== Page Intro ====== */
-.page-intro {
-  text-align: center;
-  padding: 1rem;
-  background: #1a1a1a;
-  border-bottom: 1px solid #333;
-}
-.page-intro h1 {
-  margin: 0;
-}
-.page-intro blockquote {
-  margin: 0.5rem 0 0;
-}
-
-/* ====== Sections ====== */
-section {
-  margin-bottom: 2rem;
-  text-align: center; /* force center unless overridden */
-}
-section h2 {
-  border-bottom: 2px solid #333;
-  padding-bottom: 0.3rem;
-  margin-bottom: 0.5rem;
-}
-
-/* ====== Menu Fix for Empire of Pitosia page ====== */
+/* Empire of Pitosia specific styles */
 body.empire-page #menu-container {
   position: fixed;
   top: 0;
   right: 0;
+  width: 220px;
   height: 100vh;
-  width: 200px;
   background-color: #181818;
   border-left: 2px solid #333;
   padding: 1rem 0.5rem;
   overflow-y: auto;
   text-align: left;
   z-index: 1000;
+  box-shadow: -4px 0 12px rgba(0,0,0,0.6);
 }
 
 body.empire-page #menu-container a {
   display: block;
-  color: #4ea3ff;
-  padding: 0.5rem 0.75rem;
-  margin: 0.2rem 0;
+  margin: 0.25rem 0;
+  padding: 0.4rem 0.8rem;
   border-radius: 6px;
   font-weight: bold;
-  text-decoration: none;
+  color: #4ea3ff;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 body.empire-page #menu-container a:hover {
@@ -146,7 +139,8 @@ body.empire-page #menu-container a:hover {
   color: #fff;
 }
 
-/* Make main content leave space for the right menu */
 body.empire-page main {
-  margin-right: 220px; /* same width + padding as menu */
+  margin-right: 240px; /* leave room for menu */
+  text-align: left; /* fix left alignment for content */
+  line-height: 1.65; /* slightly more spacing */
 }

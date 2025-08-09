@@ -1,142 +1,72 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="The Empire of Pitosia, the #1 global power of Shlank III. Learn about its history, government, society, economy, and culture." />
-  <title>Empire of Pitosia - Panategwa Hub</title>
-  <link rel="stylesheet" href="styles.css" />
-  <script src="menu-loader.js" defer></script>
-</head>
-<body>
+/* Base Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-  <div id="menu-container"></div>
+body {
+  font-family: Arial, sans-serif;
+  line-height: 1.6;
+  background: #111;
+  color: #eee;
+  padding: 0 1rem;
+}
 
-  <main>
-    <h1>Empire of Pitosia</h1>
-    <blockquote>“Play nice, and we'll give you a good life”</blockquote>
+/* Page Header */
+.page-intro {
+  text-align: center;
+  padding: 2rem 0;
+  border-bottom: 2px solid #444;
+}
+.page-intro h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+.page-intro blockquote {
+  font-style: italic;
+  color: #ccc;
+}
 
-    <section>
-      <h2>Overview</h2>
-      <dl>
-        <dt>Race:</dt><dd>Pitosians</dd>
-        <dt>Rank:</dt><dd>#1 Global Power</dd>
-        <dt>Population:</dt><dd>3 billion</dd>
-        <dt>Language:</dt><dd>Papadese</dd>
-        <dt>Currency:</dt><dd>Papadopon</dd>
-        <dt>Capital:</dt><dd>Yeaurfiv</dd>
-      </dl>
-    </section>
+/* Section Titles */
+h2 {
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #555;
+  padding-bottom: 0.25rem;
+}
 
-    <section>
-      <h2>Government</h2>
-      <dl>
-        <dt>Ideology:</dt><dd>Absolutism</dd>
-        <dt>Leader:</dt><dd>Monarch Pitos the Great</dd>
-        <dt>Stability:</dt><dd>High</dd>
-        <dt>Laws:</dt><dd>Harsh and effective</dd>
-      </dl>
-    </section>
+/* Fact Tables */
+.fact-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+}
+.fact-table th {
+  text-align: left;
+  background: #222;
+  padding: 0.5rem;
+  width: 40%;
+}
+.fact-table td {
+  background: #1a1a1a;
+  padding: 0.5rem;
+}
 
-    <section>
-      <h2>Geography</h2>
-      <dl>
-        <dt>Continent:</dt><dd>Yan</dd>
-        <dt>Terrain:</dt><dd>Varies from northern mountains and western forests to southern flatlands and deserts</dd>
-        <dt>Climate:</dt><dd>Moderate</dd>
-        <dt>Resources:</dt><dd>Wood, ores, crops</dd>
-        <dt>Natural Disasters:</dt><dd>Moderate</dd>
-      </dl>
-    </section>
+/* Footer */
+footer {
+  text-align: center;
+  padding: 1rem 0;
+  margin-top: 2rem;
+  border-top: 2px solid #444;
+  font-size: 0.9rem;
+  color: #aaa;
+}
 
-    <section>
-      <h2>Society</h2>
-      <dl>
-        <dt>Upper Class (15%):</dt><dd>Business owners and government allies</dd>
-        <dt>Middle Class (50%):</dt><dd>Workers and soldiers</dd>
-        <dt>Lower Class (35%):</dt><dd>Farmers and slaves</dd>
-        <dt>Religion:</dt><dd>None</dd>
-      </dl>
-    </section>
-
-    <section>
-      <h2>Economy</h2>
-      <dl>
-        <dt>Status:</dt><dd>Strongest on Shlank III</dd>
-        <dt>Work:</dt><dd>Farming, trade, military</dd>
-        <dt>Exports:</dt><dd>Crops, timber, troops</dd>
-        <dt>Imports:</dt><dd>Rare metals, stone</dd>
-      </dl>
-    </section>
-
-    <section>
-      <h2>Military</h2>
-      <dl>
-        <dt>Size:</dt><dd>60 million (2% of the population)</dd>
-        <dt>Gear:</dt><dd>Spears, swords, battle animals</dd>
-        <dt>Armor:</dt><dd>Shields, leather, metal</dd>
-        <dt>Service:</dt><dd>Mandatory (buyout allowed)</dd>
-        <dt>Reputation:</dt><dd>Feared and respected</dd>
-      </dl>
-    </section>
-
-    <section>
-      <h2>Culture</h2>
-      <dl>
-        <dt>Food:</dt><dd>Nutritious and cheap</dd>
-        <dt>Technology:</dt><dd>Advanced</dd>
-        <dt>Art and Music:</dt><dd>Minimalist</dd>
-        <dt>Holiday:</dt><dd>Founding Day</dd>
-      </dl>
-    </section>
-
-    <section>
-      <h2>Education</h2>
-      <dl>
-        <dt>Access:</dt><dd>Free and required</dd>
-        <dt>Focus:</dt><dd>Math, combat, economy, history, literature, technology</dd>
-        <dt>Literacy:</dt><dd>High</dd>
-      </dl>
-    </section>
-
-    <section>
-      <h2>Healthcare</h2>
-      <dl>
-        <dt>Access:</dt><dd>Free</dd>
-        <dt>Medicine:</dt><dd>Herbal, basic surgery</dd>
-        <dt>Facilities:</dt><dd>Efficient</dd>
-      </dl>
-    </section>
-
-    <section>
-      <h2>Foreign Relations</h2>
-      <dl>
-        <dt>Allies:</dt><dd><a href="empire-of-rashooti-page.html">Rashooties</a>, <a href="jamuhairie-kingdom-page.html">Jamuhairies</a></dd>
-        <dt>Enemies:</dt><dd>No major enemies</dd>
-        <dt>History:</dt><dd>Highly variable depending on era</dd>
-      </dl>
-    </section>
-
-    <section>
-      <h2>History</h2>
-      <dl>
-        <dt>Founder:</dt><dd>Yan Shlanker and MarXenrei</dd>
-        <dt>Founding Date:</dt><dd>Unknown</dd>
-        <dt>Goal:</dt><dd>Revive the Yeaurfiv Empire</dd>
-        <dt>Notable Event:</dt><dd>The <strong>Battle of Yeaurfiv</strong> — The Yeaurfivian Confederation fought against a coalition of Arifalums, Jamuhairies, Alrehans, and others.<br>The Yeaurfivian Confederation lost, but they permanently left their mark.</dd>
-      </dl>
-    </section>
-
-    <section>
-      <h2>Calendar System</h2>
-      <p>
-        The Empire of Pitosia uses a numeric calendar system based on the founding of the empire.
-        The year is divided into <strong>11 months</strong>, each with <strong>8 days</strong>, followed by a <strong>5-day festival period</strong> at the end of the year.
-        Months are referred to by number, starting from <strong>Month 0</strong> (the first month) up to <strong>Month 11</strong> (the last).
-        Example: 2400 years, 3 months, and 5 days would be written as <strong>2400.3.5</strong>.
-      </p>
-    </section>
-  </main>
-
-</body>
-</html>
+/* Responsive */
+@media (max-width: 600px) {
+  .fact-table th, .fact-table td {
+    display: block;
+    width: 100%;
+  }
+}

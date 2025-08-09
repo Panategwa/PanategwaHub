@@ -40,47 +40,30 @@ blockquote {
   text-align: left; /* keep quotes left aligned */
 }
 
-/* ====== Menu ====== */
+/* ====== Menu (default for other pages) ====== */
 #menu-container {
-  position: fixed;        /* stays in place when scrolling */
-  top: 0;
-  right: 0;
-  height: 100%;
-  width: 200px;           /* adjust if you want bigger/smaller */
-  background-color: #181818;
-  border-left: 2px solid #333;
-  padding: 1rem 0.5rem;
-  overflow-y: auto;       /* scroll if menu is long */
-  text-align: left;       /* keep menu items aligned neatly */
+  background-color: #222;
+  padding: 0.5rem;
+  border-bottom: 1px solid #333;
+  text-align: center;
 }
 
 #menu-container a {
-  display: block;
-  color: #4ea3ff;
-  padding: 0.5rem 0.75rem;
-  margin: 0.2rem 0;
-  border-radius: 6px;
+  margin-right: 1rem;
   font-weight: bold;
-}
-
-#menu-container a:hover {
-  background-color: #222;
-  color: #fff;
+  color: #4ea3ff;
   text-decoration: none;
 }
-
-/* Make main content leave space for the right menu */
-main {
-  margin-right: 220px; /* matches menu width + padding */
+#menu-container a:hover {
+  text-decoration: underline;
 }
-
 
 /* ====== Fact Tables ====== */
 .fact-table {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 0.5rem;
-  text-align: left; /* keep table content left aligned */
+  text-align: left;
 }
 .fact-table th,
 .fact-table td {
@@ -102,7 +85,7 @@ main {
   padding-left: 1.2rem;
   list-style-type: disc;
   color: #ccc;
-  text-align: left; /* keep bullet points left aligned */
+  text-align: left;
 }
 .fact-bullets li {
   margin: 0.25rem 0;
@@ -131,4 +114,39 @@ section h2 {
   border-bottom: 2px solid #333;
   padding-bottom: 0.3rem;
   margin-bottom: 0.5rem;
+}
+
+/* ====== Menu Fix for Empire of Pitosia page ====== */
+body.empire-page #menu-container {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 200px;
+  background-color: #181818;
+  border-left: 2px solid #333;
+  padding: 1rem 0.5rem;
+  overflow-y: auto;
+  text-align: left;
+  z-index: 1000;
+}
+
+body.empire-page #menu-container a {
+  display: block;
+  color: #4ea3ff;
+  padding: 0.5rem 0.75rem;
+  margin: 0.2rem 0;
+  border-radius: 6px;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+body.empire-page #menu-container a:hover {
+  background-color: #222;
+  color: #fff;
+}
+
+/* Make main content leave space for the right menu */
+body.empire-page main {
+  margin-right: 220px; /* same width + padding as menu */
 }

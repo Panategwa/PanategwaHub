@@ -1,4 +1,5 @@
 /* styles.css */
+
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background-color: #121212;
@@ -9,14 +10,21 @@ body {
 }
 
 #menu-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
   background-color: #1f1f1f;
   padding: 1rem;
   border-bottom: 2px solid #444;
+  z-index: 9999;
 }
 
 main {
+  margin-top: 70px; /* height of menu container */
   max-width: 900px;
-  margin: 2rem auto;
+  margin-left: auto;
+  margin-right: auto;
   padding-bottom: 3rem;
 }
 
@@ -71,12 +79,4 @@ a {
 
 a:hover, a:focus {
   text-decoration: underline;
-}
-
-footer {
-  text-align: center;
-  padding: 1rem 0;
-  border-top: 1px solid #444;
-  color: #666;
-  font-size: 0.9rem;
 }

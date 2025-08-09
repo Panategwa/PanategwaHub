@@ -1,246 +1,82 @@
-<<<<<<< HEAD
-/* General resets */
-* {
-  box-sizing: border-box;
-=======
-/* ====== General Styles ====== */
-body {
-  margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background-color: #111;
-  color: #eee;
-  line-height: 1.6;
->>>>>>> parent of 2d4c70e (asd)
-}
-
-<<<<<<< HEAD
+/* styles.css */
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background-color: #121212;
-  color: #eee;
+  color: #e0e0e0;
   margin: 0;
-  padding: 0;
-  line-height: 1.5;
-  text-align: center;
-=======
-h1, h2, h3 {
-  color: #fff;
->>>>>>> parent of c7c01fd (bruhhhhhhhh)
-}
-
-/* Menu container default style */
-#menu-container {
-  background-color: #181818;
-  padding: 1rem;
-  border-bottom: 2px solid #333;
-  box-shadow: 0 0 10px #000;
-  position: static;
-  width: 100%;
-  text-align: center;
-  overflow: visible;
-  z-index: 10;
-}
-
-#menu-container a {
-  color: #4ea3ff;
-  font-weight: bold;
-  text-decoration: none;
-  margin: 0 0.75rem;
-  padding: 0.3rem 0.5rem;
-  border-radius: 6px;
-  transition: background-color 0.2s ease, color 0.2s ease;
-  display: inline-block;
-}
-
-#menu-container a:hover {
-  background-color: #222;
-  color: #fff;
-}
-
-<<<<<<< HEAD
-/* Main content */
-main {
-  max-width: 900px;
-  margin: 2rem auto;
   padding: 0 1rem;
-  text-align: center;
   line-height: 1.6;
 }
 
-/* Headings */
+#menu-container {
+  background-color: #1f1f1f;
+  padding: 1rem;
+  border-bottom: 2px solid #444;
+}
+
+main {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding-bottom: 3rem;
+}
+
+h1, h2 {
+  font-family: 'Georgia', serif;
+  color: #a4c8ff;
+}
+
 h1 {
-  font-size: 2.5rem;
-  margin-bottom: 0.25rem;
-  color: #61dafb;
-  text-shadow: 0 0 8px #4ea3ff;
+  font-size: 2.8rem;
+  margin-bottom: 0.5rem;
+  text-align: center;
+  text-shadow: 0 0 5px #7abaff;
 }
 
 h2 {
-  font-size: 1.75rem;
+  font-size: 1.8rem;
+  border-bottom: 1px solid #3b5998;
+  padding-bottom: 0.3rem;
   margin-top: 2.5rem;
-  margin-bottom: 1rem;
-  color: #4ea3ff;
-  text-shadow: 0 0 6px #4ea3ff;
 }
 
-/* Blockquote styling */
 blockquote {
   font-style: italic;
-  color: #bbb;
-  border-left: 5px solid #4ea3ff;
-  margin: 1rem auto 3rem;
+  border-left: 4px solid #7abaff;
+  margin: 1rem 0 2rem 0;
   padding-left: 1rem;
-  max-width: 700px;
+  color: #b0c4ff;
   text-align: center;
 }
 
-/* Definition list styling */
 dl {
-  text-align: left;
-  max-width: 650px;
-  margin: 0 auto;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.4rem 1.5rem;
+  margin: 0;
 }
 
 dt {
-  font-weight: 700;
-  margin-top: 1rem;
-  color: #a0cfff;
+  font-weight: bold;
+  color: #7abaff;
 }
 
 dd {
-  margin-left: 1.25rem;
-  margin-bottom: 0.7rem;
-  color: #ccc;
+  margin: 0;
 }
 
-/* Links inside content */
-=======
->>>>>>> parent of 2d4c70e (asd)
 a {
-  color: #4ea3ff;
+  color: #88bbff;
   text-decoration: none;
-  font-weight: bold;
 }
 
-a:hover {
+a:hover, a:focus {
   text-decoration: underline;
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-/* Empire of Pitosia specific styles */
-body.empire-page #menu-container {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 220px;
-  height: 100vh;
-=======
-/* Main Container */
-=======
->>>>>>> parent of 2d4c70e (asd)
-main {
-  padding: 1rem;
-  max-width: 1000px;
-  margin: auto;
-}
-
-blockquote {
-  font-style: italic;
-  color: #aaa;
-  border-left: 4px solid #444;
-  padding-left: 0.5rem;
-  margin: 0.5rem 0 1rem;
-}
-
-/* ====== Menu ====== */
-#menu-container {
-  background-color: #222;
-  padding: 0.5rem;
-  border-bottom: 1px solid #333;
-}
-
-#menu-container a {
-  margin-right: 1rem;
-  font-weight: bold;
-}
-
-/* ====== Fact Tables ====== */
-.fact-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 0.5rem;
-}
-.fact-table th,
-.fact-table td {
-  padding: 0.5rem;
-  border: 1px solid #333;
-}
-.fact-table th {
-  background-color: #222;
-  text-align: left;
-  color: #ddd;
-}
-.fact-table td {
->>>>>>> parent of c7c01fd (bruhhhhhhhh)
-  background-color: #181818;
-  border-left: 2px solid #333;
-  padding: 1rem 0.5rem;
-  overflow-y: auto;
-  text-align: left;
-  z-index: 1000;
-  box-shadow: -4px 0 12px rgba(0,0,0,0.6);
-}
-
-<<<<<<< HEAD
-body.empire-page #menu-container a {
-  display: block;
-=======
-/* ====== Bullet Lists for Facts ====== */
-.fact-bullets {
-  margin-top: 0.5rem;
-  padding-left: 1.2rem;
-  list-style-type: disc;
-  color: #ccc;
-}
-.fact-bullets li {
->>>>>>> parent of 2d4c70e (asd)
-  margin: 0.25rem 0;
-  padding: 0.4rem 0.8rem;
-  border-radius: 6px;
-  font-weight: bold;
-  color: #4ea3ff;
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-body.empire-page #menu-container a:hover {
-  background-color: #222;
-  color: #fff;
-}
-
-<<<<<<< HEAD
-body.empire-page main {
-  margin-right: 240px; /* leave room for menu */
-  text-align: left; /* fix left alignment for content */
-  line-height: 1.65; /* slightly more spacing */
-=======
-/* ====== Sections ====== */
-section {
-  margin-bottom: 2rem;
-}
-section h2 {
-  border-bottom: 2px solid #333;
-  padding-bottom: 0.3rem;
-  margin-bottom: 0.5rem;
->>>>>>> parent of c7c01fd (bruhhhhhhhh)
-}
-
-/* ====== Footer ====== */
 footer {
   text-align: center;
-  padding: 1rem;
-  background-color: #222;
-  color: #aaa;
+  padding: 1rem 0;
+  border-top: 1px solid #444;
+  color: #666;
   font-size: 0.9rem;
-  border-top: 1px solid #333;
 }

@@ -12,26 +12,26 @@ body {
 /* Headings */
 h1, h2, h3 {
   font-family: 'Georgia', serif;
-  color: #a4c8ff;
+  color: #ffffff;
 }
 
 h1 {
   font-size: 2.8rem;
   margin-bottom: 0.5rem;
   text-align: center;
-  text-shadow: 0 0 5px #7abaff;
+  text-shadow: 0 0 5px #ffffff;
 }
 
 h2 {
   font-size: 1.8rem;
-  border-bottom: 1px solid #3b5998;
+  border-bottom: 1px solid #bbbbbb;
   padding-bottom: 0.3rem;
   margin-top: 2.5rem;
 }
 
 /* Links */
 a {
-  color: #88bbff;
+  color: #b7d6ff;
   text-decoration: none;
 }
 a:hover,
@@ -47,16 +47,6 @@ main {
   margin-right: auto;
   padding: 1rem;
   padding-bottom: 3rem;
-}
-
-/* Blockquotes */
-blockquote {
-  font-style: italic;
-  border-left: 4px solid #7abaff;
-  margin: 1rem 0 2rem 0;
-  padding-left: 1rem;
-  color: #b0c4ff;
-  text-align: center;
 }
 
 /* Description Lists */
@@ -77,14 +67,4 @@ dd {
 /* Sections */
 section {
   margin-bottom: 2rem;
-}
-
-/* Footer */
-footer {
-  text-align: center;
-  padding: 1rem;
-  background-color: #222;
-  color: #aaa;
-  font-size: 0.9rem;
-  border-top: 1px solid #333;
 }

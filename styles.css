@@ -9,18 +9,6 @@ body {
   line-height: 1.6;
 }
 
-/* Menu Container */
-#menu-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  background-color: #1f1f1f;
-  padding: 1rem;
-  border-bottom: 2px solid #444;
-  z-index: 9999;
-}
-
 /* Headings */
 h1, h2, h3 {
   font-family: 'Georgia', serif;
@@ -53,7 +41,7 @@ a:focus {
 
 /* Main Content Area */
 main {
-  margin-top: 70px; /* push content below fixed menu */
+  margin-top: 70px; /* match menu height */
   max-width: 900px;
   margin-left: auto;
   margin-right: auto;

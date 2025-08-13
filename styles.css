@@ -5,10 +5,9 @@ body {
   background-color: #121212;
   color: #e0e0e0;
   margin: 0;
-  padding: 0;
+  padding: 0 2rem; /* left/right padding for the whole page */
   line-height: 1.6;
 }
-
 
 /* Headings */
 h1, h2, h3 {
@@ -40,13 +39,26 @@ a:focus {
   text-decoration: underline;
 }
 
+/* Menu Container */
+#menu-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background-color: #1f1f1f;
+  padding: 1rem 2rem; /* side padding so text isn't touching edges */
+  border-bottom: 2px solid #444;
+  z-index: 9999;
+  box-sizing: border-box;
+}
+
 /* Main Content Area */
 main {
   margin-top: 70px; /* match menu height */
   max-width: 900px;
   margin-left: auto;
   margin-right: auto;
-  padding: 1rem;
+  padding: 1rem 0; /* vertical padding, no extra horizontal since body handles it */
   padding-bottom: 3rem;
 }
 

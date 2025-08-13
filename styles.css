@@ -2,10 +2,7 @@
 
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(90deg, rgb(10, 189, 64), rgb(107, 51, 211));
-  background-attachment: fixed; /* keeps gradient in place while scrolling */
-  background-repeat: no-repeat;
-  background-size: cover;
+  background-color: rgb(50, 200, 100);
   color: #e0e0e0;
   margin: 0;
   padding: 0 1rem;

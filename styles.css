@@ -1,11 +1,12 @@
 /* styles.css */
 
+/* General Page Styles */
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background-color: #121212;
   color: #e0e0e0;
   margin: 0;
-  padding: 0 2rem; /* left/right padding for the whole page */
+  padding: 0 1rem; /* space on left & right edges */
   line-height: 1.6;
 }
 
@@ -39,46 +40,13 @@ a:focus {
   text-decoration: underline;
 }
 
-/* Menu Container */
-#menu-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  background-color: #1f1f1f;
-  padding: 1rem 2rem;
-  border-bottom: 2px solid #444;
-  z-index: 9999;
-  box-sizing: border-box;
-
-  display: flex;
-  justify-content: center; /* center horizontally */
-  align-items: center;     /* center vertically */
-  gap: 1.5rem;             /* space between menu items */
-}
-
-#menu-container a {
-  padding: 0.6rem 1.2rem;       /* more padding for bigger buttons */
-  font-size: 1.15rem;           /* slightly bigger text */
-  font-weight: 600;             /* bolder text */
-  background-color: #2a2a2a;    /* dark background */
-  border-radius: 8px;           /* smoother rounded corners */
-  transition: background-color 0.2s ease, transform 0.15s ease;
-}
-
-#menu-container a:hover {
-  background-color: #4a6cff;    /* bright hover color */
-  color: #fff;                  /* white text on hover */
-  transform: scale(1.07);       /* slightly bigger grow effect */
-}
-
 /* Main Content Area */
 main {
-  margin-top: 70px; /* match menu height */
+  margin-top: 70px; /* leaves space for fixed menu */
   max-width: 900px;
   margin-left: auto;
   margin-right: auto;
-  padding: 1rem 0; /* vertical padding, no extra horizontal since body handles it */
+  padding: 1rem;
   padding-bottom: 3rem;
 }
 

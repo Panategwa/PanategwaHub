@@ -59,7 +59,7 @@ a:focus {
 
 #menu-container a {
   padding: 0.6rem 1.2rem;       /* more padding for bigger buttons */
-  font-size: 1.15rem;           /* slightly bigger */
+  font-size: 1.15rem;           /* slightly bigger text */
   font-weight: 600;             /* bolder text */
   background-color: #2a2a2a;    /* dark background */
   border-radius: 8px;           /* smoother rounded corners */

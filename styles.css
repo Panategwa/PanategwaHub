@@ -1,6 +1,3 @@
-/* styles.css */
-
-/* ===== Body & Global Styles ===== */
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background-color: #121212;
@@ -10,7 +7,7 @@ body {
   line-height: 1.6;
 }
 
-/* ===== Headings ===== */
+/* Headings */
 h1, h2, h3 {
   font-family: 'Georgia', serif;
   color: #ffffff;
@@ -30,18 +27,17 @@ h2 {
   margin-top: 2.5rem;
 }
 
-/* ===== Links ===== */
+/* Links */
 a {
   color: #b7d6ff;
   text-decoration: none;
 }
-
 a:hover,
 a:focus {
   text-decoration: underline;
 }
 
-/* ===== Menu Container ===== */
+/* Menu Container */
 #menu-container {
   position: fixed;
   top: 0;
@@ -52,53 +48,183 @@ a:focus {
   border-bottom: 2px solid #444;
   z-index: 9999;
   box-sizing: border-box;
+
   display: flex;
   justify-content: center; /* center horizontally */
-  align-items: center; /* center vertically */
-  gap: 1.5rem; /* space between menu items */
+  align-items: center;     /* center vertically */
+  gap: 1.5rem;             /* space between menu items */
 }
 
-#menu-container a {
-  padding: 0.5rem 1rem; /* button padding */
-  font-size: 1.1rem; /* slightly bigger text */
-  background-color: #2a2a2a; /* button background */
-  border-radius: 6px; /* rounded corners */
-  transition: background-color 0.2s ease, transform 0.15s ease;
-}
 
-#menu-container a:hover {
-  background-color: #3a3a3a; /* lighter on hover */
-  transform: scale(1.05); /* subtle grow effect */
-}
-
-/* ===== Main Content Area ===== */
+/* Main Content Area */
 main {
   margin-top: 70px; /* match menu height */
   max-width: 900px;
   margin-left: auto;
   margin-right: auto;
-  padding: 1rem 0; /* vertical padding */
+  padding: 1rem 0; /* vertical padding, no extra horizontal since body handles it */
   padding-bottom: 3rem;
 }
 
-/* ===== Description Lists ===== */
+/* Description Lists */
 dl {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 0.4rem 1.5rem;
   margin: 0;
 }
-
 dt {
   font-weight: bold;
   color: #7abaff;
 }
-
 dd {
   margin: 0;
 }
 
-/* ===== Sections ===== */
+/* Sections */
+section {
+  margin-bottom: 2rem;
+}
+ChatGPT said:
+
+Nice — this version’s way cleaner and actually centers your menu while keeping a safe “no-text-touching-the-edge” zone.
+
+Right now your body padding and the menu’s justify-content: center combo is what’s making it look balanced.
+
+If you want, I can also make the menu stick out slightly with a shadow so it pops from the background when scrolling — keeps that sleek UI vibe.
+
+You said:
+make the menu have better and slightly bigger buttons
+ChatGPT said:
+
+Gotcha — we can give your menu links a bit more size, padding, and hover effects so they feel like actual clickable buttons instead of just text.
+
+Here’s the updated part for your styles.css (just add this under the #menu-container section):
+
+#menu-container a {
+  padding: 0.5rem 1rem;        /* button padding */
+  font-size: 1.1rem;           /* slightly bigger text */
+  background-color: #2a2a2a;   /* button background */
+  border-radius: 6px;          /* rounded corners */
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+#menu-container a:hover {
+  background-color: #3a3a3a;   /* lighter on hover */
+  transform: scale(1.05);      /* subtle grow effect */
+}
+
+
+This will:
+
+Make buttons wider and taller so they’re easier to click.
+
+Give them a dark rounded background to look like actual menu items.
+
+Add a slight scale-up animation on hover for a smooth effect.
+
+Do you want me to also make them highlight in blue when hovered, to match your link color? That would make them pop more.
+
+You said:
+/* styles.css */
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #121212;
+  color: #e0e0e0;
+  margin: 0;
+  padding: 0 2rem; /* left/right padding for the whole page */
+  line-height: 1.6;
+}
+
+/* Headings */
+h1, h2, h3 {
+  font-family: 'Georgia', serif;
+  color: #ffffff;
+}
+
+h1 {
+  font-size: 2.8rem;
+  margin-bottom: 0.5rem;
+  text-align: center;
+  text-shadow: 0 0 5px #ffffff;
+}
+
+h2 {
+  font-size: 1.8rem;
+  border-bottom: 1px solid #bbbbbb;
+  padding-bottom: 0.3rem;
+  margin-top: 2.5rem;
+}
+
+/* Links */
+a {
+  color: #b7d6ff;
+  text-decoration: none;
+}
+a:hover,
+a:focus {
+  text-decoration: underline;
+}
+
+/* Menu Container */
+#menu-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background-color: #1f1f1f;
+  padding: 1rem 2rem;
+  border-bottom: 2px solid #444;
+  z-index: 9999;
+  box-sizing: border-box;
+
+  display: flex;
+  justify-content: center; /* center horizontally */
+  align-items: center;     /* center vertically */
+  gap: 1.5rem;             /* space between menu items */
+}
+
+#menu-container a {
+  padding: 0.5rem 1rem;        /* button padding */
+  font-size: 1.1rem;           /* slightly bigger text */
+  background-color: #2a2a2a;   /* button background */
+  border-radius: 6px;          /* rounded corners */
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+#menu-container a:hover {
+  background-color: #3a3a3a;   /* lighter on hover */
+  transform: scale(1.05);      /* subtle grow effect */
+}
+
+
+/* Main Content Area */
+main {
+  margin-top: 70px; /* match menu height */
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1rem 0; /* vertical padding, no extra horizontal since body handles it */
+  padding-bottom: 3rem;
+}
+
+/* Description Lists */
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.4rem 1.5rem;
+  margin: 0;
+}
+dt {
+  font-weight: bold;
+  color: #7abaff;
+}
+dd {
+  margin: 0;
+}
+
+/* Sections */
 section {
   margin-bottom: 2rem;
 }

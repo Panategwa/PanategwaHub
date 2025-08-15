@@ -57,6 +57,20 @@ a:focus {
   gap: 1.5rem;             /* space between menu items */
 }
 
+#menu-container a {
+  padding: 0.6rem 1.2rem;       /* more padding for bigger buttons */
+  font-size: 1.15rem;           /* slightly bigger */
+  font-weight: 600;             /* bolder text */
+  background-color: #2a2a2a;    /* dark background */
+  border-radius: 8px;           /* smoother rounded corners */
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+#menu-container a:hover {
+  background-color: #4a6cff;    /* bright hover color */
+  color: #fff;                  /* white text on hover */
+  transform: scale(1.07);       /* slightly bigger grow effect */
+}
 
 /* Main Content Area */
 main {

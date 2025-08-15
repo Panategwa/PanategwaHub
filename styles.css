@@ -1,16 +1,16 @@
 /* styles.css */
 
-/* General Page Styles */
+/* ===== Body & Global Styles ===== */
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background-color: #121212;
   color: #e0e0e0;
   margin: 0;
-  padding: 0 1rem; /* space on left & right edges */
+  padding: 0 2rem; /* left/right padding for the whole page */
   line-height: 1.6;
 }
 
-/* Headings */
+/* ===== Headings ===== */
 h1, h2, h3 {
   font-family: 'Georgia', serif;
   color: #ffffff;
@@ -30,42 +30,75 @@ h2 {
   margin-top: 2.5rem;
 }
 
-/* Links */
+/* ===== Links ===== */
 a {
   color: #b7d6ff;
   text-decoration: none;
 }
+
 a:hover,
 a:focus {
   text-decoration: underline;
 }
 
-/* Main Content Area */
+/* ===== Menu Container ===== */
+#menu-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background-color: #1f1f1f;
+  padding: 1rem 2rem;
+  border-bottom: 2px solid #444;
+  z-index: 9999;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center; /* center horizontally */
+  align-items: center; /* center vertically */
+  gap: 1.5rem; /* space between menu items */
+}
+
+#menu-container a {
+  padding: 0.5rem 1rem; /* button padding */
+  font-size: 1.1rem; /* slightly bigger text */
+  background-color: #2a2a2a; /* button background */
+  border-radius: 6px; /* rounded corners */
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+#menu-container a:hover {
+  background-color: #3a3a3a; /* lighter on hover */
+  transform: scale(1.05); /* subtle grow effect */
+}
+
+/* ===== Main Content Area ===== */
 main {
-  margin-top: 70px; /* leaves space for fixed menu */
+  margin-top: 70px; /* match menu height */
   max-width: 900px;
   margin-left: auto;
   margin-right: auto;
-  padding: 1rem;
+  padding: 1rem 0; /* vertical padding */
   padding-bottom: 3rem;
 }
 
-/* Description Lists */
+/* ===== Description Lists ===== */
 dl {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 0.4rem 1.5rem;
   margin: 0;
 }
+
 dt {
   font-weight: bold;
   color: #7abaff;
 }
+
 dd {
   margin: 0;
 }
 
-/* Sections */
+/* ===== Sections ===== */
 section {
   margin-bottom: 2rem;
 }

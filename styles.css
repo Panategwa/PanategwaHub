@@ -41,6 +41,23 @@ a:focus {
   text-decoration: underline;
 }
 
+button {
+  background-color: #999292; /* dark red */
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-family: 'Rubik', sans-serif;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+button:hover {
+  background-color: #33df97; /* lighter red when hovered */
+  transform: scale(1.05);
+}
+
 /* ===== Menu Container ===== */
 #menu-container {
   position: fixed;

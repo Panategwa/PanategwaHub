@@ -49,13 +49,39 @@ a:focus {
   width: 100%;
   background-color: #1f1f1f;
   padding: 1rem 2rem;
-  border-bottom: 3px solid #444;
+  border-bottom: 3px solid #474747;
   box-sizing: border-box;
   display: flex;
   justify-content: center; /* center horizontally */
   align-items: center; /* center vertically */
   gap: 0.5rem; /* space between menu items */
 }
+
+/* ===== Menu Buttons ===== */
+.menu-button {
+  background-color: #999292; /* dark red */
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-family: 'Rubik', sans-serif;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.menu-button:hover {
+  background-color: #33df97; /* lighter red when hovered */
+  transform: scale(1.05);
+}
+
+.menu-button.active,
+.menu-button:disabled {
+  background-color: #005c48; /* darker red for the active page */
+  cursor: default;
+  transform: none;
+}
+
 
 /* ===== Main Content Area ===== */
 main {

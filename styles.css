@@ -7,6 +7,7 @@ body {
   color: #e0e0e0;
   margin: 0;
   padding: 0 2rem; /* left/right padding for the whole page */
+  padding-top: 80px; /* pushes everything down a bit */
   line-height: 1.6;
 }
 
@@ -74,6 +75,8 @@ button:hover {
   gap: 0.5rem; /* space between menu items */
 }
 
+
+
 /* ===== Menu Buttons ===== */
 .menu-button {
   background-color: #999292; /* dark red */
@@ -130,4 +133,19 @@ dd {
 /* ===== Sections ===== */
 section {
   margin-bottom: 2rem;
+}
+
+/* ===== Responsive Menu Buttons ===== */
+#menu-container {
+  flex-wrap: wrap; /* allow buttons to go to next line on small screens */
+  justify-content: center;
+  gap: 0.4rem; /* smaller gap for mobile */
+}
+
+.menu-button {
+  padding: 0.5rem 1rem;
+  font-size: clamp(0.8rem, 2vw, 1rem); /* font scales with screen width */
+  flex: 1 1 auto; /* buttons can shrink but try to grow evenly */
+  min-width: 80px; /* prevent them from getting too tiny */
+  text-align: center;
 }

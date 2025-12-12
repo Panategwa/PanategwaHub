@@ -1,53 +1,61 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Panategwa d Taxonomy</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    #taxonomy-container button { display: block; margin: 5px 0; padding: 8px 12px; cursor: pointer; }
-    #search-results div { margin: 3px 0; }
-    #breadcrumbs { margin-bottom: 15px; font-weight: bold; }
-    input { margin-bottom: 10px; padding: 6px; width: 300px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panategwa d Taxonomy</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; }
+  #taxonomy-container button, #control-buttons button { display: block; margin: 5px 0; padding: 8px 12px; cursor: pointer; }
+  #search-results div { margin: 3px 0; }
+  #breadcrumbs { margin-bottom: 15px; font-weight: bold; }
+  input { margin-bottom: 10px; padding: 6px; width: 300px; }
+  #more-search-panel { display: none; margin-top: 10px; border: 1px solid #ccc; padding: 10px; }
+</style>
 </head>
 <body>
-  <h1>Panategwa d Taxonomy Explorer</h1>
 
-  <div id="breadcrumbs"></div>
+<h1>Panategwa d Taxonomy Explorer</h1>
 
-  <div id="taxonomy-container"></div>
+<div id="breadcrumbs"></div>
 
-  <input type="text" id="search-bar" placeholder="Search species...">
+<div id="control-buttons">
+  <button id="back-button">⬅ Back</button>
+  <button id="more-button">🔍 More Search</button>
+  <button id="close-button">✖ Close All</button>
+</div>
+
+<div id="taxonomy-container"></div>
+
+<div id="more-search-panel">
+  <input type="text" id="search-bar" placeholder="Search any rank...">
   <div id="search-results"></div>
+</div>
 
-  <script>
-    // --- TAXONOMY DATA ---
-    const taxonomy = {
-      domains: [
+<script>
+// --- TAXONOMY DATA ---
+const taxonomy = {
+  domains: [
+    {
+      name: "Eukarya",
+      kingdoms: [
         {
-          name: "Eukarya",
-          kingdoms: [
+          name: "Animalia",
+          phyla: [
             {
-              name: "Animalia",
-              phyla: [
+              name: "Chordata",
+              classes: [
                 {
-                  name: "Chordata",
-                  classes: [
+                  name: "Mammalia",
+                  orders: [
                     {
-                      name: "Mammalia",
-                      orders: [
+                      name: "Primates",
+                      families: [
                         {
-                          name: "Primates",
-                          families: [
-                            {
-                              name: "Hominidae",
-                              genera: [
-                                { name: "Homo", species: ["Homo sapiens"] },
-                                { name: "Triopanathropus", species: ["Triopanathropus panategwanus"] }
-                              ]
-                            }
+                          name: "Hominidae",
+                          genera: [
+                            { name: "Homo", species: ["Homo sapiens"] },
+                            { name: "Triopanathropus", species: ["Triopanathropus panategwanus"] }
                           ]
                         }
                       ]
@@ -55,78 +63,128 @@
                   ]
                 }
               ]
-            },
-            { name: "Plantae", phyla: [] }
+            }
           ]
         },
-        { name: "Prokarya", kingdoms: [] },
-        { name: "Mycota-Pan", kingdoms: [] }
+        { name: "Plantae", phyla: [] }
       ]
+    },
+    { name: "Prokarya", kingdoms: [] },
+    { name: "Mycota-Pan", kingdoms: [] }
+  ]
+};
+
+// --- STATE ---
+let currentPath = [];
+let currentNode = taxonomy.domains;
+
+// --- FUNCTIONS ---
+function renderLevel(items) {
+  const container = document.getElementById("taxonomy-container");
+  container.innerHTML = "";
+  items.forEach(item => {
+    const btn = document.createElement("button");
+    btn.textContent = item.name;
+    btn.onclick = () => {
+      currentPath.push(item.name);
+      renderNextLevel(item);
     };
+    container.appendChild(btn);
+  });
+  document.getElementById("breadcrumbs").textContent = currentPath.join(" > ");
+}
 
-    // --- TAXONOMY FUNCTIONS ---
-    let currentPath = [];
+function renderNextLevel(item) {
+  currentNode = item;
+  if(item.kingdoms) renderLevel(item.kingdoms);
+  else if(item.phyla) renderLevel(item.phyla);
+  else if(item.classes) renderLevel(item.classes);
+  else if(item.orders) renderLevel(item.orders);
+  else if(item.families) renderLevel(item.families);
+  else if(item.genera) renderLevel(item.genera);
+  else if(item.species) renderLevel(item.species.map(s => ({name:s})));
+}
 
-    function renderLevel(items) {
-      const container = document.getElementById("taxonomy-container");
-      container.innerHTML = "";
-      items.forEach(item => {
-        const btn = document.createElement("button");
-        btn.textContent = item.name;
-        btn.onclick = () => {
-          currentPath.push(item.name);
-          renderNextLevel(item);
-        };
-        container.appendChild(btn);
-      });
-      document.getElementById("breadcrumbs").textContent = currentPath.join(" > ");
+function findRanks(query, node, path = []) {
+  let matches = [];
+  // Check all possible ranks
+  if(node.name && node.name.toLowerCase().includes(query)) matches.push([...path, node.name]);
+  if(node.species) {
+    node.species.forEach(s => { if(s.toLowerCase().includes(query)) matches.push([...path, s]); });
+  }
+  for(let key in node) {
+    if(Array.isArray(node[key])) {
+      node[key].forEach(child => matches = matches.concat(findRanks(query, child, [...path, node.name || ""])));
     }
+  }
+  return matches;
+}
 
-    function renderNextLevel(item) {
-      if(item.kingdoms) renderLevel(item.kingdoms);
-      else if(item.phyla) renderLevel(item.phyla);
-      else if(item.classes) renderLevel(item.classes);
-      else if(item.orders) renderLevel(item.orders);
-      else if(item.families) renderLevel(item.families);
-      else if(item.genera) renderLevel(item.genera);
-      else if(item.species) renderLevel(item.species.map(s => ({name:s})));
-    }
+function showSearchResults(results){
+  const container = document.getElementById("search-results");
+  container.innerHTML = "";
+  results.forEach(path => {
+    const div = document.createElement("div");
+    div.textContent = path.filter(n=>n!=="").join(" > ");
+    container.appendChild(div);
+  });
+}
 
-    function findSpecies(query, node, path = []) {
-      let matches = [];
-      if(node.species) {
-        node.species.forEach(s => {
-          if(s.toLowerCase().includes(query)) matches.push([...path, s]);
-        });
-      }
-      for(let key in node){
-        if(Array.isArray(node[key])) {
-          node[key].forEach(child => {
-            matches = matches.concat(findSpecies(query, child, [...path, node.name || ""]));
-          });
+// --- EVENT LISTENERS ---
+document.getElementById("search-bar").addEventListener("input", e => {
+  const query = e.target.value.toLowerCase();
+  const results = findRanks(query, taxonomy);
+  showSearchResults(results);
+});
+
+// Back button
+document.getElementById("back-button").addEventListener("click", () => {
+  if(currentPath.length === 0) return;
+  currentPath.pop();
+  // Recompute node at currentPath
+  let node = taxonomy;
+  for(let name of currentPath) {
+    let found = null;
+    function findChild(n) {
+      for(let k in n) {
+        if(Array.isArray(n[k])) {
+          for(let c of n[k]) if(c.name === name) { found = c; return; }
         }
       }
-      return matches;
     }
+    findChild(node);
+    if(found) node = found;
+  }
+  currentNode = node;
+  if(node.kingdoms) renderLevel(node.kingdoms);
+  else if(node.phyla) renderLevel(node.phyla);
+  else if(node.classes) renderLevel(node.classes);
+  else if(node.orders) renderLevel(node.orders);
+  else if(node.families) renderLevel(node.families);
+  else if(node.genera) renderLevel(node.genera);
+  else if(node.species) renderLevel(node.species.map(s => ({name:s})));
+  document.getElementById("breadcrumbs").textContent = currentPath.join(" > ");
+});
 
-    function showSearchResults(results){
-      const container = document.getElementById("search-results");
-      container.innerHTML = "";
-      results.forEach(path => {
-        const div = document.createElement("div");
-        div.textContent = path.filter(n=>n!=="").join(" > ");
-        container.appendChild(div);
-      });
-    }
+// More button
+document.getElementById("more-button").addEventListener("click", () => {
+  const panel = document.getElementById("more-search-panel");
+  panel.style.display = panel.style.display === "none" ? "block" : "none";
+});
 
-    document.getElementById("search-bar").addEventListener("input", e => {
-      const query = e.target.value.toLowerCase();
-      const results = findSpecies(query, taxonomy);
-      showSearchResults(results);
-    });
+// Close All button
+document.getElementById("close-button").addEventListener("click", () => {
+  currentPath = [];
+  currentNode = taxonomy.domains;
+  renderLevel(currentNode);
+  document.getElementById("more-search-panel").style.display = "none";
+  document.getElementById("search-bar").value = "";
+  document.getElementById("search-results").innerHTML = "";
+  document.getElementById("breadcrumbs").textContent = "";
+});
 
-    // Initial render
-    renderLevel(taxonomy.domains);
-  </script>
+// --- INITIAL RENDER ---
+renderLevel(currentNode);
+</script>
 </body>
 </html>

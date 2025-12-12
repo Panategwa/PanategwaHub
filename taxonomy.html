@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panategwa d Taxonomy</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    #taxonomy-container button { display: block; margin: 5px 0; padding: 8px 12px; cursor: pointer; }
+    #search-results div { margin: 3px 0; }
+    #breadcrumbs { margin-bottom: 15px; font-weight: bold; }
+    input { margin-bottom: 10px; padding: 6px; width: 300px; }
+  </style>
+</head>
+<body>
+  <h1>Panategwa d Taxonomy Explorer</h1>
+
+  <div id="breadcrumbs"></div>
+
+  <div id="taxonomy-container"></div>
+
+  <input type="text" id="search-bar" placeholder="Search species...">
+  <div id="search-results"></div>
+
+  <script>
+    // --- TAXONOMY DATA ---
+    const taxonomy = {
+      domains: [
+        {
+          name: "Eukarya",
+          kingdoms: [
+            {
+              name: "Animalia",
+              phyla: [
+                {
+                  name: "Chordata",
+                  classes: [
+                    {
+                      name: "Mammalia",
+                      orders: [
+                        {
+                          name: "Primates",
+                          families: [
+                            {
+                              name: "Hominidae",
+                              genera: [
+                                { name: "Homo", species: ["Homo sapiens"] },
+                                { name: "Triopanathropus", species: ["Triopanathropus panategwanus"] }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            { name: "Plantae", phyla: [] }
+          ]
+        },
+        { name: "Prokarya", kingdoms: [] },
+        { name: "Mycota-Pan", kingdoms: [] }
+      ]
+    };
+
+    // --- TAXONOMY FUNCTIONS ---
+    let currentPath = [];
+
+    function renderLevel(items) {
+      const container = document.getElementById("taxonomy-container");
+      container.innerHTML = "";
+      items.forEach(item => {
+        const btn = document.createElement("button");
+        btn.textContent = item.name;
+        btn.onclick = () => {
+          currentPath.push(item.name);
+          renderNextLevel(item);
+        };
+        container.appendChild(btn);
+      });
+      document.getElementById("breadcrumbs").textContent = currentPath.join(" > ");
+    }
+
+    function renderNextLevel(item) {
+      if(item.kingdoms) renderLevel(item.kingdoms);
+      else if(item.phyla) renderLevel(item.phyla);
+      else if(item.classes) renderLevel(item.classes);
+      else if(item.orders) renderLevel(item.orders);
+      else if(item.families) renderLevel(item.families);
+      else if(item.genera) renderLevel(item.genera);
+      else if(item.species) renderLevel(item.species.map(s => ({name:s})));
+    }
+
+    function findSpecies(query, node, path = []) {
+      let matches = [];
+      if(node.species) {
+        node.species.forEach(s => {
+          if(s.toLowerCase().includes(query)) matches.push([...path, s]);
+        });
+      }
+      for(let key in node){
+        if(Array.isArray(node[key])) {
+          node[key].forEach(child => {
+            matches = matches.concat(findSpecies(query, child, [...path, node.name || ""]));
+          });
+        }
+      }
+      return matches;
+    }
+
+    function showSearchResults(results){
+      const container = document.getElementById("search-results");
+      container.innerHTML = "";
+      results.forEach(path => {
+        const div = document.createElement("div");
+        div.textContent = path.filter(n=>n!=="").join(" > ");
+        container.appendChild(div);
+      });
+    }
+
+    document.getElementById("search-bar").addEventListener("input", e => {
+      const query = e.target.value.toLowerCase();
+      const results = findSpecies(query, taxonomy);
+      showSearchResults(results);
+    });
+
+    // Initial render
+    renderLevel(taxonomy.domains);
+  </script>
+</body>
+</html>

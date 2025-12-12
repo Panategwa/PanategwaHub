@@ -1,107 +1,92 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Panategwa Hub - Taxonomy</title>
-  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-  <script src="menu-loader.js" defer></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panategwa d Taxonomy</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; }
+  #taxonomy-container button, #control-buttons button { display: block; margin: 5px 0; padding: 8px 12px; cursor: pointer; }
+  #search-results div { margin: 3px 0; padding: 5px; background: #eee; cursor: pointer; }
+  #search-results div:hover { background: #ddd; }
+  #breadcrumbs { margin-bottom: 10px; font-weight: bold; }
+  #current-rank { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+  #info-box { margin-top: 15px; padding: 10px; background: #f2f2f2; border-radius: 5px; }
+  input { margin-bottom: 10px; padding: 6px; width: 300px; }
+</style>
 </head>
 <body>
 
-  <!-- menu will inject here -->
-  <div id="menu-container"></div><br>
+<h1>Panategwa d Taxonomy Explorer</h1>
 
-  <h1>Panategwa d Taxonomy Explorer</h1>
+<div id="current-rank">Domains</div>
+<div id="breadcrumbs"></div>
 
-  <div id="current-rank">Domains</div>
-  <div id="breadcrumbs"></div>
+<div id="control-buttons">
+  <button id="close-button">✖ Close All</button>
+</div>
 
-  <div id="control-buttons">
-    <button id="back-button">⬅ Back</button>
-    <button id="close-button">✖ Close All</button>
-  </div>
+<input type="text" id="search-bar" placeholder="Search any rank...">
+<div id="search-results"></div>
 
-  <input type="text" id="search-bar" placeholder="Search any rank...">
-  <div id="search-results"></div>
-
-  <div id="taxonomy-container"></div>
+<div id="taxonomy-container"></div>
+<div id="info-box">Select a rank to see info here...</div>
 
 <script>
-// --- TAXONOMY DATA ---
+// --- TAXONOMY DATA (nested object style) ---
 const taxonomy = {
-  domains: [
-    {
-      name: "Eukarya",
-      kingdoms: [
-        {
-          name: "Animalia",
-          phyla: [
-            {
-              name: "Chordata",
-              classes: [
-                {
-                  name: "Mammalia",
-                  orders: [
-                    {
-                      name: "Primates",
-                      families: [
-                        {
-                          name: "Hominidae",
-                          genera: [
-                            { name: "Homo", species: ["Homo sapiens"] },
-                            { name: "Triopanathropus", species: ["Triopanathropus panategwanus"] }
-                          ]
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
+  Eukarya: {
+    info: "Eukarya are organisms with a nucleus.",
+    Animalia: {
+      info: "Multicellular animals.",
+      Chordata: {
+        info: "Animals with a notochord.",
+        Mammalia: {
+          info: "Warm-blooded vertebrates with hair.",
+          Primates: {
+            info: "Large-brained, forward-facing eyes.",
+            Hominidae: {
+              info: "Great apes and humans.",
+              Homo: {
+                info: "Genus of humans.",
+                "Homo sapiens": { info: "Modern humans." }
+              },
+              Triopanathropus: {
+                info: "Fictional Panategwan genus.",
+                "Triopanathropus panategwanus": { info: "Native species of Panategwa d." }
+              }
             }
-          ]
-        },
-        { name: "Plantae", phyla: [] }
-      ]
+          }
+        }
+      }
     },
-    { name: "Prokarya", kingdoms: [] },
-    { name: "Mycota-Pan", kingdoms: [] }
-  ]
+    Plantae: { info: "Multicellular plants." }
+  },
+  Prokarya: { info: "Single-celled organisms without a nucleus." },
+  "Mycota-Pan": { info: "Fungi-like organisms." }
 };
 
 // --- STATE ---
 let currentPath = [];
-let nodePathStack = [taxonomy.domains];
-let currentRank = ["Domains"];
+let currentNode = taxonomy;
 
-// --- UTILITY FUNCTIONS ---
-function getChildren(node){
-  if(node.kingdoms) return node.kingdoms;
-  if(node.phyla) return node.phyla;
-  if(node.classes) return node.classes;
-  if(node.orders) return node.orders;
-  if(node.families) return node.families;
-  if(node.genera) return node.genera;
-  if(node.species) return node.species.map(s => ({name:s}));
-  return [];
-}
-
+// --- FUNCTIONS ---
 function getRankName(level){
-  const ranks = ["Domains","Kingdoms","Phyla","Classes","Orders","Families","Genera","Species"];
+  const ranks = ["Domain","Kingdom","Phylum","Class","Order","Family","Genus","Species"];
   return ranks[level] || "";
 }
 
-function renderLevel(items){
+function renderLevel(node){
   const container = document.getElementById("taxonomy-container");
   container.innerHTML = "";
-  items.forEach(item => {
+  Object.keys(node).forEach(key => {
+    if(key === "info") return;
     const btn = document.createElement("button");
-    btn.textContent = item.name;
+    btn.textContent = key;
     btn.onclick = () => {
-      currentPath.push(item.name);
-      nodePathStack.push(getChildren(item));
-      currentRank.push(getRankName(currentRank.length));
-      renderLevel(getChildren(item));
+      currentPath.push(key);
+      currentNode = node[key];
+      renderLevel(currentNode);
       updateUI();
     };
     container.appendChild(btn);
@@ -111,22 +96,18 @@ function renderLevel(items){
 
 function updateUI(){
   document.getElementById("breadcrumbs").textContent = currentPath.join(" > ");
-  document.getElementById("current-rank").textContent = currentRank[currentRank.length-1];
+  document.getElementById("current-rank").textContent = currentPath.map((_, i) => getRankName(i)).join(" > ");
+  const infoBox = document.getElementById("info-box");
+  infoBox.textContent = currentNode.info || "No info available for this rank.";
 }
 
 // --- SEARCH FUNCTIONS ---
-function findRanks(query, node, path = []){
+function findRanks(query, node = taxonomy, path = []){
   let matches = [];
-  if(node.name && node.name.toLowerCase().includes(query)) matches.push({path:[...path, node.name], node: node});
-  if(node.species){
-    node.species.forEach(s => {
-      if(s.toLowerCase().includes(query)) matches.push({path:[...path, s], node: {species:[s]}});
-    });
-  }
   for(let key in node){
-    if(Array.isArray(node[key])){
-      node[key].forEach(child => matches = matches.concat(findRanks(query, child, [...path, node.name || ""])));
-    }
+    if(key === "info") continue;
+    if(key.toLowerCase().includes(query)) matches.push({ path:[...path, key], node: node[key] });
+    if(typeof node[key] === "object") matches = matches.concat(findRanks(query, node[key], [...path, key]));
   }
   return matches;
 }
@@ -136,22 +117,11 @@ function showSearchResults(results){
   container.innerHTML = "";
   results.forEach(item => {
     const div = document.createElement("div");
-    div.textContent = item.path.filter(n=>n!=="").join(" > ");
+    div.textContent = item.path.join(" > ");
     div.onclick = () => {
-      // Navigate to clicked node
-      currentPath = item.path.filter(n=>n!=="");
-      nodePathStack = [taxonomy.domains];
-      currentRank = ["Domains"];
-      let node = {domains: taxonomy.domains};
-      for(let i=0;i<currentPath.length;i++){
-        let name = currentPath[i];
-        let children = getChildren(node);
-        let found = children.find(c=>c.name===name || c===name);
-        nodePathStack.push(children);
-        currentRank.push(getRankName(i+1));
-        node = found;
-      }
-      renderLevel(getChildren(node));
+      currentPath = item.path;
+      currentNode = item.node;
+      renderLevel(currentNode);
       updateUI();
       container.innerHTML = "";
       document.getElementById("search-bar").value = "";
@@ -161,36 +131,24 @@ function showSearchResults(results){
 }
 
 // --- EVENT LISTENERS ---
-document.getElementById("search-bar").addEventListener("input", e=>{
+document.getElementById("search-bar").addEventListener("input", e => {
   const query = e.target.value.toLowerCase();
-  const results = findRanks(query, taxonomy);
+  const results = findRanks(query);
   showSearchResults(results);
 });
 
-document.getElementById("back-button").addEventListener("click", ()=>{
-  if(currentPath.length === 0) return;
-  currentPath.pop();
-  nodePathStack.pop();
-  currentRank.pop();
-  renderLevel(nodePathStack[nodePathStack.length-1]);
-  updateUI();
-});
-
-document.getElementById("close-button").addEventListener("click", ()=>{
+document.getElementById("close-button").addEventListener("click", () => {
   currentPath = [];
-  nodePathStack = [taxonomy.domains];
-  currentRank = ["Domains"];
-  renderLevel(nodePathStack[0]);
+  currentNode = taxonomy;
+  renderLevel(currentNode);
   document.getElementById("breadcrumbs").textContent = "";
   document.getElementById("search-results").innerHTML = "";
   document.getElementById("search-bar").value = "";
-  updateUI();
 });
 
 // --- INITIAL RENDER ---
-renderLevel(taxonomy.domains);
-updateUI();
-
+renderLevel(currentNode);
 </script>
+
 </body>
 </html>

@@ -148,4 +148,54 @@ section {
   flex: 1 1 auto; /* buttons can shrink but try to grow evenly */
   min-width: 80px; /* prevent them from getting too tiny */
   text-align: center;
+
+  /* ===== Taxonomy Search Bar ===== */
+#search-bar {
+  font-family: 'Rubik', sans-serif;
+  font-size: 1.3rem;        /* bigger text */
+  padding: 1rem 1.2rem;     /* bigger padding */
+  width: 100%;
+  max-width: 550px;
+  border-radius: 12px;
+  border: none;
+  background-color: rgba(255, 255, 255, 0.1); /* slightly transparent */
+  color: #ffffff;
+  outline: none;
+  margin-bottom: 0.5rem;
+  box-shadow: 0 0 12px rgba(0,0,0,0.4);
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+#search-bar::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+#search-bar:focus {
+  background-color: rgba(255, 255, 255, 0.15);
+  transform: scale(1.02);
+}
+
+/* ===== Search Results ===== */
+#search-results {
+  max-width: 550px;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+#search-results div {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.4rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.15s;
+  font-family: 'Rubik', sans-serif;
+}
+
+#search-results div:hover {
+  background-color: rgba(51, 223, 151, 0.25); /* matches button hover color */
+  transform: scale(1.03);
+}
+
 }

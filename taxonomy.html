@@ -1,36 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panategwa d Taxonomy</title>
-<style>
-  body { font-family: Arial, sans-serif; padding: 20px; }
-  #taxonomy-container button, #control-buttons button { display: block; margin: 5px 0; padding: 8px 12px; cursor: pointer; }
-  #search-results div { margin: 3px 0; }
-  #breadcrumbs { margin-bottom: 15px; font-weight: bold; }
-  input { margin-bottom: 10px; padding: 6px; width: 300px; }
-  #more-search-panel { display: none; margin-top: 10px; border: 1px solid #ccc; padding: 10px; }
-</style>
+  <meta charset="UTF-8">
+  <title>Panategwa Hub - Taxonomy</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="menu-loader.js" defer></script>
 </head>
 <body>
 
-<h1>Panategwa d Taxonomy Explorer</h1>
+  <!-- menu will inject here -->
+  <div id="menu-container"></div><br>
 
-<div id="breadcrumbs"></div>
+  <h1>Panategwa d Taxonomy Explorer</h1>
 
-<div id="control-buttons">
-  <button id="back-button">⬅ Back</button>
-  <button id="more-button">🔍 More Search</button>
-  <button id="close-button">✖ Close All</button>
-</div>
+  <div id="current-rank">Domains</div>
+  <div id="breadcrumbs"></div>
 
-<div id="taxonomy-container"></div>
+  <div id="control-buttons">
+    <button id="back-button">⬅ Back</button>
+    <button id="close-button">✖ Close All</button>
+  </div>
 
-<div id="more-search-panel">
   <input type="text" id="search-bar" placeholder="Search any rank...">
   <div id="search-results"></div>
-</div>
+
+  <div id="taxonomy-container"></div>
 
 <script>
 // --- TAXONOMY DATA ---
@@ -76,10 +71,27 @@ const taxonomy = {
 
 // --- STATE ---
 let currentPath = [];
-let currentNode = taxonomy.domains;
+let nodePathStack = [taxonomy.domains];
+let currentRank = ["Domains"];
 
-// --- FUNCTIONS ---
-function renderLevel(items) {
+// --- UTILITY FUNCTIONS ---
+function getChildren(node){
+  if(node.kingdoms) return node.kingdoms;
+  if(node.phyla) return node.phyla;
+  if(node.classes) return node.classes;
+  if(node.orders) return node.orders;
+  if(node.families) return node.families;
+  if(node.genera) return node.genera;
+  if(node.species) return node.species.map(s => ({name:s}));
+  return [];
+}
+
+function getRankName(level){
+  const ranks = ["Domains","Kingdoms","Phyla","Classes","Orders","Families","Genera","Species"];
+  return ranks[level] || "";
+}
+
+function renderLevel(items){
   const container = document.getElementById("taxonomy-container");
   container.innerHTML = "";
   items.forEach(item => {
@@ -87,33 +99,32 @@ function renderLevel(items) {
     btn.textContent = item.name;
     btn.onclick = () => {
       currentPath.push(item.name);
-      renderNextLevel(item);
+      nodePathStack.push(getChildren(item));
+      currentRank.push(getRankName(currentRank.length));
+      renderLevel(getChildren(item));
+      updateUI();
     };
     container.appendChild(btn);
   });
+  updateUI();
+}
+
+function updateUI(){
   document.getElementById("breadcrumbs").textContent = currentPath.join(" > ");
+  document.getElementById("current-rank").textContent = currentRank[currentRank.length-1];
 }
 
-function renderNextLevel(item) {
-  currentNode = item;
-  if(item.kingdoms) renderLevel(item.kingdoms);
-  else if(item.phyla) renderLevel(item.phyla);
-  else if(item.classes) renderLevel(item.classes);
-  else if(item.orders) renderLevel(item.orders);
-  else if(item.families) renderLevel(item.families);
-  else if(item.genera) renderLevel(item.genera);
-  else if(item.species) renderLevel(item.species.map(s => ({name:s})));
-}
-
-function findRanks(query, node, path = []) {
+// --- SEARCH FUNCTIONS ---
+function findRanks(query, node, path = []){
   let matches = [];
-  // Check all possible ranks
-  if(node.name && node.name.toLowerCase().includes(query)) matches.push([...path, node.name]);
-  if(node.species) {
-    node.species.forEach(s => { if(s.toLowerCase().includes(query)) matches.push([...path, s]); });
+  if(node.name && node.name.toLowerCase().includes(query)) matches.push({path:[...path, node.name], node: node});
+  if(node.species){
+    node.species.forEach(s => {
+      if(s.toLowerCase().includes(query)) matches.push({path:[...path, s], node: {species:[s]}});
+    });
   }
-  for(let key in node) {
-    if(Array.isArray(node[key])) {
+  for(let key in node){
+    if(Array.isArray(node[key])){
       node[key].forEach(child => matches = matches.concat(findRanks(query, child, [...path, node.name || ""])));
     }
   }
@@ -123,68 +134,63 @@ function findRanks(query, node, path = []) {
 function showSearchResults(results){
   const container = document.getElementById("search-results");
   container.innerHTML = "";
-  results.forEach(path => {
+  results.forEach(item => {
     const div = document.createElement("div");
-    div.textContent = path.filter(n=>n!=="").join(" > ");
+    div.textContent = item.path.filter(n=>n!=="").join(" > ");
+    div.onclick = () => {
+      // Navigate to clicked node
+      currentPath = item.path.filter(n=>n!=="");
+      nodePathStack = [taxonomy.domains];
+      currentRank = ["Domains"];
+      let node = {domains: taxonomy.domains};
+      for(let i=0;i<currentPath.length;i++){
+        let name = currentPath[i];
+        let children = getChildren(node);
+        let found = children.find(c=>c.name===name || c===name);
+        nodePathStack.push(children);
+        currentRank.push(getRankName(i+1));
+        node = found;
+      }
+      renderLevel(getChildren(node));
+      updateUI();
+      container.innerHTML = "";
+      document.getElementById("search-bar").value = "";
+    };
     container.appendChild(div);
   });
 }
 
 // --- EVENT LISTENERS ---
-document.getElementById("search-bar").addEventListener("input", e => {
+document.getElementById("search-bar").addEventListener("input", e=>{
   const query = e.target.value.toLowerCase();
   const results = findRanks(query, taxonomy);
   showSearchResults(results);
 });
 
-// Back button
-document.getElementById("back-button").addEventListener("click", () => {
+document.getElementById("back-button").addEventListener("click", ()=>{
   if(currentPath.length === 0) return;
   currentPath.pop();
-  // Recompute node at currentPath
-  let node = taxonomy;
-  for(let name of currentPath) {
-    let found = null;
-    function findChild(n) {
-      for(let k in n) {
-        if(Array.isArray(n[k])) {
-          for(let c of n[k]) if(c.name === name) { found = c; return; }
-        }
-      }
-    }
-    findChild(node);
-    if(found) node = found;
-  }
-  currentNode = node;
-  if(node.kingdoms) renderLevel(node.kingdoms);
-  else if(node.phyla) renderLevel(node.phyla);
-  else if(node.classes) renderLevel(node.classes);
-  else if(node.orders) renderLevel(node.orders);
-  else if(node.families) renderLevel(node.families);
-  else if(node.genera) renderLevel(node.genera);
-  else if(node.species) renderLevel(node.species.map(s => ({name:s})));
-  document.getElementById("breadcrumbs").textContent = currentPath.join(" > ");
+  nodePathStack.pop();
+  currentRank.pop();
+  renderLevel(nodePathStack[nodePathStack.length-1]);
+  updateUI();
 });
 
-// More button
-document.getElementById("more-button").addEventListener("click", () => {
-  const panel = document.getElementById("more-search-panel");
-  panel.style.display = panel.style.display === "none" ? "block" : "none";
-});
-
-// Close All button
-document.getElementById("close-button").addEventListener("click", () => {
+document.getElementById("close-button").addEventListener("click", ()=>{
   currentPath = [];
-  currentNode = taxonomy.domains;
-  renderLevel(currentNode);
-  document.getElementById("more-search-panel").style.display = "none";
-  document.getElementById("search-bar").value = "";
-  document.getElementById("search-results").innerHTML = "";
+  nodePathStack = [taxonomy.domains];
+  currentRank = ["Domains"];
+  renderLevel(nodePathStack[0]);
   document.getElementById("breadcrumbs").textContent = "";
+  document.getElementById("search-results").innerHTML = "";
+  document.getElementById("search-bar").value = "";
+  updateUI();
 });
 
 // --- INITIAL RENDER ---
-renderLevel(currentNode);
+renderLevel(taxonomy.domains);
+updateUI();
+
 </script>
 </body>
 </html>

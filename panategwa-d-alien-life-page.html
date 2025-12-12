@@ -1,22 +1,173 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Panategwa d - Alien Life</title>
-  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panategwa d Taxonomy</title>
+
   <link rel="stylesheet" href="styles.css" />
-  <script src="menu-loader.js" defer></script>
+
+<script src="menu-loader.js" defer></script>
 </head>
 <body>
 
-  <!-- menu will inject here -->
-  <div id="menu-container"></div><br>
+<!-- Menu injected here -->
+<div id="menu-container"></div><br>
 
-  <div class="content">
-    <h1>Panategwa d - Alien Life</h1>
-    <p>Explore all known species living on Panategwa d.</p>
+<h1>Panategwa d Taxonomy Explorer</h1>
 
+<div id="current-rank">Domains</div>
+<div id="breadcrumbs"></div>
+
+<div id="control-buttons">
+  <button id="close-button">✖ Close All</button>
+</div>
+
+<input type="text" id="search-bar" placeholder="Search any rank...">
+<div id="search-results"></div>
+
+<div id="taxonomy-container"></div>
+<div id="info-box">Select a rank to see info here...</div>
+
+<script>
+// --- TAXONOMY DATA (nested object style) ---
+const taxonomy = {
+  Eukarya: {
+    info: "Eukarya are organisms with a nucleus.",
+    Animalia: {
+      info: "Multicellular animals.",
+      Chordata: {
+        info: "Animals with a notochord.",
+        Mammalia: {
+          info: "Warm-blooded vertebrates with hair.",
+          Primates: {
+            info: "Large-brained, forward-facing eyes.",
+            Hominidae: {
+              info: "Great apes and humans.",
+              Homo: {
+                info: "Genus of humans.",
+                "Homo sapiens": { info: "Modern humans." }
+              },
+              Triopanathropus: {
+                info: "Fictional Panategwan genus.",
+                "Triopanathropus panategwanus": { info: "Native species of Panategwa d." }
+              }
+            }
+          }
+        }
+      }
+    },
+    Plantae: { info: "Multicellular plants." }
+  },
+
+  Prokarya: { info: "Single-celled organisms without a nucleus." },
+  "Mycota-Pan": { info: "Fungi-like organisms." }
+};
+
+// --- STATE ---
+let currentPath = [];
+let currentNode = taxonomy;
+
+// --- HELPERS ---
+function getRankName(level){
+  const ranks = ["Domain","Kingdom","Phylum","Class","Order","Family","Genus","Species"];
+  return ranks[level] || "";
+}
+
+// --- RENDERING ---
+function renderLevel(node){
+  const container = document.getElementById("taxonomy-container");
+  container.innerHTML = "";
+
+  Object.keys(node).forEach(key => {
+    if(key === "info") return;
+    const btn = document.createElement("button");
+    btn.textContent = key;
+    btn.onclick = () => {
+      currentPath.push(key);
+      currentNode = node[key];
+      renderLevel(currentNode);
+      updateUI();
+    };
+    container.appendChild(btn);
+  });
+
+  updateUI();
+}
+
+function updateUI(){
+  document.getElementById("breadcrumbs").textContent = currentPath.join(" > ");
+  document.getElementById("current-rank").textContent =
+    currentPath.map((_, i) => getRankName(i)).join(" > ");
+
+  document.getElementById("info-box").textContent =
+    currentNode.info || "No info available for this rank.";
+}
+
+// --- SEARCH ---
+function findRanks(query, node = taxonomy, path = []){
+  let matches = [];
+
+  for(let key in node){
+    if(key === "info") continue;
+
+    if(key.toLowerCase().includes(query)){
+      matches.push({ path:[...path, key], node: node[key] });
+    }
+
+    if(typeof node[key] === "object"){
+      matches = matches.concat(findRanks(query, node[key], [...path, key]));
+    }
+  }
+  return matches;
+}
+
+function showSearchResults(results){
+  const container = document.getElementById("search-results");
+  container.innerHTML = "";
+
+  results.forEach(item => {
+    const wrap = document.createElement("div");
+    wrap.className = "button-container";
+
+    const btn = document.createElement("button");
+    btn.className = "sigma-button";
+    btn.textContent = item.path.join(" > ");
+
+    btn.onclick = () => {
+      currentPath = item.path;
+      currentNode = item.node;
+      renderLevel(currentNode);
+      updateUI();
+      container.innerHTML = "";
+      document.getElementById("search-bar").value = "";
+    };
+
+    wrap.appendChild(btn);
+    container.appendChild(wrap);
+  });
+}
+
+// --- EVENTS ---
+document.getElementById("search-bar").addEventListener("input", e => {
+  const query = e.target.value.toLowerCase();
+  const results = findRanks(query);
+  showSearchResults(results);
+});
+
+document.getElementById("close-button").addEventListener("click", () => {
+  currentPath = [];
+  currentNode = taxonomy;
+  renderLevel(currentNode);
+  document.getElementById("breadcrumbs").textContent = "";
+  document.getElementById("search-results").innerHTML = "";
+  document.getElementById("search-bar").value = "";
+});
+
+// --- START ---
+renderLevel(currentNode);
+</script>
+<br><br><br><br><br>
     <div class="button-container">
       <button class="sigma-button" onclick="window.location.href='tri-panategwaoi-anthropoi-page.html'">
         Tri-Panategwaoi Anthropoi
@@ -26,12 +177,9 @@
         Bathythalassas gigaperipatitis
       </button>
 
-      <button class="sigma-button" onclick="window.location.href='tri-panategwaoi-anthropoi-page.html'">
+      <button class="sigma-button" onclick="window.location.href='taxonomy.html'">
         Placeholder Species
       </button>
     </div>
-
-  </div>
-
 </body>
 </html>

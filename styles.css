@@ -43,7 +43,7 @@ a:focus {
 }
 
 button {
-  background-color: #999292; /* dark red */
+  background-color: #999292;
   color: white;
   border: none;
   padding: 0.6rem 1.2rem;
@@ -52,6 +52,8 @@ button {
   font-size: 1rem;
   font-family: 'Rubik', sans-serif;
   transition: background-color 0.2s, transform 0.2s;
+  margin: 10px 0;
+  display: block;
 }
 
 button:hover {

@@ -3,15 +3,37 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panategwa d Taxonomy</title>
+<title>Panategwa d - Alien Life</title>
 
-  <link rel="stylesheet" href="styles.css" />
-
+<link rel="stylesheet" href="styles.css" />
 <script src="menu-loader.js" defer></script>
+
+<style>
+  .taxonomy-type {
+    font-size: 0.9rem;
+    font-weight: normal;
+    opacity: 0.7;
+  }
+
+  #info-box {
+    margin: 10px 0 20px 0;
+    opacity: 0.85;
+  }
+
+  #search-results .more-less-button {
+    background-color: #4a4848;
+    margin-top: 8px;
+  }
+
+  #search-results .more-less-button:hover {
+    background-color: #33df97;
+    transform: scale(1.05);
+  }
+</style>
 </head>
+
 <body>
 
-<!-- Menu injected here -->
 <div id="menu-container"></div><br>
 
 <h1>Panategwa d Taxonomy Explorer</h1>
@@ -20,17 +42,28 @@
 <div id="breadcrumbs"></div>
 
 <div id="control-buttons">
-  <button id="close-button">✖ Close All</button>
+  <button id="close-button">Close All</button>
 </div>
 
 <input type="text" id="search-bar" placeholder="Search any rank...">
+
 <div id="search-results"></div>
 
+<!-- TITLE -->
+<div id="current-title">
+  <h2>Domains</h2>
+</div>
+
+<!-- INFO -->
+<div id="info-box">
+  Select a taxonomic rank to see info here...
+</div>
+
+<!-- TAXONOMY BUTTONS -->
 <div id="taxonomy-container"></div>
-<div id="info-box">Select a rank to see info here...</div>
 
 <script>
-// --- TAXONOMY DATA (nested object style) ---
+// --- TAXONOMY DATA ---
 const taxonomy = {
   Eukarya: {
     info: "Eukarya are organisms with a nucleus.",
@@ -48,25 +81,29 @@ const taxonomy = {
                 info: "Genus of humans.",
                 "Homo sapiens": { info: "Modern humans." }
               },
-              Triopanathropus: {
+              "Tri-Panategwaoi Anthropoi": {
                 info: "Fictional Panategwan genus.",
-                "Triopanathropus panategwanus": { info: "Native species of Panategwa d." }
+                "Tri-Panategwaoi Anthropoi Civilis": {
+                  info: "Alien-human species native to Panategwa d."
+                }
               }
             }
           }
         }
       }
     },
-    Plantae: { info: "Multicellular plants." }
+    Plantae: { info: "Multicellular plants." },
+    MycotaPan: { info: "Fungi-like organisms." }
   },
-
-  Prokarya: { info: "Single-celled organisms without a nucleus." },
-  "Mycota-Pan": { info: "Fungi-like organisms." }
+  Prokarya: { info: "Single-celled organisms without a nucleus." }
 };
 
 // --- STATE ---
 let currentPath = [];
 let currentNode = taxonomy;
+let searchResults = [];
+const defaultShowCount = 5;
+let expanded = false;
 
 // --- HELPERS ---
 function getRankName(level){
@@ -74,21 +111,24 @@ function getRankName(level){
   return ranks[level] || "";
 }
 
-// --- RENDERING ---
+// --- RENDER TAXONOMY ---
 function renderLevel(node){
   const container = document.getElementById("taxonomy-container");
   container.innerHTML = "";
 
   Object.keys(node).forEach(key => {
     if(key === "info") return;
+
     const btn = document.createElement("button");
     btn.textContent = key;
+
     btn.onclick = () => {
       currentPath.push(key);
       currentNode = node[key];
       renderLevel(currentNode);
       updateUI();
     };
+
     container.appendChild(btn);
   });
 
@@ -96,12 +136,26 @@ function renderLevel(node){
 }
 
 function updateUI(){
-  document.getElementById("breadcrumbs").textContent = currentPath.join(" > ");
+  const level = currentPath.length - 1;
+  const rank = getRankName(level);
+  const name = currentPath[level] || "Domains";
+
+  document.getElementById("breadcrumbs").textContent =
+    currentPath.join(" > ");
+
   document.getElementById("current-rank").textContent =
     currentPath.map((_, i) => getRankName(i)).join(" > ");
 
   document.getElementById("info-box").textContent =
     currentNode.info || "No info available for this rank.";
+
+  if(currentPath.length === 0){
+    document.getElementById("current-title").innerHTML =
+      `<h2>${name}</h2>`;
+  } else {
+    document.getElementById("current-title").innerHTML =
+      `<h2>${name} <span class="taxonomy-type">(${rank})</span></h2>`;
+  }
 }
 
 // --- SEARCH ---
@@ -123,12 +177,20 @@ function findRanks(query, node = taxonomy, path = []){
 }
 
 function showSearchResults(results){
+  searchResults = results;
+  expanded = false;
+  renderSearchResults();
+}
+
+function renderSearchResults(){
   const container = document.getElementById("search-results");
   container.innerHTML = "";
 
-  results.forEach(item => {
-    const wrap = document.createElement("div");
-    wrap.className = "button-container";
+  const count = expanded ? searchResults.length : defaultShowCount;
+  const end = Math.min(count, searchResults.length);
+
+  for(let i = 0; i < end; i++){
+    const item = searchResults[i];
 
     const btn = document.createElement("button");
     btn.className = "sigma-button";
@@ -143,16 +205,26 @@ function showSearchResults(results){
       document.getElementById("search-bar").value = "";
     };
 
-    wrap.appendChild(btn);
-    container.appendChild(wrap);
-  });
+    container.appendChild(btn);
+  }
+
+  if(searchResults.length > defaultShowCount){
+    const moreLessBtn = document.createElement("button");
+    moreLessBtn.className = "sigma-button more-less-button";
+    moreLessBtn.textContent = expanded ? "Show Less" : "Show More";
+
+    moreLessBtn.onclick = () => {
+      expanded = !expanded;
+      renderSearchResults();
+    };
+
+    container.appendChild(moreLessBtn);
+  }
 }
 
 // --- EVENTS ---
 document.getElementById("search-bar").addEventListener("input", e => {
-  const query = e.target.value.toLowerCase();
-  const results = findRanks(query);
-  showSearchResults(results);
+  showSearchResults(findRanks(e.target.value.toLowerCase()));
 });
 
 document.getElementById("close-button").addEventListener("click", () => {
@@ -167,19 +239,6 @@ document.getElementById("close-button").addEventListener("click", () => {
 // --- START ---
 renderLevel(currentNode);
 </script>
-<br><br><br><br><br>
-    <div class="button-container">
-      <button class="sigma-button" onclick="window.location.href='tri-panategwaoi-anthropoi-page.html'">
-        Tri-Panategwaoi Anthropoi
-      </button>
 
-      <button class="sigma-button" onclick="window.location.href='bathythalassas-gigaperipatitis-page.html'">
-        Bathythalassas gigaperipatitis
-      </button>
-
-      <button class="sigma-button" onclick="window.location.href='taxonomy.html'">
-        Placeholder Species
-      </button>
-    </div>
 </body>
 </html>

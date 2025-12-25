@@ -3,13 +3,21 @@
 /* ===== Body & Global Styles ===== */
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #121212;
+
+  /* Left → right light to dark gradient */
+  background: linear-gradient(
+    90deg,
+    #333333 0%,
+    #0f0f0f 100%
+  );
+
   color: #e0e0e0;
   margin: 0;
-  padding: 0 2rem; /* left/right padding for the whole page */
-  padding-top: 80px; /* pushes everything down a bit */
+  padding: 0 2rem;
+  padding-top: 80px;
   line-height: 1.6;
 }
+
 
 /* ===== Headings ===== */
 h1, h2, h3 {
@@ -151,4 +159,57 @@ section {
   min-width: 80px; /* prevent them from getting too tiny */
   text-align: center;
 
+}
+
+#search-bar{
+  width: 100%;
+  max-width: 520px;
+  padding: 14px 18px;
+  font-size: 1.1rem;
+
+  background-color: rgba(255, 255, 255, 0.75); /* slightly transparent */
+  color: #111;
+
+  border: 2px solid #000; /* black outline */
+  border-radius: 12px;
+
+  font-family: 'Rubik', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+
+  outline: none;
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+
+#search-bar::placeholder{
+  color: #686868;
+  opacity: 0.8;
+}
+
+#search-bar:focus{
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.15);
+  transform: scale(1.01); 
+}
+
+
+#search-results {
+  flex-direction: column;
+  margin-top: 10px;
+  margin-bottom: 50px; /* space between search results and taxonomy buttons */
+  }
+  
+/* Make search result buttons darker */
+#search-results .sigma-button {
+  background-color: #6f6b6b; /* darker than normal buttons */
+}
+
+/* Make Show More / Show Less buttons darker than search results */
+#search-results .more-less-button {
+  background-color: #4a4848; /* darker than search buttons */
+  margin-top: 8px;
+}
+
+#search-results .more-less-button:hover {
+  background-color: #33df97;
+  transform: scale(1.05);
 }

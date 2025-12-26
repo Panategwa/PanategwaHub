@@ -21,5 +21,9 @@ document.addEventListener("DOMContentLoaded", function () {
     menuHTML += `<button class="menu-button${isActive ? " active" : ""}"${isActive ? " disabled" : ` onclick="window.location.href='${page.url}'"`}>${page.name}</button>`;
   });
 
+  //Back to Top button
+menuHTML += `<button class="menu-button back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'});">Back to Top</button>`;
+
+
   menuContainer.innerHTML = menuHTML;
 });

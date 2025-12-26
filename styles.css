@@ -3,8 +3,7 @@
 /* ===== Body & Global Styles ===== */
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-
-  /* Left → right light to dark gradient */
+/* Left → right light to dark gradient */
   background: linear-gradient(
     90deg,
     #333333 0%,
@@ -14,7 +13,7 @@ body {
   color: #e0e0e0;
   margin: 0;
   padding: 0 2rem;
-  padding-top: 80px;
+  padding-top: 200px;
   line-height: 1.6;
 }
 
@@ -65,57 +64,75 @@ button {
 }
 
 button:hover {
-  background-color: #33df97; /* lighter red when hovered */
+  background-color: #33df97; 
   transform: scale(1.05);
 }
 
-/* ===== Menu Container ===== */
 #menu-container {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  background-color: #1f1f1f;
+  background-color: rgba(53, 53, 53, 0.9);
   padding: 1rem 2rem;
   border-bottom: 3px solid #474747;
   box-sizing: border-box;
   display: flex;
-  justify-content: center; /* center horizontally */
-  align-items: center; /* center vertically */
-  gap: 0.5rem; /* space between menu items */
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  z-index: 9999; /* <-- add this */
 }
-
 
 
 /* ===== Menu Buttons ===== */
 .menu-button {
-  background-color: #999292; /* dark red */
-  color: white;
+  background-color: rgb(117, 179, 103);
+  color: rgb(30, 30, 30);
   border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
+  padding: 1rem 2rem;
   cursor: pointer;
   font-size: 1rem;
   font-family: 'Rubik', sans-serif;
   transition: background-color 0.2s, transform 0.2s;
+  font-weight: bold;
+  padding: 0.8rem 1rem;
+  font-size: clamp(0.8rem, 2vw, 1rem); /* font scales with screen width */
+  flex: 1 1 auto; /* buttons can shrink but try to grow evenly */
+  min-width: 80px; /* prevent them from getting too tiny */
+  text-align: center;
 }
 
 .menu-button:hover {
-  background-color: #33df97; /* lighter red when hovered */
+  background-color: #428d45; 
   transform: scale(1.05);
+  color: rgb(50,50,50);
 }
 
 .menu-button.active,
 .menu-button:disabled {
   background-color: #005c48; /* darker red for the active page */
+  color: rgb(255, 255, 255);
   cursor: default;
   transform: none;
+  transform: scale(1.1);
+}
+
+.menu-button.back-to-top {
+  background-color: rgb(80, 105, 75); /* darker */
+  color: #ffffff;
+}
+
+.menu-button.back-to-top:hover {
+  background-color: #33df97;
+  color: #111;
 }
 
 
 /* ===== Main Content Area ===== */
 main {
-  margin-top: 70px; /* match menu height */
+  margin-top: 100px; /* match menu height */
   max-width: 900px;
   margin-left: auto;
   margin-right: auto;
@@ -143,22 +160,6 @@ dd {
 /* ===== Sections ===== */
 section {
   margin-bottom: 2rem;
-}
-
-/* ===== Responsive Menu Buttons ===== */
-#menu-container {
-  flex-wrap: wrap; /* allow buttons to go to next line on small screens */
-  justify-content: center;
-  gap: 0.4rem; /* smaller gap for mobile */
-}
-
-.menu-button {
-  padding: 0.5rem 1rem;
-  font-size: clamp(0.8rem, 2vw, 1rem); /* font scales with screen width */
-  flex: 1 1 auto; /* buttons can shrink but try to grow evenly */
-  min-width: 80px; /* prevent them from getting too tiny */
-  text-align: center;
-
 }
 
 #search-bar{
@@ -212,4 +213,15 @@ section {
 #search-results .more-less-button:hover {
   background-color: #33df97;
   transform: scale(1.05);
+}
+
+.search-main {
+  font-weight: bold;
+  font-size: 1.05rem;
+  display: block;
+}
+
+.search-path {
+  font-size: 0.75rem;
+  opacity: 0.65;
 }

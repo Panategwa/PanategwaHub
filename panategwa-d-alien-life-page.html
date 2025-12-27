@@ -8,120 +8,31 @@
 <link rel="stylesheet" href="styles.css" />
 <script src="menu-loader.js" defer></script>
 
-<style>
-  body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(to right, #2b2b2b, #3a3a3a);
-    color: #e0e0e0;
-    margin: 0;
-    padding: 0 2rem;
-    padding-top: 120px;
-    line-height: 1.6;
-  }
-
-  #search-bar {
-    width: 100%;
-    max-width: 420px;
-    padding: 12px 14px;
-    font-size: 1rem;
-    border-radius: 6px;
-    border: 1px solid #000;
-    background-color: rgba(255,255,255,0.9);
-    outline: none;
-    margin: 15px 0;
-  }
-
-  .sigma-button,
-  #taxonomy-container button {
-    display: block;
-    width: 100%;
-    max-width: 520px;
-    margin: 6px 0;
-    padding: 10px;
-    background-color: #4a4848;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    text-align: left;
-  }
-
-  .sigma-button:hover,
-  #taxonomy-container button:hover {
-    background-color: #33df97;
-    transform: scale(1.02);
-  }
-
-  .taxonomy-type {
-    font-size: 0.85rem;
-    font-weight: normal;
-    opacity: 0.7;
-  }
-
-  #info-box {
-    margin: 10px 0 20px 0;
-    opacity: 0.85;
-    max-width: 800px;
-  }
-
-  .search-main {
-    font-weight: bold;
-    font-size: 1.05rem;
-  }
-
-  .search-rank {
-    font-size: 0.85rem;
-    opacity: 0.7;
-  }
-
-  .search-path {
-    display: block;
-    font-size: 0.75rem;
-    opacity: 0.6;
-    margin-top: 2px;
-  }
-
-  #search-results .more-less-button {
-    background-color: #3e3e3e;
-    margin-top: 8px;
-  }
-
-  #search-results .more-less-button:hover {
-    background-color: #33df97;
-  }
-</style>
 </head>
 
 <body>
 
-<div id="menu-container"></div><br>
+<div id="menu-container"></div>
 
 <h1>Panategwa d Taxonomy Explorer</h1>
 
-<div id="current-rank">Domains</div>
-<br>
+<div id="current-rank"></div>
 <div id="breadcrumbs"></div>
-<br>
-<div id="control-buttons">
-  <button id="close-button">Close All</button>
-</div>
+
+<button id="close-button">Close All</button>
 
 <input type="text" id="search-bar" placeholder="Search any rank...">
 
 <div id="search-results"></div>
 
-<div id="current-title">
-  <h2>Domains</h2>
-</div>
+<div id="current-title"></div>
 
-<div id="info-box">
-  Select a taxonomic rank to see info here...
-</div>
+<div id="info-box">Select a taxonomic rank to see info here.</div>
 
 <div id="taxonomy-container"></div>
 
 <script>
-// --- TAXONOMY DATA ---
+// ---------------- TAXONOMY DATA ----------------
 const taxonomy = {
   Eukarya: {
     info: "Organisms whose cells have a nucleus.",
@@ -132,13 +43,9 @@ const taxonomy = {
         Mammalia: {
           info: "Warm-blooded vertebrates with hair.",
           Primates: {
-            info: "Large-brained, forward-facing eyes.",
+            info: "Large-brained mammals with forward-facing eyes.",
             Hominidae: {
-              info: "Great apes and humans.",
-              Homo: {
-                info: "Genus of humans.",
-                "Homo sapiens": { info: "Modern humans." }
-              },
+              info: "Great apes and human-like species.",
               "Tri-Panategwaoi Anthropoi": {
                 info: "Panategwan human-equivalent genus.",
                 "Tri-Panategwaoi Anthropoi Civilis": {
@@ -146,47 +53,14 @@ const taxonomy = {
 <section>
   <h2>Physical Appearance</h2>
   <ul>
-    <li><strong>Size & Weight:</strong> Infant: ~5 kg, 60 cm; Juvenile: 40–60 kg, ~1.5 m; Adult: ~120 kg, ~2.5 m</li>
-    <li><strong>Height:</strong> Adults average 2.5 meters (8 ft)</li>
-    <li><strong>Skin Color & Texture:</strong> Variable, wide range of tones and textures, depend on regional adaptations</li>
-    <li><strong>Eyes:</strong> Adapted to light conditions in environment; colors vary</li>
-    <li><strong>Other Features:</strong> Six fingers, ambidextrous, physical traits can vary greatly by environment</li>
+    <li>Average height: 2.5 m</li>
+    <li>Six fingers, ambidextrous</li>
   </ul>
 </section>
-
-<section>
-  <h2>Culture & Society</h2>
-  <ul>
-    <li><strong>Overview:</strong> Dominant sentient species of Panategwa d, highly adaptable and technologically advanced</li>
-    <li><strong>Population:</strong> ~14 Billion</li>
-    <li><strong>Habitat:</strong> Tropical rainforests, arid deserts, mountains, and arctic zones</li>
-    <li><strong>Diet:</strong> Omnivorous; meats, fruits, vegetables, grains</li>
-    <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually 2–3 offspring per birth</li>
-    <li><strong>Lifespan:</strong> Average of ~650 years, leaders of civilizations can live up to thousands of years</li>
-    <li><strong>Races:</strong>
-      <ul>
-        <li><a href="pitons-page.html">Piton Race</a></li>
-        <li><a href="rashtons-page.html">Rashton Race</a></li>
-        <li><a href="arifatons-page.html">Arifaton Race</a></li>
-      </ul>
-    </li>
-    <li><strong>Behavior:</strong> Social but can turn very aggressive</li>
-  </ul>
-</section>
-
-<section>
-  <h2>Environmental Adaptations</h2>
-  <ul>
-    <li>Adaptable to almost all regions of Panategwa d, capable of surviving harsh and diverse terrains</li>
-    <li>Physical traits and body heat regulation adjust to local climate</li>
-  </ul>
-</section>
-
-<section>
-  <h2>Illustration of a Tri-Panategwaos Anthropos:</h2>
-  <img src="tri-panategwaos-anthropos-civilis.jpg" width="600" alt="Tri-Panat" />
-</section>
-`
+`,
+                  Piton: { info: "Jungle-adapted subspecies." },
+                  Rashton: { info: "Desert-adapted subspecies." },
+                  Arifaton: { info: "Cold-region subspecies." }
                 }
               }
             }
@@ -194,30 +68,63 @@ const taxonomy = {
         }
       }
     }
-  },
-  Prokarya: { info: "Single-celled organisms without a nucleus." }
+  }
 };
 
-// --- STATE ---
+// ---------------- STATE ----------------
 let currentPath = [];
 let currentNode = taxonomy;
-let searchResults = [];
-const defaultShowCount = 5;
-let expanded = false;
 
-// --- HELPERS ---
-function getRankName(level){
-  const ranks = ["Domain","Kingdom","Phylum","Class","Order","Family","Genus","Species"];
+// ---------------- RANK DEFINITIONS ----------------
+const ranks = [
+  "Domain",
+  "Kingdom",
+  "Phylum",
+  "Class",
+  "Order",
+  "Family",
+  "Genus",
+  "Species",
+  "Subspecies"
+];
+
+const childLabels = [
+  "Domains",
+  "Kingdoms",
+  "Phyla",
+  "Classes",
+  "Orders",
+  "Families",
+  "Genera",
+  "Species",
+  "Subspecies"
+];
+
+function getRank(level) {
   return ranks[level] || "";
 }
 
-// --- RENDER TAXONOMY ---
-function renderLevel(node){
+function getChildLabel(level) {
+  return childLabels[level] || "";
+}
+
+// ---------------- RENDER ----------------
+function renderLevel(node) {
   const container = document.getElementById("taxonomy-container");
   container.innerHTML = "";
 
+  const level = currentPath.length;
+  const label = getChildLabel(level);
+
+  if (label) {
+    const header = document.createElement("div");
+    header.className = "section-label";
+    header.textContent = label + ":";
+    container.appendChild(header);
+  }
+
   Object.keys(node).forEach(key => {
-    if(key === "info") return;
+    if (key === "info") return;
 
     const btn = document.createElement("button");
     btn.textContent = key;
@@ -231,64 +138,62 @@ function renderLevel(node){
 
     container.appendChild(btn);
   });
-
-  updateUI();
 }
 
-function updateUI(){
+function updateUI() {
   const level = currentPath.length - 1;
-  const rank = getRankName(level);
   const name = currentPath[level] || "Domains";
+  const rank = level >= 0 ? getRank(level) : "";
 
-  document.getElementById("breadcrumbs").textContent = currentPath.join(" > ");
+  document.getElementById("current-title").innerHTML =
+    `<h2>${name}${rank ? ` <span class="taxonomy-type">(${rank})</span>` : ""}</h2>`;
+
+  document.getElementById("breadcrumbs").textContent =
+    currentPath.join(" > ");
+
   document.getElementById("current-rank").textContent =
-    currentPath.map((_, i) => getRankName(i)).join(" > ");
+    currentPath.map((_, i) => getRank(i)).join(" > ");
 
   document.getElementById("info-box").innerHTML =
     currentNode.info || "No info available.";
-
-  document.getElementById("current-title").innerHTML =
-    currentPath.length === 0
-      ? `<h2>${name}</h2>`
-      : `<h2>${name} <span class="taxonomy-type">(${rank})</span></h2>`;
 }
 
-// --- SEARCH ---
-function findRanks(query, node = taxonomy, path = []){
-  let matches = [];
-  for(let key in node){
-    if(key === "info") continue;
+// ---------------- SEARCH ----------------
+function findRanks(query, node = taxonomy, path = []) {
+  let results = [];
+  for (let key in node) {
+    if (key === "info") continue;
 
     const newPath = [...path, key];
 
-    if(key.toLowerCase().includes(query)){
-      matches.push({ path: newPath, node: node[key] });
+    if (key.toLowerCase().includes(query)) {
+      results.push({ path: newPath, node: node[key] });
     }
 
-    if(typeof node[key] === "object"){
-      matches = matches.concat(findRanks(query, node[key], newPath));
+    if (typeof node[key] === "object") {
+      results = results.concat(findRanks(query, node[key], newPath));
     }
   }
-  return matches;
+  return results;
 }
 
-function renderSearchResults(){
+document.getElementById("search-bar").addEventListener("input", e => {
   const container = document.getElementById("search-results");
   container.innerHTML = "";
 
-  const visible = expanded ? searchResults : searchResults.slice(0, defaultShowCount);
+  const results = findRanks(e.target.value.toLowerCase());
 
-  visible.forEach(item => {
+  results.forEach(item => {
     const level = item.path.length - 1;
-    const rank = getRankName(level);
-    const name = item.path[level];
-    const fullPath = item.path.join(" > ");
 
     const btn = document.createElement("button");
     btn.className = "sigma-button";
     btn.innerHTML = `
-      <span class="search-main">${name} <span class="search-rank">(${rank})</span></span>
-      <span class="search-path">(${fullPath})</span>
+      <span class="search-main">
+        ${item.path[level]}
+        <span class="search-rank">(${getRank(level)})</span>
+      </span>
+      <span class="search-path">(${item.path.join(" > ")})</span>
     `;
 
     btn.onclick = () => {
@@ -302,37 +207,20 @@ function renderSearchResults(){
 
     container.appendChild(btn);
   });
-
-  if(searchResults.length > defaultShowCount){
-    const toggle = document.createElement("button");
-    toggle.className = "sigma-button more-less-button";
-    toggle.textContent = expanded ? "Show Less" : "Show More";
-    toggle.onclick = () => {
-      expanded = !expanded;
-      renderSearchResults();
-    };
-    container.appendChild(toggle);
-  }
-}
-
-// --- EVENTS ---
-document.getElementById("search-bar").addEventListener("input", e => {
-  searchResults = findRanks(e.target.value.toLowerCase());
-  expanded = false;
-  renderSearchResults();
 });
 
-document.getElementById("close-button").addEventListener("click", () => {
+document.getElementById("close-button").onclick = () => {
   currentPath = [];
   currentNode = taxonomy;
   renderLevel(currentNode);
-  document.getElementById("breadcrumbs").textContent = "";
+  updateUI();
   document.getElementById("search-results").innerHTML = "";
   document.getElementById("search-bar").value = "";
-});
+};
 
-// --- START ---
+// ---------------- START ----------------
 renderLevel(currentNode);
+updateUI();
 </script>
 
 </body>

@@ -225,3 +225,83 @@ section {
   font-size: 0.75rem;
   opacity: 0.65;
 }
+
+
+  body {
+    background: linear-gradient(to right, #2b2b2b, #3a3a3a);
+    color: #e0e0e0;
+    margin: 0;
+    padding: 0 2rem;
+    padding-top: 140px;
+    line-height: 1.6;
+  }
+
+  #search-bar {
+    width: 100%;
+    max-width: 420px;
+    padding: 12px 14px;
+    font-size: 1rem;
+    border-radius: 6px;
+    border: 1px solid #000;
+    background-color: rgba(255,255,255,0.9);
+    outline: none;
+    margin: 15px 0;
+  }
+
+  .taxonomy-type {
+    font-size: 0.85rem;
+    opacity: 0.7;
+  }
+
+  .section-label {
+    margin-top: 22px;
+    margin-bottom: 6px;
+    font-weight: bold;
+    font-size: 1.05rem;
+    opacity: 0.85;
+  }
+
+  #taxonomy-container button,
+  .sigma-button {
+    display: block;
+    width: 100%;
+    max-width: 520px;
+    margin: 6px 0;
+    padding: 10px;
+    background-color: #4a4848;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  #taxonomy-container button:hover,
+  .sigma-button:hover {
+    background-color: #33df97;
+    transform: scale(1.02);
+  }
+
+  .search-main {
+    font-weight: bold;
+    font-size: 1.05rem;
+  }
+
+  .search-rank {
+    font-size: 0.85rem;
+    opacity: 0.7;
+  }
+
+  .search-path {
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.6;
+    margin-top: 2px;
+  }
+
+  #current-rank,
+#breadcrumbs {
+  font-size: 1rem;   /* make text smaller */
+  opacity: 0.5;        /* softer / less loud */
+  margin-bottom: 6px;
+}

@@ -305,3 +305,19 @@ section {
   opacity: 0.5;        /* softer / less loud */
   margin-bottom: 6px;
 }
+
+/* ===== View More / View Less Buttons ===== */
+.more-less-button {
+  background-color: #2f2f2f;
+  color: #ffffff;
+  font-weight: bold;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 10px;
+  transition: background-color 0.2s, transform 0.15s;
+}
+
+.more-less-button:hover {
+  background-color: #33df97;
+  transform: scale(1.05);
+}

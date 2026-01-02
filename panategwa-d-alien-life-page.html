@@ -7,7 +7,6 @@
 
 <link rel="stylesheet" href="styles.css" />
 <script src="menu-loader.js" defer></script>
-
 </head>
 
 <body>
@@ -16,23 +15,29 @@
 
 <h1>Panategwa d Taxonomy Explorer</h1>
 
-<div id="current-rank"></div>
+<div id="current-rank">Domains</div>
 <div id="breadcrumbs"></div>
 
-<button id="close-button">Close All</button>
+<div id="control-buttons">
+  <button id="close-button">Close All</button>
+</div>
 
 <input type="text" id="search-bar" placeholder="Search any rank...">
 
 <div id="search-results"></div>
 
-<div id="current-title"></div>
+<div id="current-title">
+  <h2>Domains</h2>
+</div>
 
-<div id="info-box">Select a taxonomic rank to see info here.</div>
-
+<div id="info-box">
+  Select a taxonomic rank to see info here...
+</div>
+<br>
 <div id="taxonomy-container"></div>
 
 <script>
-// ---------------- TAXONOMY DATA ----------------
+// ================= TAXONOMY DATA =================
 const taxonomy = {
   Eukarya: {
     info: "Organisms whose cells have a nucleus.",
@@ -43,25 +48,13 @@ const taxonomy = {
         Mammalia: {
           info: "Warm-blooded vertebrates with hair.",
           Primates: {
-            info: "Large-brained mammals with forward-facing eyes.",
+            info: "Large-brained, forward-facing eyes.",
             Hominidae: {
-              info: "Great apes and human-like species.",
+              info: "Great apes and humans.",
               "Tri-Panategwaoi Anthropoi": {
                 info: "Panategwan human-equivalent genus.",
                 "Tri-Panategwaoi Anthropoi Civilis": {
-                  info: `
-<section>
-  <h2>Physical Appearance</h2>
-  <ul>
-    <li>Average height: 2.5 m</li>
-    <li>Six fingers, ambidextrous</li>
-  </ul>
-</section>
-        <section>
-      <h2>Illustration of a Tri-Panategwaos Anthropos:</h2>
-      <img src="tri-panategwaos-anthropos-civilis.jpg" width="600" alt="Tri-Panat" />
-    </section>
-`,
+                  info: "Dominant sentient species of Panategwa d.",
                   Piton: { info: "Jungle-adapted subspecies." },
                   Rashton: { info: "Desert-adapted subspecies." },
                   Arifaton: { info: "Cold-region subspecies." }
@@ -72,59 +65,63 @@ const taxonomy = {
         }
       }
     }
+  },
+  Prokarya: {
+    info: "Single-celled organisms without a nucleus."
   }
 };
 
-// ---------------- STATE ----------------
+// ================= STATE =================
 let currentPath = [];
 let currentNode = taxonomy;
+let searchResults = [];
+let expanded = false;
+const defaultShowCount = 5;
 
-// ---------------- RANK DEFINITIONS ----------------
-const ranks = [
-  "Domain",
-  "Kingdom",
-  "Phylum",
-  "Class",
-  "Order",
-  "Family",
-  "Genus",
-  "Species",
-  "Subspecies"
-];
-
-const childLabels = [
-  "Domains",
-  "Kingdoms",
-  "Phyla",
-  "Classes",
-  "Orders",
-  "Families",
-  "Genera",
-  "Species",
-  "Subspecies"
-];
-
-function getRank(level) {
+// ================= RANK NAMES =================
+function getRankName(level) {
+  const ranks = [
+    "Domain",
+    "Kingdom",
+    "Phylum",
+    "Class",
+    "Order",
+    "Family",
+    "Genus",
+    "Species",
+    "Subspecies"
+  ];
   return ranks[level] || "";
 }
 
-function getChildLabel(level) {
-  return childLabels[level] || "";
+function getPluralRankName(level) {
+  const plurals = {
+    Domain: "Domains",
+    Kingdom: "Kingdoms",
+    Phylum: "Phyla",
+    Class: "Classes",
+    Order: "Orders",
+    Family: "Families",
+    Genus: "Genera",
+    Species: "Species",
+    Subspecies: "Subspecies"
+  };
+  return plurals[getRankName(level)] || "";
 }
 
-// ---------------- RENDER ----------------
+// ================= RENDER =================
 function renderLevel(node) {
   const container = document.getElementById("taxonomy-container");
   container.innerHTML = "";
 
   const level = currentPath.length;
-  const label = getChildLabel(level);
+  const labelName = getPluralRankName(level);
 
-  if (label) {
-    const header = document.createElement("div");
-    header.className = "section-label";
-    header.textContent = label + ":";
-    container.appendChild(header);
+  if (labelName) {
+    const label = document.createElement("div");
+    label.className = "taxonomy-label";
+    label.textContent = labelName + ":";
+    container.appendChild(label);
   }
 
   Object.keys(node).forEach(key => {
@@ -146,58 +143,65 @@ function renderLevel(node) {
 
 function updateUI() {
   const level = currentPath.length - 1;
-  const name = currentPath[level] || "Domains";
-  const rank = level >= 0 ? getRank(level) : "";
-
-  document.getElementById("current-title").innerHTML =
-    `<h2>${name}${rank ? ` <span class="taxonomy-type">(${rank})</span>` : ""}</h2>`;
+  const rank = getRankName(level);
+  const name = currentPath[level];
 
   document.getElementById("breadcrumbs").textContent =
     currentPath.join(" > ");
 
   document.getElementById("current-rank").textContent =
-    currentPath.map((_, i) => getRank(i)).join(" > ");
+    currentPath.map((_, i) => getRankName(i)).join(" > ");
 
   document.getElementById("info-box").innerHTML =
     currentNode.info || "No info available.";
+
+  if (currentPath.length === 0) {
+    document.getElementById("current-title").innerHTML = `<h2>Domains</h2>`;
+  } else {
+    document.getElementById("current-title").innerHTML =
+      `<h2>${name} <span class="taxonomy-type">(${rank})</span></h2>`;
+  }
 }
 
-// ---------------- SEARCH ----------------
+// ================= SEARCH =================
 function findRanks(query, node = taxonomy, path = []) {
-  let results = [];
+  let matches = [];
+
   for (let key in node) {
     if (key === "info") continue;
 
     const newPath = [...path, key];
 
     if (key.toLowerCase().includes(query)) {
-      results.push({ path: newPath, node: node[key] });
+      matches.push({ path: newPath, node: node[key] });
     }
 
     if (typeof node[key] === "object") {
-      results = results.concat(findRanks(query, node[key], newPath));
+      matches = matches.concat(findRanks(query, node[key], newPath));
     }
   }
-  return results;
+  return matches;
 }
 
-document.getElementById("search-bar").addEventListener("input", e => {
+function renderSearchResults() {
   const container = document.getElementById("search-results");
   container.innerHTML = "";
 
-  const results = findRanks(e.target.value.toLowerCase());
+  const visible = expanded
+    ? searchResults
+    : searchResults.slice(0, defaultShowCount);
 
-  results.forEach(item => {
+  visible.forEach(item => {
     const level = item.path.length - 1;
+    const rank = getRankName(level);
+    const name = item.path[level];
+    const fullPath = item.path.join(" > ");
 
     const btn = document.createElement("button");
     btn.className = "sigma-button";
     btn.innerHTML = `
-      <span class="search-main">
-        ${item.path[level]}
-        <span class="search-rank">(${getRank(level)})</span>
-      </span>
-      <span class="search-path">(${item.path.join(" > ")})</span>
+      <span class="search-main">${name} <span class="search-rank">(${rank})</span></span>
+      <span class="search-path">(${fullPath})</span>
     `;
 
     btn.onclick = () => {
@@ -211,18 +215,36 @@ document.getElementById("search-bar").addEventListener("input", e => {
 
     container.appendChild(btn);
   });
+
+  if (searchResults.length > defaultShowCount) {
+    const toggle = document.createElement("button");
+    toggle.className = "sigma-button more-less-button";
+    toggle.textContent = expanded ? "Show Less" : "Show More";
+    toggle.onclick = () => {
+      expanded = !expanded;
+      renderSearchResults();
+    };
+    container.appendChild(toggle);
+  }
+}
+
+// ================= EVENTS =================
+document.getElementById("search-bar").addEventListener("input", e => {
+  searchResults = findRanks(e.target.value.toLowerCase());
+  expanded = false;
+  renderSearchResults();
 });
 
-document.getElementById("close-button").onclick = () => {
+document.getElementById("close-button").addEventListener("click", () => {
   currentPath = [];
   currentNode = taxonomy;
   renderLevel(currentNode);
   updateUI();
   document.getElementById("search-results").innerHTML = "";
   document.getElementById("search-bar").value = "";
-};
+});
 
-// ---------------- START ----------------
+// ================= START =================
 renderLevel(currentNode);
 updateUI();
 </script>

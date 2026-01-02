@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panategwa d - Alien Life</title>
 
-<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="styles.css">
 <script src="menu-loader.js" defer></script>
 </head>
 
@@ -15,7 +15,7 @@
 
 <h1>Panategwa d Taxonomy Explorer</h1>
 
-<div id="current-rank">Domains</div>
+<div id="current-rank"></div>
 <div id="breadcrumbs"></div>
 
 <div id="control-buttons">
@@ -23,91 +23,125 @@
 </div>
 
 <input type="text" id="search-bar" placeholder="Search any rank...">
-
 <div id="search-results"></div>
 
-<div id="current-title">
-  <h2>Domains</h2>
-</div>
-
-<div id="info-box">
-  Select a taxonomic rank to see info here...
-</div>
+<div id="current-title"></div>
+<div id="info-box"></div>
 <br>
 <div id="taxonomy-container"></div>
 
 <script>
 // ================= TAXONOMY DATA =================
 const taxonomy = {
-  Eukarya: {
-    info: "Organisms whose cells have a nucleus.",
-    Animalia: {
-      info: "Multicellular heterotrophic organisms.",
-      Chordata: {
-        info: "Animals with a notochord.",
-        Mammalia: {
-          info: "Warm-blooded vertebrates with hair.",
-          Primates: {
-            info: "Large-brained, forward-facing eyes.",
-            Hominidae: {
-              info: "Great apes and humans.",
-              "Tri-Panategwaoi Anthropoi": {
-                info: "Panategwan human-equivalent genus.",
-                "Tri-Panategwaoi Anthropoi Civilis": {
-                  info: "Dominant sentient species of Panategwa d.",
-                  Piton: { info: "Jungle-adapted subspecies." },
-                  Rashton: { info: "Desert-adapted subspecies." },
-                  Arifaton: { info: "Cold-region subspecies." }
+  Eukarya: { 
+    info: "Organisms with complex cells containing a nucleus.",
+    
+    Longavita: {
+      info: "Long-lived, slow-aging macro-organisms.",
+      
+      // Phyla under Longavita
+      Livyatan: {
+        info: "Massive marine predators with slow metabolism and long lifespans.",
+        Cetiforma: {
+          info: "Large whale-like aquatic organisms.",
+          Balaenops: {
+            info: "Intelligent pack-oriented species."
+          }
+        }
+      },
+      Terrestrialis: {
+        info: "Long-lived land macro-organisms.",
+        Gigantopoda: {
+          info: "Huge slow-moving herbivores.",
+          Arborisapiens: {
+            info: "Tree-dwelling sapient species."
+          }
+        }
+      },
+      
+      // Organivorae as a phylum inside Longavita
+      Organivorae: {
+        info: "Multicellular organisms that consume organic matter, similar to our animals.",
+        
+        // Classes
+        Aquatica: {
+          info: "Fish-like aquatic creatures.",
+          Fluviosapiens: {
+            info: "Intelligent freshwater species."
+          },
+          Pelagica: {
+            info: "Open-ocean adapted species."
+          }
+        },
+        
+        Terrestrialorganisms: {
+          info: "Highly intelligent, abstract-thinking organisms.",
+          Cognitiva: {
+            info: "Intelligent organisms with an upright spine.",
+            Dorsuprata: {
+              info: "Great apes and humans, similar to our Hominidae.",
+              Anthropoi: {
+                info: "Sapient genus native to Panategwa d.",
+                "Anthropoi Civilis": {
+                  info: "Dominant civilized species of Panategwa d.",
+                  Piton: { info: "Forest-adapted subspecies." },
+                  Rashton: { info: "Arid-region subspecies." },
+                  Arifaton: { info: "Cold-climate subspecies." }
                 }
               }
             }
           }
         }
       }
+    },
+    
+    Plantae: {
+      info: "Organisms that photosynthesize and produce oxygen.",
+      Chlorophyta: {
+        info: "Green algae and related species."
+      },
+      Magnoliophyta: {
+        info: "Flowering plants."
+      }
     }
-  },
-  Prokarya: {
-    info: "Single-celled organisms without a nucleus."
   }
 };
+
+
+// ================= RANKS (PLURAL) =================
+const rankNames = [
+  "Domains",
+  "Kingdoms",
+  "Phyla",
+  "Classes",
+  "Orders",
+  "Families",
+  "Genera",
+  "Species",
+  "Subspecies"
+];
+
+// ================= RANKS (SINGULAR) =================
+const rankSingle = [
+  "Domain",
+  "Kingdom",
+  "Phylum",
+  "Class",
+  "Order",
+  "Family",
+  "Genus",
+  "Species",
+  "Subspecies"
+];
+
+
 
 // ================= STATE =================
 let currentPath = [];
 let currentNode = taxonomy;
 let searchResults = [];
 let expanded = false;
-const defaultShowCount = 5;
-
-// ================= RANK NAMES =================
-function getRankName(level) {
-  const ranks = [
-    "Domain",
-    "Kingdom",
-    "Phylum",
-    "Class",
-    "Order",
-    "Family",
-    "Genus",
-    "Species",
-    "Subspecies"
-  ];
-  return ranks[level] || "";
-}
-
-function getPluralRankName(level) {
-  const plurals = {
-    Domain: "Domains",
-    Kingdom: "Kingdoms",
-    Phylum: "Phyla",
-    Class: "Classes",
-    Order: "Orders",
-    Family: "Families",
-    Genus: "Genera",
-    Species: "Species",
-    Subspecies: "Subspecies"
-  };
-  return plurals[getRankName(level)] || "";
-}
+const defaultShowCount = 4;
 
 // ================= RENDER =================
 function renderLevel(node) {
@@ -115,7 +149,7 @@ function renderLevel(node) {
   container.innerHTML = "";
 
   const level = currentPath.length;
-  const labelName = getPluralRankName(level);
+  const labelName = rankNames[level];
 
   if (labelName) {
     const label = document.createElement("div");
@@ -142,29 +176,31 @@ function renderLevel(node) {
 }
 
 function updateUI() {
-  const level = currentPath.length - 1;
-  const rank = getRankName(level);
-  const name = currentPath[level];
+  const title = document.getElementById("current-title");
+  const info = document.getElementById("info-box");
+  const breadcrumbs = document.getElementById("breadcrumbs");
+  const currentRank = document.getElementById("current-rank");
 
-  document.getElementById("breadcrumbs").textContent =
-    currentPath.join(" > ");
-
-  document.getElementById("current-rank").textContent =
-    currentPath.map((_, i) => getRankName(i)).join(" > ");
-
-  document.getElementById("info-box").innerHTML =
-    currentNode.info || "No info available.";
+  breadcrumbs.textContent = currentPath.join(" > ");
 
   if (currentPath.length === 0) {
-    document.getElementById("current-title").innerHTML = `<h2>Domains</h2>`;
-  } else {
-    document.getElementById("current-title").innerHTML =
-      `<h2>${name} <span class="taxonomy-type">(${rank})</span></h2>`;
+    title.innerHTML = `<h2>Domains</h2>`;
+    currentRank.textContent = "Domains";
+    info.textContent = "Select a domain to begin.";
+    return;
   }
+
+  const level = currentPath.length - 1;
+  const name = currentPath[level];
+  const rank = rankSingle[level];
+
+  title.innerHTML = `<h2>${name} <span class="taxonomy-type">(${rank})</span></h2>`;
+  currentRank.textContent = rankNames.slice(0, level + 1).join(" > ");
+  info.textContent = currentNode.info || "No info available.";
 }
 
 // ================= SEARCH =================
-function findRanks(query, node = taxonomy, path = []) {
+function findMatches(query, node = taxonomy, path = []) {
   let matches = [];
 
   for (let key in node) {
@@ -177,7 +213,7 @@ function findRanks(query, node = taxonomy, path = []) {
     }
 
     if (typeof node[key] === "object") {
-      matches = matches.concat(findRanks(query, node[key], newPath));
+      matches = matches.concat(findMatches(query, node[key], newPath));
     }
   }
   return matches;
@@ -187,21 +223,20 @@ function renderSearchResults() {
   const container = document.getElementById("search-results");
   container.innerHTML = "";
 
-  const visible = expanded
+  const shown = expanded
     ? searchResults
     : searchResults.slice(0, defaultShowCount);
 
-  visible.forEach(item => {
+  shown.forEach(item => {
     const level = item.path.length - 1;
-    const rank = getRankName(level);
     const name = item.path[level];
-    const fullPath = item.path.join(" > ");
+    const rank = rankSingle[level];
 
     const btn = document.createElement("button");
     btn.className = "sigma-button";
     btn.innerHTML = `
-      <span class="search-main">${name} <span class="search-rank">(${rank})</span></span>
-      <span class="search-path">(${fullPath})</span>
+      <span class="search-main">${name} (${rank})</span>
+      <span class="search-path">(${item.path.join(" > ")})</span>
     `;
 
     btn.onclick = () => {
@@ -230,7 +265,7 @@ function renderSearchResults() {
 
 // ================= EVENTS =================
 document.getElementById("search-bar").addEventListener("input", e => {
-  searchResults = findRanks(e.target.value.toLowerCase());
+  searchResults = findMatches(e.target.value.toLowerCase());
   expanded = false;
   renderSearchResults();
 });
@@ -244,7 +279,7 @@ document.getElementById("close-button").addEventListener("click", () => {
   document.getElementById("search-bar").value = "";
 });
 
-// ================= START =================
+// ================= INIT =================
 renderLevel(currentNode);
 updateUI();
 </script>

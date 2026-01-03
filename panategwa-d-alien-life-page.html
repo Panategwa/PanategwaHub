@@ -33,79 +33,244 @@
 <script>
 // ================= TAXONOMY DATA =================
 const taxonomy = {
-  Eukarya: { 
-    info: "Organisms with complex cells containing a nucleus.",
-    
-    Longavita: {
-      info: "Long-lived, slow-aging macro-organisms.",
-      
-      // Phyla under Longavita
-      Livyatan: {
-        info: "Massive marine predators with slow metabolism and long lifespans.",
-        Cetiforma: {
-          info: "Large whale-like aquatic organisms.",
-          Balaenops: {
-            info: "Intelligent pack-oriented species."
-          }
-        }
-      },
-      Terrestrialis: {
-        info: "Long-lived land macro-organisms.",
-        Gigantopoda: {
-          info: "Huge slow-moving herbivores.",
-          Arborisapiens: {
-            info: "Tree-dwelling sapient species."
-          }
-        }
-      },
-      
-      // Organivorae as a phylum inside Longavita
-      Organivorae: {
-        info: "Multicellular organisms that consume organic matter, similar to our animals.",
-        
-        // Classes
-        Aquatica: {
-          info: "Fish-like aquatic creatures.",
-          Fluviosapiens: {
-            info: "Intelligent freshwater species."
-          },
-          Pelagica: {
-            info: "Open-ocean adapted species."
-          }
-        },
-        
-        Terrestrialorganisms: {
-          info: "Highly intelligent, abstract-thinking organisms.",
-          Cognitiva: {
-            info: "Intelligent organisms with an upright spine.",
-            Dorsuprata: {
-              info: "Great apes and humans, similar to our Hominidae.",
-              Anthropoi: {
-                info: "Sapient genus native to Panategwa d.",
-                "Anthropoi Civilis": {
-                  info: "Dominant civilized species of Panategwa d.",
-                  Piton: { info: "Forest-adapted subspecies." },
-                  Rashton: { info: "Arid-region subspecies." },
-                  Arifaton: { info: "Cold-climate subspecies." }
+  Eukarya: { // Domain
+    info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Organisms with complex cells containing a nucleus, forming the foundation of advanced life on Panategwa d.</li>
+    <li>Highly diverse in structure, habitat, and behavior, including terrestrial and aquatic forms.</li>
+  </ul>
+</section>
+<section>
+  <h2>Domains & Kingdoms</h2>
+  <ul>
+    <li>Kingdoms include Organivorae, Plantae, Fungi</li>
+  </ul>
+</section>
+`,
+
+    // ================= ORGANIVORAE =================
+    Organivorae: { // Kingdom
+      info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Multicellular organisms consuming organic matter, including plants and smaller animals.</li>
+    <li>Exhibit complex behaviors, social hierarchies, and intelligence in various forms.</li>
+  </ul>
+</section>
+`,
+
+      Dorsata: { // Phylum
+        info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Upright-walking organisms with developed nervous systems and enhanced motor skills.</li>
+    <li>Adapted for complex locomotion, including climbing and dexterous manipulation.</li>
+  </ul>
+</section>
+`,
+        Cognitiva: { // Class
+          info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Highly intelligent species capable of abstract thought, planning, and cultural development.</li>
+    <li>Exhibit social structures and tool usage across environments.</li>
+  </ul>
+</section>
+`,
+          Dorsuprata: { // Order
+            info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Upright-walking orders with vertical spinal alignment and dexterous limbs.</li>
+    <li>Often form cohesive social groups with hierarchical leadership.</li>
+  </ul>
+</section>
+`,
+            Anthropida: { // Family
+              info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Families of highly sapient organisms, with rich cultures and technologies.</li>
+    <li>Notable for long lifespans, communication systems, and environmental adaptations.</li>
+  </ul>
+</section>
+`,
+              Anthropoi: { // Genus
+                info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Genus of sapient Panategwan humans.</li>
+    <li>Exhibit advanced problem-solving, intergroup cooperation, and adaptive behaviors.</li>
+  </ul>
+</section>
+`,
+                "Anthropoi Civilis": { // Species
+                  info: `
+<section>
+  <h2>Physical Appearance</h2>
+  <ul>
+    <li><strong>Size & Weight:</strong> Infant: ~5 kg, 60 cm; Juvenile: 40–60 kg, ~1.5 m; Adult: ~120 kg, ~2.5 m</li>
+    <li><strong>Height:</strong> Adults average 2.5 meters (8 ft)</li>
+    <li><strong>Skin Color & Texture:</strong> Variable, wide range of tones and textures, depend on regional adaptations</li>
+    <li><strong>Eyes:</strong> Adapted to light conditions in environment; colors vary</li>
+    <li><strong>Other Features:</strong> Six fingers, ambidextrous, physical traits vary by environment</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Culture & Society</h2>
+  <ul>
+    <li><strong>Overview:</strong> Dominant sentient species of Panategwa d, highly adaptable and technologically advanced</li>
+    <li><strong>Population:</strong> ~14 Billion</li>
+    <li><strong>Habitat:</strong> Tropical rainforests, deserts, mountains, arctic zones</li>
+    <li><strong>Diet:</strong> Omnivorous; meats, fruits, vegetables, grains</li>
+    <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually 2–3 offspring per birth</li>
+    <li><strong>Lifespan:</strong> Average ~650 years, leaders may live thousands of years</li>
+    <li><strong>Subspecies:</strong>
+      <ul>
+        <li>Piton – Forest-adapted, climbing specialists</li>
+        <li>Rashton – Desert-adapted, heat- and water-efficient</li>
+        <li>Arifaton – Cold-climate, heavily insulated and enduring</li>
+      </ul>
+    </li>
+    <li><strong>Behavior:</strong> Social but can become aggressive when threatened</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Environmental Adaptations</h2>
+  <ul>
+    <li>Adaptable to almost all regions of Panategwa d</li>
+    <li>Physical traits and body heat regulation adjust to local climate</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Illustration</h2>
+  <img src="tri-panategwaos-anthropos-civilis.jpg" width="600" alt="Tri-Panat" />
+</section>
+`,
+                  Piton: { info: "Forest-adapted subspecies with climbing and camouflage skills." },
+                  Rashton: { info: "Desert-adapted subspecies, efficient in heat and water management." },
+                  Arifaton: { info: "Cold-adapted subspecies with insulation and endurance adaptations." }
                 }
               }
             }
           }
         }
+      },
+
+      Exosclerata: { // Phylum
+        info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Organisms with external skeletons, primarily terrestrial walkers.</li>
+    <li>Exhibit social coordination and tool usage in some species.</li>
+  </ul>
+</section>
+`,
+        Arthropoda: { info: "Intelligent exoskeleton-bearing species with diverse adaptations." },
+        Crustacea: { info: "Aquatic and semi-aquatic exoskeleton species, some highly social." }
+      },
+
+      Leviathanata: { // Phylum
+        info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Gigantic aquatic creatures, some forming packs.</li>
+    <li>Exhibit advanced social behaviors and hunting strategies.</li>
+  </ul>
+</section>
+`,
+        Cetiforma: { info: "Whale-like advanced social aquatic species." },
+        Megaceta: { info: "Massive open-ocean species with deep diving abilities." }
+      },
+
+      Veriforma: { // Phylum
+        info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Worm-like or elongated organisms, mostly subterranean or aquatic.</li>
+    <li>Exhibit specialized burrowing or swimming adaptations.</li>
+  </ul>
+</section>
+`,
+        Serpentica: { info: "Intelligent burrowing or swimming species." },
+        Tubularis: { info: "Flexible worm-like species with environmental versatility." }
       }
     },
-    
-    Plantae: {
-      info: "Organisms that photosynthesize and produce oxygen.",
-      Chlorophyta: {
-        info: "Green algae and related species."
-      },
-      Magnoliophyta: {
-        info: "Flowering plants."
-      }
+
+    Plantae: { // Kingdom
+      info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Photosynthetic organisms forming the base of ecosystems.</li>
+    <li>Range from simple algae to complex flowering plants.</li>
+  </ul>
+</section>
+`,
+      Chlorophyta: { info: "Green algae and simple aquatic plants." },
+      Magnoliophyta: { info: "Flowering plants with vascular systems." }
+    },
+
+    Fungi: { // Kingdom
+      info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Decomposing organisms that recycle organic matter.</li>
+    <li>Range from microscopic yeasts to large mushrooms.</li>
+  </ul>
+</section>
+`,
+      Basidiomycota: { info: "Mushroom-forming fungi with complex spore systems." },
+      Ascomycota: { info: "Sac fungi producing spores in specialized structures." }
     }
+  },
+
+  Prokarya: { // Domain
+    info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Single-celled organisms without nuclei, highly diverse in metabolism and habitat.</li>
+    <li>Include bacteria, cyanobacteria, and other microbes.</li>
+  </ul>
+</section>
+`,
+    Bacteria: { info: "Common prokaryotic cells, some pathogenic, some beneficial." },
+    Cyanobacteria: { info: "Photosynthetic bacteria, producing oxygen and nutrients." }
+  },
+
+  Archea: { // Domain
+    info: `
+<section>
+  <h2>Overview</h2>
+  <ul>
+    <li>Extremophiles with unique biochemistry, inhabiting harsh environments.</li>
+    <li>Include heat- and salt-loving microorganisms.</li>
+  </ul>
+</section>
+`,
+    Thermophila: { info: "Heat-loving microorganisms thriving in extreme temperatures." },
+    Halophila: { info: "Salt-adapted microorganisms inhabiting hypersaline environments." }
   }
 };
+
+
+
 
 
 // ================= RANKS (PLURAL) =================
@@ -196,7 +361,8 @@ function updateUI() {
 
   title.innerHTML = `<h2>${name} <span class="taxonomy-type">(${rank})</span></h2>`;
   currentRank.textContent = rankNames.slice(0, level + 1).join(" > ");
-  info.textContent = currentNode.info || "No info available.";
+  info.innerHTML = currentNode.info || "No info available.";
+
 }
 
 // ================= SEARCH =================

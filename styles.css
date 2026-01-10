@@ -2,21 +2,14 @@
 
 /* ===== Body & Global Styles ===== */
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-/* Left → right light to dark gradient */
-  background: linear-gradient(
-    90deg,
-    #333333 0%,
-    #0f0f0f 100%
-  );
-
   color: #e0e0e0;
   margin: 0;
   padding: 0 2rem;
   padding-top: 200px;
   line-height: 1.6;
+  min-height: 100vh;
+  background: linear-gradient(to bottom right, rgb(3, 70, 48), rgb(21, 2, 46)); 
 }
-
 
 /* ===== Headings ===== */
 h1, h2, h3 {
@@ -25,19 +18,29 @@ h1, h2, h3 {
 }
 
 h1 {
-  font-size: 2.8rem;
+  font-size: 3rem;
   margin-bottom: 0.5rem;
   text-align: center;
   text-shadow: 0 0 5px #ffffff;
 }
 
 h2 {
-  font-size: 1.8rem;
+  font-size: 2rem;
   border-bottom: 1px solid #bbbbbb;
   padding-bottom: 0.3rem;
   margin-top: 2.5rem;
 }
 
+h3 {
+  font-size: 1.5rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+p {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
 /* ===== Links ===== */
 a {
   color: #b7d6ff;
@@ -225,16 +228,6 @@ section {
   font-size: 0.75rem;
   opacity: 0.65;
 }
-
-
-  body {
-    background: linear-gradient(to right, #2b2b2b, #3a3a3a);
-    color: #e0e0e0;
-    margin: 0;
-    padding: 0 2rem;
-    padding-top: 140px;
-    line-height: 1.6;
-  }
 
   #search-bar {
     width: 100%;

@@ -1,14 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panategwa d - Alien Life</title>
-
-<link rel="stylesheet" href="styles.css">
-<script src="menu-loader.js" defer></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Panategwa d - Life</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="menu-loader.js" defer></script>
 </head>
-
 <body>
 
 <div id="menu-container"></div>
@@ -42,7 +41,6 @@ const taxonomy = {
     <li>Highly diverse in structure, habitat, and behavior, including terrestrial and aquatic forms.</li>
   </ul>
 </section>
-
 `,
 
     // ================= ORGANIVORAE =================
@@ -57,12 +55,12 @@ const taxonomy = {
 </section>
 `,
 
-      Dorsata: { // Phylum
+      Spondylota: { // Phylum
         info: `
 <section>
   <h2>Overview</h2>
   <ul>
-    <li>Upright-walking organisms with developed nervous systems and enhanced motor skills.</li>
+    <li>Organisms with a backbone and a complex nervous system.</li>
     <li>Adapted for complex locomotion, including climbing and dexterous manipulation.</li>
   </ul>
 </section>
@@ -107,55 +105,206 @@ const taxonomy = {
   </ul>
 </section>
 `,
-                "Anthropoi Civilis": { // Species
+                "Anthropoi civilis": { // Species
                   info: `
 <section>
-  <h2>Physical Appearance</h2>
+  <h2>General Description</h2>
   <ul>
-    <li><strong>Size & Weight:</strong> Infant: ~5 kg, 60 cm; Juvenile: 40–60 kg, ~1.5 m; Adult: ~120 kg, ~2.5 m</li>
-    <li><strong>Height:</strong> Adults average 2.5 meters (8 ft)</li>
-    <li><strong>Skin Color & Texture:</strong> Variable, wide range of tones and textures, depend on regional adaptations</li>
-    <li><strong>Eyes:</strong> Adapted to light conditions in environment; colors vary</li>
-    <li><strong>Other Features:</strong> Six fingers, ambidextrous, physical traits vary by environment</li>
+    <li>The dominant intelligent species of Panategwa d, highly adaptable and social.</li>
+    <li>Live in almost every environment and organize around long-lived leaders.</li>
   </ul>
 </section>
 
 <section>
-  <h2>Culture & Society</h2>
+  <h2>Lifestyle</h2>
   <ul>
-    <li><strong>Overview:</strong> Dominant sentient species of Panategwa d, highly adaptable and technologically advanced</li>
-    <li><strong>Population:</strong> ~14 Billion</li>
-    <li><strong>Habitat:</strong> Tropical rainforests, deserts, mountains, arctic zones</li>
-    <li><strong>Diet:</strong> Omnivorous; meats, fruits, vegetables, grains</li>
-    <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually 2–3 offspring per birth</li>
-    <li><strong>Lifespan:</strong> Average ~650 years, leaders may live thousands of years</li>
-    <li><strong>Subspecies:</strong>
-      <ul>
-        <li>Piton – Forest-adapted, climbing specialists</li>
-        <li>Rashton – Desert-adapted, heat- and water-efficient</li>
-        <li>Arifaton – Cold-climate, heavily insulated and enduring</li>
-      </ul>
-    </li>
-    <li><strong>Behavior:</strong> Social but can become aggressive when threatened</li>
+    <li><strong>Population:</strong> ~11 billion</li>
+    <li><strong>Diet:</strong> Omnivorous; elites consume rare Leviathan nutrients to extend lifespan</li>
+    <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually twins or triplets</li>
+    <li><strong>Lifespan:</strong> Average is 250 years, upper class can live 1,000+ years, and the leaders can live tens of thousands</li>
+    <li><strong>Behavior:</strong> Social, hierarchical; community-enforced rules; elder sacrifices culturally expected</li>
   </ul>
 </section>
 
 <section>
-  <h2>Environmental Adaptations</h2>
+  <h2>Skin Color</h2>
   <ul>
-    <li>Adaptable to almost all regions of Panategwa d</li>
-    <li>Physical traits and body heat regulation adjust to local climate</li>
+    <li>Piton: Desert-tan</li>
+    <li>Rashton: Olive-brown</li>
+    <li>Arifaton: Light-bear-brown (lighter than Rashton)</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Extras</h2>
+  <ul>
+    <li>Six fingers, ambidextrous; body traits vary by environment</li>
+    <li>Aging slows after ~100 years; enhanced endurance and intelligence</li>
+    <li>Soldiers form a large part of society; Leviathan hunts supply nutrients for leaders</li>
+    <li>Highly cooperative; capable of massive-scale projects</li>
+    <li>Culture emphasizes loyalty, survival, and respect for elders and leaders</li>
   </ul>
 </section>
 
 <section>
   <h2>Illustration</h2>
-  <img src="tri-panategwaos-anthropos-civilis.jpg" width="600" alt="Tri-Panat" />
+  <img src="anthropoi-civilis.jpg" width="600" alt="Tri-Panat" />
 </section>
 `,
-                  Piton: { info: "Forest-adapted subspecies with climbing and camouflage skills." },
-                  Rashton: { info: "Desert-adapted subspecies, efficient in heat and water management." },
-                  Arifaton: { info: "Cold-adapted subspecies with insulation and endurance adaptations." }
+Piton: { 
+  info: `
+<section>
+  <h2>General Description</h2>
+  <ul>
+    <li>The largest and most socially active race of Anthropoi civilis, centered around forests, deserts, and water regions.</li>
+    <li>Culturally advanced, excellent swimmers, and rely heavily on fishing.</li>
+    <li>Six fingers, ambidextrous; desert-tan skin color.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Lifestyle</h2>
+  <ul>
+    <li><strong>Population:</strong> ~2.5 billion</li>
+    <li><strong>Habitat:</strong> Forests, deserts, temperate regions, and rivers/coastal areas; adapted to both cold and warm climates</li>
+    <li><strong>Diet:</strong> Omnivorous; elites consume Leviathan-derived nutrients for extended lifespan</li>
+    <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually twins or triplets</li>
+    <li><strong>Lifespan:</strong> Poor ~200–300 years; rich ~500–1,000 years; leaders tens of thousands</li>
+    <li><strong>Behavior:</strong> Social, hierarchical; elder sacrifices culturally respected</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Extras</h2>
+  <ul>
+    <li>Physically strong; excellent swimmers; highly cooperative, especially in Leviathan hunts</li>
+    <li>Soldiers form a large part of society; loyalty to leaders is central</li>
+    <li>Culture emphasizes loyalty, survival, and respect for elders and leaders</li>
+  </ul>
+</section>
+`,
+"The Pitosian Empire": { info: `
+  <section>
+    <h2>Info</h2>
+    <ul>
+      <li>Capital: Kavalon</li>
+      <li>Population: ~400 million</li>
+      <li>Specializes in fishing, forestry, and Leviathan hunts.</li>
+    </ul>
+  </section>` },
+"The Prokhivanian Empire": { info: `
+  <section>
+    <h2>Nation 2</h2>
+      <ul>
+        <li>Capital: Aridra</li>
+        <li>Population: ~600 million</li>
+        <li>Known for desert trade, oasis farming, and cultural festivals.</li>
+      </ul>
+    </section>` }
+},
+Rashton: { 
+  info: `
+<section>
+  <h2>General Description</h2>
+  <ul>
+    <li>The wealthiest and most strategically organized race of Anthropoi civilis, adapted to hot climates with efficient heat and water management.</li>
+    <li>Known for discipline, trade, and resource management; culturally moderate with strong hierarchical structures.</li>
+    <li>Six fingers, ambidextrous; olive-brown skin color.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Lifestyle</h2>
+  <ul>
+    <li><strong>Population:</strong> ~3.5 billion</li>
+    <li><strong>Habitat:</strong> Hot climates; deserts and arid regions with efficient water management systems</li>
+    <li><strong>Diet:</strong> Omnivorous; elites consume Leviathan-derived nutrients for extended lifespan; skilled farmers and traders</li>
+    <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually twins or triplets</li>
+    <li><strong>Lifespan:</strong> Poor ~200–300 years; rich ~500–1,000+ years; leaders tens of thousands</li>
+    <li><strong>Behavior:</strong> Disciplined, strategic, hierarchical; elder sacrifices culturally expected</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Extras</h2>
+  <ul>
+    <li>High wealth concentration; leaders monopolize luxury resources for longevity</li>
+    <li>Soldiers form a large part of society; organized communities with strong defense systems</li>
+    <li>Skilled farmers, traders, and resource managers; value stability and strategic planning</li>
+    <li>Culture emphasizes loyalty, survival, and respect for elders and leaders</li>
+  </ul>
+</section>
+`,
+"The Empire of Rashooti": { info: `
+  <section>
+    <h2>Nation 3</h2>
+      <ul>
+        <li>Leader: Rashoot</li>
+        <li>Population: ~1.5 billion</li>
+        <li>Known for trade, irrigation systems, and military organization.</li>
+      </ul>
+  </section>` },
+"The Jamuhairi Dynasty": { info: `
+  <section>
+    <h2>Nation 4</h2>
+      <ul><li>Leader: Muhairi</li>
+        <li>Population: ~2 billion</li>
+        <li>Specializes in desert cities, strategic commerce, and disciplined armies.</li>
+      </ul>
+  </section>` }
+},
+Arifaton: { 
+  info: `
+<section>
+  <h2>General Description</h2>
+  <ul>
+    <li>The most populous and culturally rich race of Anthropoi civilis, adapted to warm and temperate climates.</li>
+    <li>Known for cooperation, tradition, and strong community bonds; socially cohesive despite lower wealth concentration.</li>
+    <li>Six fingers, ambidextrous; light-bear-brown skin color.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Lifestyle</h2>
+  <ul>
+    <li><strong>Population:</strong> ~5 billion</li>
+    <li><strong>Habitat:</strong> Warm and temperate climates; forests, grasslands, and agricultural regions</li>
+    <li><strong>Diet:</strong> Omnivorous; diet focuses on local agriculture and hunting; few elites consume Leviathan-derived nutrients</li>
+    <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually twins or triplets</li>
+    <li><strong>Lifespan:</strong> Poor ~200–300 years; rich ~500–1,000+ years; leaders tens of thousands</li>
+    <li><strong>Behavior:</strong> Cooperative, culturally cohesive, hierarchical; elder sacrifices culturally expected</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Extras</h2>
+  <ul>
+    <li>Most populous race; soldiers form ~25% of population; strong communal enforcement</li>
+    <li>Culturally rich with emphasis on traditions and cooperation; moderate technological advancement</li>
+    <li>High social cohesion; leaders essential for survival and community organization</li>
+    <li>Culture emphasizes loyalty, survival, and respect for elders and leaders</li>
+  </ul>
+</section>
+`,
+"The Arifalum Empire": { info: `
+  <section>
+    <h2>Nation 5</h2>
+      <ul>
+        <li>Capital: Glenora</li>
+        <li>Population: 4.5 billion</li>
+        <li>Famous for farming, traditions, and education.</li>
+      </ul>
+  </section>` },
+"The Nee vekian Kingdom": { info: `
+  <section>
+    <h2>Nation 6</h2>
+      <ul>
+        <li>Capital: Brystol</li>
+        <li>Population: 500 million</li>
+        <li>Centers on cooperative communities, craft, and culture.</li>
+      </ul>
+    </section>` }
+}
                 }
               }
             }
@@ -245,11 +394,14 @@ const taxonomy = {
   </ul>
 </section>
 `,
-    Bacteria: { info: "Common prokaryotic cells, some pathogenic, some beneficial." },
-    Cyanobacteria: { info: "Photosynthetic bacteria, producing oxygen and nutrients." }
+    Bacteria: { // Kingdom
+      info: "Prokaryotic cells with diverse metabolic capabilities.",
+      Eubacteria: { info: "Common prokaryotic cells, some pathogenic, some beneficial." },
+      Cyanobacteria: { info: "Photosynthetic bacteria, producing oxygen and nutrients." }
+    }
   },
 
-  Archea: { // Domain
+  Archaea: { // Domain
     info: `
 <section>
   <h2>Overview</h2>
@@ -264,10 +416,6 @@ const taxonomy = {
   }
 };
 
-
-
-
-
 // ================= RANKS (PLURAL) =================
 const rankNames = [
   "Domains",
@@ -278,7 +426,8 @@ const rankNames = [
   "Families",
   "Genera",
   "Species",
-  "Subspecies"
+  "Subspecies",
+  "Nations"
 ];
 
 // ================= RANKS (SINGULAR) =================
@@ -291,10 +440,9 @@ const rankSingle = [
   "Family",
   "Genus",
   "Species",
-  "Subspecies"
+  "Subspecies",
+  "Nation"
 ];
-
-
 
 // ================= STATE =================
 let currentPath = [];
@@ -343,21 +491,26 @@ function updateUI() {
 
   breadcrumbs.textContent = currentPath.join(" > ");
 
+  // ===== NOTHING SELECTED YET =====
   if (currentPath.length === 0) {
     title.innerHTML = `<h2>Domains</h2>`;
-    currentRank.textContent = "Domains";
-    info.textContent = "Select a domain to begin.";
+    currentRank.textContent = "";
+    info.textContent = "Select a taxonomy rank to begin.";
     return;
   }
 
+  // ===== SOMETHING IS SELECTED =====
   const level = currentPath.length - 1;
   const name = currentPath[level];
   const rank = rankSingle[level];
 
-  title.innerHTML = `<h2>${name} <span class="taxonomy-type">(${rank})</span></h2>`;
-  currentRank.textContent = rankNames.slice(0, level + 1).join(" > ");
-  info.innerHTML = currentNode.info || "No info available.";
+  // Show taxonomy ladder ONLY after a domain is clicked
+  currentRank.textContent = rankNames
+    .slice(0, level + 1)
+    .join(" > ");
 
+  title.innerHTML = `<h2>${name} <span class="taxonomy-type">(${rank})</span></h2>`;
+  info.innerHTML = currentNode.info || "No info available.";
 }
 
 // ================= SEARCH =================
@@ -394,7 +547,7 @@ function renderSearchResults() {
     const rank = rankSingle[level];
 
     const btn = document.createElement("button");
-    btn.className = "sigma-button";
+    btn.className = "search-button";
     btn.innerHTML = `
       <span class="search-main">${name} (${rank})</span>
       <span class="search-path">(${item.path.join(" > ")})</span>
@@ -414,7 +567,7 @@ function renderSearchResults() {
 
   if (searchResults.length > defaultShowCount) {
     const toggle = document.createElement("button");
-    toggle.className = "sigma-button more-less-button";
+    toggle.className = "search-button more-less-button";
     toggle.textContent = expanded ? "Show Less" : "Show More";
     toggle.onclick = () => {
       expanded = !expanded;

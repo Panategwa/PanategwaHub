@@ -86,14 +86,22 @@ section {
 }
 
 /* ===== Links ===== */
-a {
-  color: #b7d6ff;
-  text-decoration: none;
+a, .nation-link {
+ color: rgb(150, 175, 200);          /* link blue */
+  cursor: pointer;         /* hand cursor */
+  font-weight: 500;
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 
-a:hover,
+a:hover, .nation-link:hover,
 a:focus {
-  text-decoration: underline;
+  color: #1f7ad9;
+  background-color: rgba(74, 163, 255, 0.12);
+  border-radius: 4px;
+}
+
+.nation-link:active {
+  color: #155aa8;
 }
 
 /* ===== Buttons ===== */
@@ -110,53 +118,55 @@ button {
   transition: background-color 0.2s, transform 0.2s;
   margin: 1rem 0;
   display: block;
+  transition: background-color 2s, transform 2s;
 }
 
 button:hover {
-  background-color: rgb(50, 75, 50, 0.75);
-  color: rgb(200, 200, 200);
-  transform: scale(1.02);
+  background-color: rgb(50, 75, 50, 0.9);
+  transform: scale(1.05);
 }
 
-/* ===== Menu Container ===== */
 #menu-container {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  background-color: rgba(20, 50, 20, 0.5);
+  background-color: rgba(0, 150, 125, 0.5);
   padding: 1rem 2rem;
-  border-bottom: 4px solid rgb(10, 25, 10, 0.5);
+  border-bottom: 4px solid rgba(0, 0, 0, 0.75);
   box-sizing: border-box;
   display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
+  flex-wrap: wrap;       /* allow buttons to move up if they hit the edge */
+  gap: 0.5rem;           /* spacing between buttons */
   z-index: 9999;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
 }
+
 
 /* ===== Menu Buttons ===== */
 .menu-button {
-  background-color: rgba(125, 150, 75, 0.5);
+  background-color: rgba(200, 255, 100, 0.25);
   color: rgb(0, 0, 0, 0.8);
   border: 4px solid rgb(0, 0, 0, 0.8);
   transition: background-color 0.2s, transform 0.2s;
   font-weight: bold;
   padding: 0.8rem 1rem;
-  flex: auto;
   min-width: 80px;
+  transition: background-color 2s, transform 2s;
+  flex: 1 1 auto;   
 }
 
 .menu-button:hover {
-  background-color: rgb(75, 100, 75, 0.8);
+  background-color: rgba(175, 200, 75, 0.6);
 }
 
 .menu-button.active,
 .menu-button:disabled {
-  background-color: rgb(50, 75, 25, 0.8);
+  background-color: rgb(50, 75, 25, 0.5);
   color: rgb(255, 255, 255);
   cursor: default;
   transform: scale(1.05);
+  
 }
 
 .menu-button.back-to-top {
@@ -188,24 +198,32 @@ main {
   font-size: 1rem;
   border-radius: 6px;
   border: 1px solid #000;
-  background-color: rgba(220, 255, 240, 0.8);
+  background-color: rgba(200, 240, 200, 0.75);
   outline: none;
   margin: 15px 0;
   font-family: 'Rubik', 'Inter', 'Segoe UI', system-ui, sans-serif;
   font-weight: 500;
   letter-spacing: 0.3px;
-  transition: box-shadow 0.2s, transform 0.15s;
+  transition: background-color 2s, box-shadow 1s, transform 1s;
 }
 
 #search-bar::placeholder {
+
   color: rgb(0, 20, 0, 0.8);
   opacity: 0.8;
   font: bold 1rem 'Rubik', 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
+#search-bar:hover {
+  background-color: rgba(175, 220, 175, 0.5);
+  box-shadow: 0 0 0 10px rgba(0,0,0,0.15);
+  transform: scale(1.05);     
+}
+
 #search-bar:focus {
-  box-shadow: 0 0 0 3px rgba(0,0,0,0.15);
-  transform: scale(1.01); 
+  background-color: rgba(240, 255, 240, 0.8);
+  box-shadow: 0 0 0 20px rgba(0,0,0,0.10);
+  transform: scale(0.95); 
 }
 
 /* ===== Search Results ===== */
@@ -320,3 +338,86 @@ main {
   background-color: #33df97;
   transform: scale(1.05);
 }
+
+/* ===== Advanced Toggle Button ===== */
+#advanced-toggle {
+  background-color: rgba(70, 110, 70, 0.8);
+  color: #fff;
+  border: 3px solid rgba(0, 0, 0, 0.8);
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-family: 'Rubik', sans-serif;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+  margin: 1rem 0;
+  display: inline-block;
+}
+
+#advanced-toggle:hover {
+  background-color: rgba(50, 85, 50, 0.85);
+  transform: scale(1.02);
+}
+
+/* ===== Advanced Panel ===== */
+#advanced-panel {
+  background-color: rgba(0, 100, 0, 0.2);
+  border: 5px solid rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  margin-top: 1rem;
+  max-width: 420px;
+}
+
+/* ===== Advanced Panel Headings ===== */
+#advanced-panel h3 {
+  font-size: 1.3rem;
+  margin-bottom: 0.8rem;
+  color: rgb(255, 255, 255);
+  font-family: 'Georgia', serif;
+  text-decoration: underline;
+}
+
+/* ===== Exclude/Include Checkboxes ===== */
+#exclude-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'Rubik', sans-serif;
+  font-size: 1rem;
+  color: rgb(200, 200, 200);
+  margin-bottom: 0.4rem;
+  cursor: pointer;
+  transition: background-color 2s, transform 2s;
+}
+
+#exclude-options label:hover {
+  color: rgb(255, 255, 0, 0.5);
+  transform: scale(0.975);
+}
+
+#exclude-options input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #1f7ad9;
+  cursor: pointer;
+}
+
+/* ===== Include All Checkbox ===== */
+#include-all {
+  font-weight: bold;
+}
+#include-all:checked + label {
+  color: #7fffbf;
+}
+#include-all:hover + label {
+  color: #33df97;
+}
+#include-all {
+  width: 20px;
+  height: 20px;
+  accent-color: #1f7ad9;
+  cursor: pointer;
+}
+

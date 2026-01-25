@@ -188,8 +188,6 @@ main {
   padding-bottom: 3rem;
 }
 
-
-
 /* ===== Search Bar ===== */
 #search-bar {
   width: 100%;
@@ -341,7 +339,7 @@ main {
 
 /* ===== Advanced Toggle Button ===== */
 #advanced-toggle {
-  background-color: rgba(70, 110, 70, 0.8);
+  background-color: rgba(80, 100, 80, 0.75);
   color: #fff;
   border: 3px solid rgba(0, 0, 0, 0.8);
   padding: 0.8rem 1.5rem;
@@ -356,18 +354,8 @@ main {
 }
 
 #advanced-toggle:hover {
-  background-color: rgba(50, 85, 50, 0.85);
+  background-color: rgba(75, 85, 75, 0.85);
   transform: scale(1.02);
-}
-
-/* ===== Advanced Panel ===== */
-#advanced-panel {
-  background-color: rgba(0, 100, 0, 0.2);
-  border: 5px solid rgba(0, 0, 0, 0.5);
-  border-radius: 8px;
-  padding: 1rem 1.5rem;
-  margin-top: 1rem;
-  max-width: 420px;
 }
 
 /* ===== Advanced Panel Headings ===== */

@@ -18,7 +18,7 @@
 <div id="breadcrumbs"></div>
 
 <div id="control-buttons">
-  <button id="close-button">Close All</button>
+  <button id="reset-button">Reset All</button>
 </div>
 
 <input type="text" id="search-bar" placeholder="Search any rank...">
@@ -27,7 +27,7 @@
 <button id="advanced-toggle">Advanced</button>
 
 <div id="advanced-panel" style="display:none;">
-  <h3>Exclude/Include Taxonomic Ranks:</h3>
+  <h2>Exclude/Include Taxonomic Ranks from search:</h2>
 
   <label>
     <input type="checkbox" id="include-all" checked>
@@ -164,7 +164,7 @@ const taxonomy = {
   <img src="anthropoi-civilis.jpg" width="600" alt="Tri-Panat" />
 </section>
 `,
-Piton: { 
+Piton: { // Subspecies
   info: `
 <section>
   <h2>General Description</h2>
@@ -258,26 +258,18 @@ Piton: {
 </section>
 
 <section>
-  <h2>Culture & Beliefs</h2>
-  <dl>
-    <dt>Core Belief:</dt><dd>Protect the empire at all costs</dd>
-    <dt>Education:</dt><dd>Free, required, state-run</dd>
-    <dt>Technology:</dt><dd>Highly advanced, military-focused</dd>
-  </dl>
-</section>
-
-<section>
   <h2>History</h2>
   <dl>
     <dt>Origins:</dt>
     <dd>
-      The Pitosians originated from the continent of Pitosia, where poverty and harsh conditions shaped a disciplined society.
-      Seeking a better future, they sent expeditions to Yurfiv, hoping to migrate there.
-      In Yurfiv, their growing population and advanced technology allowed them to overpower local civilizations, enslaving many while others became reluctant allies.
-      As resentment grew and other nations prepared to rise against them, the Pitosians made a last-ditch effort to avoid war by abolishing slavery and trying to rebuild trust through diplomacy.
-      It was too late — the War of the Fifth Millennia broke out shortly afterward.
+      The Pitosians originated from the continent of Pitosia, where poverty and harsh conditions forced them to seek new lands.
+      They sent expeditions to Yurfiv, hoping to migrate there in the future.
+      In Yurfiv, their growing population and advanced technology allowed them to overpower the native civilisations, enslaving many while others became reluctant allies.
+      As resentment grew and other nations prepared to rise against them, the Pitosians abolished slavery and tried to rebuild trust.
+      It was too late — the War of the Fifth Millennia broke out shortly afterward, and their allies abandoned them, some even joined the enemies of the Pitosians.
       Even after the Pitosians returned to their homeland, the conflict continued for years through invasions and long-range attacks.
-      Eventually, the fighting ended, leaving the Pitosians isolated but hardened. Since then, they have built their empire around self-reliance, strict order, and military dominance, knowing that survival can never depend on the reliance of others.
+      Eventually, the fighting ended, leaving the Pitosians isolated but hardened.
+      Since then, the Pitosians have built their empire around self-reliance, strict order, and military dominance, knowing that survival can never depend on the reliance of others.
     </dd>
   </dl>
 </section>
@@ -288,7 +280,10 @@ Piton: {
 <dt>Allies:</dt>
 <dd>
   <span class="nation-link" data-nation="The Jamuhairi Dynasty">
-    Jamuhairies
+    Jamuhairies,
+  </span>
+    <span class="nation-link" data-nation="The Prokheevanian Empire">
+    Prokheevans
   </span>
 </dd>
     <dt>Enemies:</dt><dd>None at present</dd>
@@ -306,7 +301,7 @@ Piton: {
       </ul>
     </section>` }
 },
-Rashton: { 
+Rashton: { // Subspecies
   info: `
 <section>
   <h2>General Description</h2>
@@ -357,7 +352,7 @@ Rashton: {
       </ul>
   </section>` }
 },
-Arifaton: { 
+Arifaton: { // Subspecies
   info: `
 <section>
   <h2>General Description</h2>
@@ -426,43 +421,40 @@ Exosclerata: { // Phylum
   </ul>
 </section>
 `,
-  Arthropoda: {
+  Arthropoda: { // Class
     info: "Exoskeleton-bearing species with diverse adaptations.",
-    Insecta: { // Class
+    Insecta: { // Order
       info: "Small, winged or wingless species with segmented bodies and exoskeletons.",
-      Coleoptera: { // Order
+      Coleoptera: { // Family
         info: "Beetle-like species with hardened forewings for protection.",
-        Scarabaeidae: { // Family
+        Scarabaeidae: { // Genus
           info: "Dung beetles and large ground beetles with strong mandibles.",
-          Scarabaeus: { // Genus
+          Scarabaeus: { // Species
             info: "Ground-dwelling dung beetles known for rolling and burying organic matter.",
-            "Scarabaeus sacer": { // Species
+            "Scarabaeus sacer": { // Subspecies
               info: "Sacred beetle, culturally important in some civilizations.",
               "Scarabaeus sacer aurum": { // Subspecies
-                info: "Golden-hued variant found in desert ecosystems."
-              },
-              "Scarabaeus sacer viridis": {
-                info: "Green forest-dwelling variant with unique burrowing behavior."
+                info: "Golden-hued variant of beetles found in desert ecosystems."
+              
               }
             }
           }
         }
       },
-      Lepidoptera: {
+      Lepidoptera: { // Order
         info: "Butterfly- and moth-like species with scaled wings.",
-        Nymphalidae: {
+        Nymphalidae: { // Family
           info: "Colorful butterflies with diverse patterns.",
-          Danaus: {
+          Danaus: { // Genus
             info: "Milkweed butterflies, migratory and highly social.",
-            "Danaus plexippus": {
-              info: "Monarch butterfly equivalent, known for long migrations.",
-              "Danaus plexippus minor": { info: "Smaller island-dwelling subspecies." }
+            "Danaus plexippus": { // Species
+              info: "Monarch butterfly analog, known for long migrations."
             }
           }
         }
       }
     },
-    Arachnida: {
+    Arachnida: { // Class
       info: "Spider-like and scorpion-like species, usually terrestrial predators.",
       Araneae: {
         info: "True spiders with silk-producing abilities.",
@@ -476,22 +468,40 @@ Exosclerata: { // Phylum
           }
         }
       }
+    },
+    Formicidae: { // Class
+      info: "Ant-like organisms with complex social structures.",
+      Atta: { // Genus
+        info: "Leafcutter ants, known for farming fungus.",
+        "Atta cephalotes": { // Species
+          info: "Common leafcutter ant species in tropical forests."
+        }
+      }
     }
   },
 
-  Crustacea: {
-    info: "Aquatic and semi-aquatic exoskeleton species, some highly social.",
-    Malacostraca: {
+  Crustacea: { // Class
+    info: "Aquatic and semi-aquatic exoskeleton species.",
+    Malacostraca: { // Order
       info: "Large crustaceans like crabs, lobsters, and shrimp.",
-      Decapoda: {
+      Decapoda: { // Family
         info: "Ten-legged crustaceans, many with advanced social behavior.",
-        Portunidae: {
+        Portunidae: { // Genus
           info: "Swimming crabs with flattened hind legs.",
-          Callinectes: {
-            info: "Blue crab analog, agile swimmers.",
-            "Callinectes sapidus": {
-              info: "Common blue crab species in shallow waters."
+          Xenoptera: { // Order
+            info: "Alien arthropods with transparent exoskeletons and bioluminescent organs. Capable of gliding between forest canopies using wing-like extensions.",
+            Luminaridae: { // Family
+              info: "Families of gliding xenopterans, highly social and communicate via light signals.",
+              Luminara: { // Genus
+                info: "Large, colony-forming xenopterans.",
+                "Luminara spectra": { // Species
+                  info: "Gliding arthropod, up to 30 cm long, emits colored light pulses to coordinate group movement and deter predators."
+                }
+              }
             }
+          },
+          Callinectes: { // Species
+            info: "Blue crab analog, agile swimmers.",
           }
         }
       }
@@ -505,84 +515,125 @@ Leviathanata: { // Phylum
 <section>
   <h2>Overview</h2>
   <ul>
-    <li>Gigantic aquatic and aerial creatures dominating oceans and skies.</li>
-    <li>Some form highly coordinated packs or herds; others are solitary giants.</li>
-    <li>Exhibit advanced social behaviors, hunting strategies, and territorial intelligence.</li>
+    <li>Extremely large aquatic and aerial organisms occupying top ecological niches.</li>
+    <li>Characterized by slow metabolisms, reinforced skeletal structures, and long lifespans.</li>
+    <li>Display varying degrees of intelligence, social coordination, and environmental adaptation.</li>
   </ul>
 </section>
 `,
-  Cetiforma: {
-    info: "Whale-like advanced social aquatic species.",
-    "Titanic Cetus": {
-      info: `
+  Pelagotheria: { // Class
+    info: "Large-bodied pelagic leviathans adapted for open-ocean life.",
+    Luminocetiformes: { // Order
+      info: "Slow-moving filter-feeding leviathans utilizing bioluminescence.",
+      Luminocetidae: { // Family
+        info: "Massive bioluminescent oceanic organisms forming loose social groups.",
+        Luminocetus: { // Genus
+          info: "Extremely large pelagic filter-feeders with patterned light organs.",
+          "Luminocetus magnus": { // Species
+            info: `
 <section>
   <h2>General Description</h2>
   <ul>
-    <li>Oceanic behemoth reaching up to 15 km in length.</li>
-    <li>Forms large pods for cooperative hunting of smaller leviathans and massive plankton clouds.</li>
-    <li>Skin covered in reflective bioluminescent patterns used for communication and navigation in deep waters.</li>
+    <li>Reaches lengths of up to 4 km.</li>
+    <li>Feeds primarily on planktonic megafauna.</li>
+    <li>Uses rhythmic bioluminescent pulses for intraspecies communication.</li>
   </ul>
 </section>
 `
-    }
-  },
-  Megaceta: {
-    info: "Massive open-ocean species with deep diving abilities.",
-    "Aqualon Giganteus": {
-      info: `
+          },
+          "Luminocetus borealis": { // Species
+            info: `
 <section>
   <h2>General Description</h2>
   <ul>
-    <li>Enormous balloon-like leviathan floating on water, tens of km long and tall.</li>
-    <li>Buoyant body filled with gas sacs; drifts with currents but can slowly navigate using giant fin-like structures.</li>
-    <li>Feeds on plankton clouds and smaller floating creatures; rarely surfaces fully due to fragile upper structure.</li>
-    <li>Often forms temporary "floating islands" where smaller species attach or hide.</li>
+    <li>Slightly smaller relative, averaging 2.8 km in length.</li>
+    <li>Inhabits colder, deeper waters.</li>
+    <li>Displays slower movement and dimmer light emission.</li>
   </ul>
 </section>
 `
-    }
-  },
-  Volucrata: { // New Class for flying leviathans
-    info: "Massive flying leviathans dominating the skies, some with intercontinental wingspans.",
-    Skystrider: { // Order
-      info: "Flying leviathans with hollow bones and gas-filled sacs for lift.",
-      Aeronyx: { // Family
-        info: "Titanic airborne predators, highly intelligent, communicate through sonic pulses.",
-        "Aeronyx colossus": { // Genus/Species
-          info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>Giant flying leviathan with a wingspan of 2 km, capable of gliding for days.</li>
-    <li>Feeds on smaller leviathans, aerial plankton, and occasionally hunts in packs.</li>
-    <li>Body covered with reflective scales to reduce heat absorption during long flights.</li>
-    <li>Highly territorial; nests on floating land masses or tall mountain peaks.</li>
-  </ul>
-</section>
-`
+          }
         }
       }
     }
   },
-  Abyssal: { // New Class for deep-sea giants
-    info: "Colossal leviathans living in the abyssal depths, adapted to extreme pressure.",
-    Bathymax: {
-      info: "Gigantic, slow-moving deep-sea leviathans, glow faintly to attract prey.",
-      "Bathymax titanicus": {
-        info: `
+
+  Aerotheria: { // Class
+    info: "Gigantic aerial leviathans capable of sustained flight.",
+    Gravivoluciformes: { // Order
+      info: "Flying leviathans using gas-filled skeletal cavities for lift.",
+      Caelavidae: { // Family
+        info: "Highly intelligent airborne predators with vast territories.",
+        Caelavus: { // Genus
+          info: "Large sky-dominating leviathans with elongated wings.",
+          "Caelavus imperator": { // Species
+            info: `
 <section>
   <h2>General Description</h2>
   <ul>
-    <li>Longest known deep-sea leviathan, 30+ km in length, slowly roaming trenches.</li>
-    <li>Skin is near-transparent; internal bioluminescent organs attract prey in total darkness.</li>
-    <li>Rarely surfaces; interacts minimally with other species except during mating swarms.</li>
+    <li>Wingspan exceeding 1.9 km.</li>
+    <li>Capable of remaining airborne for several days.</li>
+    <li>Preys on smaller aerial and surface-dwelling organisms.</li>
   </ul>
 </section>
 `
+          },
+          "Caelavus minor": { // Species
+            info: `
+<section>
+  <h2>General Description</h2>
+  <ul>
+    <li>Smaller species with a wingspan around 1.2 km.</li>
+    <li>More agile and faster than larger relatives.</li>
+    <li>Often observed in loose migratory formations.</li>
+  </ul>
+</section>
+`
+          }
+        }
+      }
+    }
+  },
+
+  Bathytheria: { // Class
+    info: "Deep-sea leviathans adapted to extreme pressure and darkness.",
+    Abyssotheriiformes: { // Order
+      info: "Gigantic trench-dwelling organisms with low metabolic rates.",
+      Abyssotheriidae: { // Family
+        info: "Slow-moving deep-ocean leviathans with internal light organs.",
+        Abyssotherium: { // Genus
+          info: "Massive abyssal leviathans rarely observed alive.",
+          "Abyssotherium longum": { // Species
+            info: `
+<section>
+  <h2>General Description</h2>
+  <ul>
+    <li>Measured lengths exceeding 25 km.</li>
+    <li>Transparent outer tissues reduce structural stress.</li>
+    <li>Feeds on deep-sea megafauna and organic falls.</li>
+  </ul>
+</section>
+`
+          },
+          "Abyssotherium lentum": { // Species
+            info: `
+<section>
+  <h2>General Description</h2>
+  <ul>
+    <li>Shorter species averaging 18 km in length.</li>
+    <li>Extremely slow movement conserves energy.</li>
+    <li>Emits faint constant bioluminescence.</li>
+  </ul>
+</section>
+`
+          }
+        }
       }
     }
   }
 },
+
+
 
 Veriforma: { // Phylum
   info: `
@@ -610,7 +661,7 @@ Veriforma: { // Phylum
 </section>
 `
     },
-    "Aqualis": { // Genus
+    Aqualis: { // Genus
       info: `
 <section>
   <h2>General Description</h2>
@@ -637,7 +688,7 @@ Veriforma: { // Phylum
 </section>
 `
     },
-    "Mudcrawler": { // Genus
+    Mudcrawler: { // Genus
       info: `
 <section>
   <h2>General Description</h2>
@@ -1263,7 +1314,7 @@ let excludedRanks = new Set();
 let currentPath = [];
 let currentNode = taxonomy;
 let searchResults = [];
-let expanded = false;
+let expanded = true;
 const defaultShowCount = 4;
 
 // ================= ADVANCED SEARCH SETUP =================
@@ -1495,7 +1546,7 @@ document.getElementById("search-bar").addEventListener("input", e => {
   renderSearchResults();
 });
 
-document.getElementById("close-button").addEventListener("click", () => {
+document.getElementById("reset-button").addEventListener("click", () => {
   currentPath = [];
   currentNode = taxonomy;
   renderLevel(currentNode);

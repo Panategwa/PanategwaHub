@@ -1,203 +1,206 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Panategwa d - Life</title>
-  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-  <script src="menu-loader.js" defer></script>
-</head>
-<body>
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Panategwa d - Life</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="menu-loader.js" defer></script>
+  </head>
+  <body>
 
-<div id="menu-container"></div>
+  <div id="menu-container"></div>
 
-<h1>Panategwa d Taxonomy Explorer</h1>
+  <h1>Panategwa d Taxonomy Explorer</h1>
 
-<div id="current-rank"></div>
-<div id="breadcrumbs"></div>
+  <div id="current-rank"></div>
+  <div id="breadcrumbs"></div>
 
-<div id="control-buttons">
-  <button id="reset-button">Reset All</button>
-</div>
+  <div id="control-buttons">
+    <button id="reset-button">Reset All</button>
+  </div>
 
-<input type="text" id="search-bar" placeholder="Search any rank...">
-<div id="search-results"></div>
+  <input type="text" id="search-bar" placeholder="Search any rank...">
+  <div id="search-results"></div>
 
-<button id="advanced-toggle">Advanced</button>
+  <button id="advanced-toggle">Advanced</button>
 
-<div id="advanced-panel" style="display:none;">
-  <h2>Exclude/Include Taxonomic Ranks from search:</h2>
+  <div id="advanced-panel" style="display:none;">
+    <h2>Exclude/Include Taxonomic Ranks from search:</h2>
 
-  <label>
-    <input type="checkbox" id="include-all" checked>
-    Include/Exclude All
-  </label>
+    <label>
+      <input type="checkbox" id="include-all" checked>
+      Include/Exclude All
+    </label>
 
-  <div id="exclude-options"></div>
-</div>
+    <div id="exclude-options"></div>
+  </div>
 
-<div id="current-title"></div>
-<div id="info-box"></div>
-<br>
-<div id="taxonomy-container"></div>
+  <div id="current-title"></div>
+  <div id="info-box"></div>
+  <br>
+  <div id="taxonomy-container"></div>
 
-<script>
-// ================= TAXONOMY DATA =================
-const taxonomy = {
-  Eukarya: { // Domain
-    info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Organisms with complex cells containing a nucleus, forming the foundation of advanced life on Panategwa d.</li>
-    <li>Highly diverse in structure, habitat, and behavior, including terrestrial and aquatic forms.</li>
-  </ul>
-</section>
-`,
-
-    // ================= ORGANIVORAE =================
-    Organivorae: { // Kingdom
+  <script>
+  // ================= TAXONOMY DATA =================
+  const taxonomy = {
+    Eukarya: { // Domain
       info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Multicellular organisms consuming organic matter, including plants and smaller animals.</li>
-    <li>Exhibit complex behaviors, social hierarchies, and intelligence in various forms.</li>
-  </ul>
-</section>
-`,
+  <section>
+    <h2>Overview</h2>
+    <ul>
+      <li>Organisms with complex cells containing a nucleus, forming the foundation of advanced life on Panategwa d.</li>
+      <li>Highly diverse in structure, habitat, and behavior, including terrestrial and aquatic forms.</li>
+    </ul>
+  </section>
+  `,
 
-      Spondylota: { // Phylum
+      // ================= ORGANIVORAE =================
+      Organivorae: { // Kingdom
         info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Organisms with a backbone and a complex nervous system.</li>
-    <li>Adapted for complex locomotion, including climbing and dexterous manipulation.</li>
-  </ul>
-</section>
-`,
-        Cognitiva: { // Class
+  <section>
+    <h2>Overview</h2>
+    <ul>
+      <li>Multicellular organisms consuming organic matter, including plants and smaller animals.</li>
+      <li>Exhibit complex behaviors, social hierarchies, and intelligence in various forms.</li>
+    </ul>
+  </section>
+  `,
+
+        Spondylota: { // Phylum
           info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Highly intelligent species capable of abstract thought, planning, and cultural development.</li>
-    <li>Exhibit social structures and tool usage across environments.</li>
-  </ul>
-</section>
-`,
-          Dorsuprata: { // Order
+  <section>
+    <h2>Overview</h2>
+    <ul>
+      <li>Organisms with a backbone and a complex nervous system.</li>
+      <li>Adapted for complex locomotion, including climbing and dexterous manipulation.</li>
+    </ul>
+  </section>
+  `,
+          Cognitiva: { // Class
             info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Upright-walking orders with vertical spinal alignment and dexterous limbs.</li>
-    <li>Often form cohesive social groups with hierarchical leadership.</li>
-  </ul>
-</section>
-`,
-            Anthropida: { // Family
+  <section>
+    <h2>Overview</h2>
+    <ul>
+      <li>Highly intelligent species capable of abstract thought, planning, and cultural development.</li>
+      <li>Exhibit social structures and tool usage across environments.</li>
+    </ul>
+  </section>
+  `,
+            Dorsuprata: { // Order
               info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Families of highly sapient organisms, with rich cultures and technologies.</li>
-    <li>Notable for long lifespans, communication systems, and environmental adaptations.</li>
-  </ul>
-</section>
-`,
-              Anthropoi: { // Genus
+  <section>
+    <h2>Overview</h2>
+    <ul>
+      <li>Upright-walking orders with vertical spinal alignment and dexterous limbs.</li>
+      <li>Often form cohesive social groups with hierarchical leadership.</li>
+    </ul>
+  </section>
+  `,
+              Anthropida: { // Family
                 info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Genus of sapient Panategwan humans.</li>
-    <li>Exhibit advanced problem-solving, intergroup cooperation, and adaptive behaviors.</li>
-  </ul>
-</section>
-`,
-                "Anthropoi civilis": { // Species
+  <section>
+    <h2>Overview</h2>
+    <ul>
+      <li>Families of highly sapient organisms, with rich cultures and technologies.</li>
+      <li>Notable for long lifespans, communication systems, and environmental adaptations.</li>
+    </ul>
+  </section>
+  `,
+                Anthropoi: { // Genus
                   info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>The dominant intelligent species of Panategwa d, highly adaptable and social.</li>
-    <li>Live in almost every environment and organize around long-lived leaders.</li>
-  </ul>
-</section>
+  <section>
+    <h2>Overview</h2>
+    <ul>
+      <li>Genus of sapient Panategwan humans.</li>
+      <li>Exhibit advanced problem-solving, intergroup cooperation, and adaptive behaviors.</li>
+    </ul>
+  </section>
+  `,
+                  "Anthropoi civilis": { // Species
+                    info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>The dominant intelligent species of Panategwa d, highly adaptable and social.</li>
+      <li>Live in almost every environment and organize around long-lived leaders.</li>
+    </ul>
+  </section>
 
-<section>
-  <h2>Lifestyle</h2>
-  <ul>
-    <li><strong>Population:</strong> ~11 billion</li>
-    <li><strong>Diet:</strong> Omnivorous; elites consume rare Leviathan nutrients to extend lifespan</li>
-    <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually twins or triplets</li>
-    <li><strong>Lifespan:</strong> Average is 250 years, upper class can live 1,000+ years, and the leaders can live tens of thousands</li>
-    <li><strong>Behavior:</strong> Social, hierarchical; community-enforced rules; elder sacrifices culturally expected</li>
-  </ul>
-</section>
+  <section>
+    <h2>Lifestyle</h2>
+    <ul>
+      <li><strong>Population:</strong> ~11 billion</li>
+      <li><strong>Diet:</strong> Omnivorous; elites consume rare Leviathan nutrients to extend lifespan</li>
+      <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually twins or triplets</li>
+      <li><strong>Lifespan:</strong> Average is 250 years, upper class can live 1,000+ years, and the leaders can live tens of thousands</li>
+      <li><strong>Behavior:</strong> Social, hierarchical; community-enforced rules; elder sacrifices culturally expected</li>
+    </ul>
+  </section>
 
-<section>
-  <h2>Skin Color</h2>
-  <ul>
-    <li>Piton: Desert-tan</li>
-    <li>Rashton: Olive-brown</li>
-    <li>Arifaton: Light-bear-brown (lighter than Rashton)</li>
-  </ul>
-</section>
+  <section>
+    <h2>Skin Color</h2>
+    <ul>
+      <li>Piton: Desert-tan</li>
+      <li>Rashton: Olive-brown</li>
+      <li>Arifaton: Light-bear-brown (lighter than Rashton)</li>
+    </ul>
+  </section>
 
-<section>
-  <h2>Extras</h2>
-  <ul>
-    <li>Six fingers, ambidextrous; body traits vary by environment</li>
-    <li>Aging slows after ~100 years; enhanced endurance and intelligence</li>
-    <li>Soldiers form a large part of society; Leviathan hunts supply nutrients for leaders</li>
-    <li>Highly cooperative; capable of massive-scale projects</li>
-    <li>Culture emphasizes loyalty, survival, and respect for elders and leaders</li>
-  </ul>
-</section>
+  <section>
+    <h2>Extras</h2>
+    <ul>
+      <li>Six fingers, ambidextrous; body traits vary by environment</li>
+      <li>Aging slows after ~100 years; enhanced endurance and intelligence</li>
+      <li>Soldiers form a large part of society; Leviathan hunts supply nutrients for leaders</li>
+      <li>Highly cooperative; capable of massive-scale projects</li>
+      <li>Culture emphasizes loyalty, survival, and respect for elders and leaders</li>
+    </ul>
+  </section>
 
-<section>
-  <h2>Illustration</h2>
-  <img src="anthropoi-civilis.jpg" width="600" alt="Tri-Panat" />
-</section>
-`,
-Piton: { // Subspecies
-  info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>The largest and most socially active race of Anthropoi civilis, centered around forests, deserts, and water regions.</li>
-    <li>Culturally advanced, excellent swimmers, and rely heavily on fishing.</li>
-    <li>Six fingers, ambidextrous; desert-tan skin color.</li>
-  </ul>
-</section>
+  <section>
+    <h2>Illustration</h2>
+    <img src="anthropoi-civilis.png" width="600" alt="Tri-Panat" />
+  </section>
+  `,
+  "Anthropoi civilis pitosianus": { // Subspecies
+    info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>The largest and most socially active race of Anthropoi civilis, centered around forests, deserts, and water regions.</li>
+      <li>Culturally advanced, excellent swimmers, and rely heavily on fishing.</li>
+      <li>Six fingers, ambidextrous; desert-tan skin color.</li>
+    </ul>
+  </section>
 
-<section>
-  <h2>Lifestyle</h2>
-  <ul>
-    <li><strong>Population:</strong> ~2.5 billion</li>
-    <li><strong>Habitat:</strong> Forests, deserts, temperate regions, and rivers/coastal areas; adapted to both cold and warm climates</li>
-    <li><strong>Diet:</strong> Omnivorous; elites consume Leviathan-derived nutrients for extended lifespan</li>
-    <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually twins or triplets</li>
-    <li><strong>Lifespan:</strong> Poor ~200–300 years; rich ~500–1,000 years; leaders tens of thousands</li>
-    <li><strong>Behavior:</strong> Social, hierarchical; elder sacrifices culturally respected</li>
-  </ul>
-</section>
+  `,
+  "Pitosialis": { // Clade
+    info: `
 
-<section>
-  <h2>Extras</h2>
-  <ul>
-    <li>Physically strong; excellent swimmers; highly cooperative, especially in Leviathan hunts</li>
-    <li>Soldiers form a large part of society; loyalty to leaders is central</li>
-    <li>Culture emphasizes loyalty, survival, and respect for elders and leaders</li>
-  </ul>
-</section>
-`,
-"The Empire of Pitosia": { info: `
+  <br>
+  <section>
+    <h2>General</h2>
+    <dl>
+  <dt>General Description:</dt>
+    <dd>
+      The Empire of Pitosia is a strict and powerful nation shaped by exile and survival.
+      Once dominant across the world, the Pitosians were defeated in the War of the Fifth Millennia and forced to retreat from Yurfiv to their original homeland of Pitosia.
+      Rather than falling apart, the empire rebuilt itself around order, control, and strength.
+      Their military might is unmatched, and society is highly disciplined.
+      Pitosians value loyalty, duty, and sacrifice above all else.
+    </dd>
 
+      <dt>Population:</dt><dd>~1.5 billion</dd>
+      <dt>Monarch:</dt><dd>Pitos the Great</dd>
+    </dl>
+  </section>
+
+
+  `,
+  "Pitosians": { // Ethnotype
+    info: `
 <br>
 <section>
   <h2>General</h2>
@@ -280,8 +283,9 @@ Piton: { // Subspecies
 <dt>Allies:</dt>
 <dd>
   <span class="nation-link" data-nation="The Jamuhairi Dynasty">
-    Jamuhairies,
+    Jamuhairies
   </span>
+  ,&nbsp;
     <span class="nation-link" data-nation="The Prokheevanian Empire">
     Prokheevans
   </span>
@@ -289,1061 +293,1168 @@ Piton: { // Subspecies
     <dt>Enemies:</dt><dd>None at present</dd>
   </dl>
 </section>
+  `
+}, // End of Pitosians
 
-  ` },
-"The Prokheevanian Empire": { info: `
-  <section>
-    <h2>Nation 2</h2>
-      <ul>
-        <li>Capital: Aridra</li>
-        <li>Population: ~600 million</li>
-        <li>Known for desert trade, oasis farming, and cultural festivals.</li>
-      </ul>
-    </section>` }
-},
-Rashton: { // Subspecies
-  info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>The wealthiest and most strategically organized race of Anthropoi civilis, adapted to hot climates with efficient heat and water management.</li>
-    <li>Known for discipline, trade, and resource management; culturally moderate with strong hierarchical structures.</li>
-    <li>Six fingers, ambidextrous; olive-brown skin color.</li>
-  </ul>
-</section>
-
-<section>
-  <h2>Lifestyle</h2>
-  <ul>
-    <li><strong>Population:</strong> ~3.5 billion</li>
-    <li><strong>Habitat:</strong> Hot climates; deserts and arid regions with efficient water management systems</li>
-    <li><strong>Diet:</strong> Omnivorous; elites consume Leviathan-derived nutrients for extended lifespan; skilled farmers and traders</li>
-    <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually twins or triplets</li>
-    <li><strong>Lifespan:</strong> Poor ~200–300 years; rich ~500–1,000+ years; leaders tens of thousands</li>
-    <li><strong>Behavior:</strong> Disciplined, strategic, hierarchical; elder sacrifices culturally expected</li>
-  </ul>
-</section>
-
-<section>
-  <h2>Extras</h2>
-  <ul>
-    <li>High wealth concentration; leaders monopolize luxury resources for longevity</li>
-    <li>Soldiers form a large part of society; organized communities with strong defense systems</li>
-    <li>Skilled farmers, traders, and resource managers; value stability and strategic planning</li>
-    <li>Culture emphasizes loyalty, survival, and respect for elders and leaders</li>
-  </ul>
-</section>
-`,
-"The Empire of Rashooti": { info: `
-  <section>
-    <h2>Info</h2>
-      <ul>
-        <li>Leader: Rashoot</li>
-        <li>Population: ~1.5 billion</li>
-        <li>Known for trade, irrigation systems, and military organization.</li>
-      </ul>
-  </section>` },
-"The Jamuhairi Dynasty": { info: `
-  <section>
-    <h2>Nation 4</h2>
-      <ul><li>Leader: Muheri</li>
-        <li>Population: ~2 billion</li>
-        <li>Specializes in desert cities, strategic commerce, and disciplined armies.</li>
-      </ul>
-  </section>` }
-},
-Arifaton: { // Subspecies
-  info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>The most populous and culturally rich race of Anthropoi civilis, adapted to warm and temperate climates.</li>
-    <li>Known for cooperation, tradition, and strong community bonds; socially cohesive despite lower wealth concentration.</li>
-    <li>Six fingers, ambidextrous; light-bear-brown skin color.</li>
-  </ul>
-</section>
-
-<section>
-  <h2>Lifestyle</h2>
-  <ul>
-    <li><strong>Population:</strong> ~5 billion</li>
-    <li><strong>Habitat:</strong> Warm and temperate climates; forests, grasslands, and agricultural regions</li>
-    <li><strong>Diet:</strong> Omnivorous; diet focuses on local agriculture and hunting; few elites consume Leviathan-derived nutrients</li>
-    <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually twins or triplets</li>
-    <li><strong>Lifespan:</strong> Poor ~200–300 years; rich ~500–1,000+ years; leaders tens of thousands</li>
-    <li><strong>Behavior:</strong> Cooperative, culturally cohesive, hierarchical; elder sacrifices culturally expected</li>
-  </ul>
-</section>
-
-<section>
-  <h2>Extras</h2>
-  <ul>
-    <li>Most populous race; soldiers form ~25% of population; strong communal enforcement</li>
-    <li>Culturally rich with emphasis on traditions and cooperation; moderate technological advancement</li>
-    <li>High social cohesion; leaders essential for survival and community organization</li>
-    <li>Culture emphasizes loyalty, survival, and respect for elders and leaders</li>
-  </ul>
-</section>
-`,
-"The Arifalum Empire": { info: `
-  <section>
-    <h2>Nation 5</h2>
-      <ul>
-        <li>Capital: Glenora</li>
-        <li>Population: 4.5 billion</li>
-        <li>Famous for farming, traditions, and education.</li>
-      </ul>
-  </section>` },
-"The Neevekian Kingdom": { info: `
-  <section>
-    <h2>Nation 6</h2>
-      <ul>
-        <li>Capital: Brystol</li>
-        <li>Population: 500 million</li>
-        <li>Centers on cooperative communities, craft, and culture.</li>
-      </ul>
-    </section>` }
-}
-                }
-              }
-            }
-          }
-        }
-      },
-
-Exosclerata: { // Phylum
-  info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Organisms with external skeletons, primarily terrestrial walkers.</li>
-    <li>Exhibit social coordination and tool usage in some species.</li>
-  </ul>
-</section>
-`,
-  Arthropoda: { // Class
-    info: "Exoskeleton-bearing species with diverse adaptations.",
-    Insecta: { // Order
-      info: "Small, winged or wingless species with segmented bodies and exoskeletons.",
-      Coleoptera: { // Family
-        info: "Beetle-like species with hardened forewings for protection.",
-        Scarabaeidae: { // Genus
-          info: "Dung beetles and large ground beetles with strong mandibles.",
-          Scarabaeus: { // Species
-            info: "Ground-dwelling dung beetles known for rolling and burying organic matter.",
-            "Scarabaeus sacer": { // Subspecies
-              info: "Sacred beetle, culturally important in some civilizations.",
-              "Scarabaeus sacer aurum": { // Subspecies
-                info: "Golden-hued variant of beetles found in desert ecosystems."
-              
-              }
-            }
-          }
-        }
-      },
-      Lepidoptera: { // Order
-        info: "Butterfly- and moth-like species with scaled wings.",
-        Nymphalidae: { // Family
-          info: "Colorful butterflies with diverse patterns.",
-          Danaus: { // Genus
-            info: "Milkweed butterflies, migratory and highly social.",
-            "Danaus plexippus": { // Species
-              info: "Monarch butterfly analog, known for long migrations."
-            }
-          }
-        }
-      }
-    },
-    Arachnida: { // Class
-      info: "Spider-like and scorpion-like species, usually terrestrial predators.",
-      Araneae: {
-        info: "True spiders with silk-producing abilities.",
-        Theridiidae: {
-          info: "Cobweb and tangle-web spiders.",
-          Latrodectus: {
-            info: "Widow spiders, highly venomous with distinct markings.",
-            "Latrodectus nigricauda": {
-              info: "Black widow analog, prefers warm regions."
-            }
-          }
-        }
-      }
-    },
-    Formicidae: { // Class
-      info: "Ant-like organisms with complex social structures.",
-      Atta: { // Genus
-        info: "Leafcutter ants, known for farming fungus.",
-        "Atta cephalotes": { // Species
-          info: "Common leafcutter ant species in tropical forests."
-        }
-      }
-    }
-  },
-
-  Crustacea: { // Class
-    info: "Aquatic and semi-aquatic exoskeleton species.",
-    Malacostraca: { // Order
-      info: "Large crustaceans like crabs, lobsters, and shrimp.",
-      Decapoda: { // Family
-        info: "Ten-legged crustaceans, many with advanced social behavior.",
-        Portunidae: { // Genus
-          info: "Swimming crabs with flattened hind legs.",
-          Xenoptera: { // Order
-            info: "Alien arthropods with transparent exoskeletons and bioluminescent organs. Capable of gliding between forest canopies using wing-like extensions.",
-            Luminaridae: { // Family
-              info: "Families of gliding xenopterans, highly social and communicate via light signals.",
-              Luminara: { // Genus
-                info: "Large, colony-forming xenopterans.",
-                "Luminara spectra": { // Species
-                  info: "Gliding arthropod, up to 30 cm long, emits colored light pulses to coordinate group movement and deter predators."
-                }
-              }
-            }
-          },
-          Callinectes: { // Species
-            info: "Blue crab analog, agile swimmers.",
-          }
-        }
-      }
-    }
-  }
-},
-
-
-Leviathanata: { // Phylum
-  info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Extremely large aquatic and aerial organisms occupying top ecological niches.</li>
-    <li>Characterized by slow metabolisms, reinforced skeletal structures, and long lifespans.</li>
-    <li>Display varying degrees of intelligence, social coordination, and environmental adaptation.</li>
-  </ul>
-</section>
-`,
-  Pelagotheria: { // Class
-    info: "Large-bodied pelagic leviathans adapted for open-ocean life.",
-    Luminocetiformes: { // Order
-      info: "Slow-moving filter-feeding leviathans utilizing bioluminescence.",
-      Luminocetidae: { // Family
-        info: "Massive bioluminescent oceanic organisms forming loose social groups.",
-        Luminocetus: { // Genus
-          info: "Extremely large pelagic filter-feeders with patterned light organs.",
-          "Luminocetus magnus": { // Species
-            info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>Reaches lengths of up to 4 km.</li>
-    <li>Feeds primarily on planktonic megafauna.</li>
-    <li>Uses rhythmic bioluminescent pulses for intraspecies communication.</li>
-  </ul>
-</section>
-`
-          },
-          "Luminocetus borealis": { // Species
-            info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>Slightly smaller relative, averaging 2.8 km in length.</li>
-    <li>Inhabits colder, deeper waters.</li>
-    <li>Displays slower movement and dimmer light emission.</li>
-  </ul>
-</section>
-`
-          }
-        }
-      }
-    }
-  },
-
-  Aerotheria: { // Class
-    info: "Gigantic aerial leviathans capable of sustained flight.",
-    Gravivoluciformes: { // Order
-      info: "Flying leviathans using gas-filled skeletal cavities for lift.",
-      Caelavidae: { // Family
-        info: "Highly intelligent airborne predators with vast territories.",
-        Caelavus: { // Genus
-          info: "Large sky-dominating leviathans with elongated wings.",
-          "Caelavus imperator": { // Species
-            info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>Wingspan exceeding 1.9 km.</li>
-    <li>Capable of remaining airborne for several days.</li>
-    <li>Preys on smaller aerial and surface-dwelling organisms.</li>
-  </ul>
-</section>
-`
-          },
-          "Caelavus minor": { // Species
-            info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>Smaller species with a wingspan around 1.2 km.</li>
-    <li>More agile and faster than larger relatives.</li>
-    <li>Often observed in loose migratory formations.</li>
-  </ul>
-</section>
-`
-          }
-        }
-      }
-    }
-  },
-
-  Bathytheria: { // Class
-    info: "Deep-sea leviathans adapted to extreme pressure and darkness.",
-    Abyssotheriiformes: { // Order
-      info: "Gigantic trench-dwelling organisms with low metabolic rates.",
-      Abyssotheriidae: { // Family
-        info: "Slow-moving deep-ocean leviathans with internal light organs.",
-        Abyssotherium: { // Genus
-          info: "Massive abyssal leviathans rarely observed alive.",
-          "Abyssotherium longum": { // Species
-            info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>Measured lengths exceeding 25 km.</li>
-    <li>Transparent outer tissues reduce structural stress.</li>
-    <li>Feeds on deep-sea megafauna and organic falls.</li>
-  </ul>
-</section>
-`
-          },
-          "Abyssotherium lentum": { // Species
-            info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>Shorter species averaging 18 km in length.</li>
-    <li>Extremely slow movement conserves energy.</li>
-    <li>Emits faint constant bioluminescence.</li>
-  </ul>
-</section>
-`
-          }
-        }
-      }
-    }
-  }
-},
-
-
-
-Veriforma: { // Phylum
-  info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Worm-like or elongated organisms, mostly underground or in water.</li>
-    <li>Some are predatory, hunting small animals or aquatic life.</li>
-    <li>Adapted to digging, swimming, or slithering through tight spaces.</li>
-  </ul>
-</section>
-`,
-  Serpentica: { // Class
-    info: "Slender, intelligent worm-like predators.",
-    infoPredators: "Burrowers that can sense vibrations to hunt prey.",
-    "Earthwormia": { // Genus
-      info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>Medium-sized predatory worm, ~1–2 meters long.</li>
-    <li>Burrows through soil to ambush insects and small animals.</li>
-    <li>Some have small sensory eyes and tiny fang-like structures to grasp prey.</li>
-  </ul>
-</section>
-`
-    },
-    Aqualis: { // Genus
-      info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>Water-dwelling worm, ~1–3 meters long, swims using muscular waves.</li>
-    <li>Feeds on small fish, plankton, and other aquatic creatures.</li>
-    <li>Often forms small packs to herd prey into shallow areas.</li>
-  </ul>
-</section>
-`
-    }
-  },
-  Tubularis: { // Class
-    info: "Flexible, burrowing worms that adapt to many environments.",
-    "Sandlurker": { // Genus
-      info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>Lives in sandy deserts or riverbanks, ~0.5–1 meter long.</li>
-    <li>Ambushes small rodents and insects, moving just below the surface.</li>
-    <li>Skin can change slightly in color to blend with the environment.</li>
-  </ul>
-</section>
-`
-    },
-    Mudcrawler: { // Genus
-      info: `
-<section>
-  <h2>General Description</h2>
-  <ul>
-    <li>Thick-bodied worm, ~2 meters long, lives in muddy swamps or wetlands.</li>
-    <li>Swims slowly, grabs small aquatic prey with sucker-like mouth.</li>
-    <li>Often found alone, but sometimes in small groups hunting cooperatively.</li>
-  </ul>
-</section>
-`
-      }
-    }
-  }
-},
-
-
-Plantae: { // Kingdom
-  info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Photosynthetic organisms forming the base of ecosystems.</li>
-    <li>Range from microscopic plankton to massive trees and flowering plants.</li>
-    <li>Provide food, oxygen, shelter, and habitats for countless species.</li>
-    <li>Some are edible, medicinal, ornamental, or even used as building materials.</li>
-  </ul>
-</section>
-`,
-
-  Chlorophyta: { // Phylum
-    info: "Green algae and simple aquatic plants.",
-    Ulva: { // Genus
-      info: "Sea lettuce; edible, grows in shallow waters."
-    },
-    Chlorella: { // Genus
-      info: "Microscopic green algae; used as supplement."
-    },
-    Spirogyra: { // Genus
-      info: "Filamentous freshwater algae forming green mats."
-    },
-    Codium: { // Genus
-      info: "Soft, branching seaweed; forms underwater forests."
-    },
-    Cladophora: { // Genus
-      info: "Thread-like algae, often in nutrient-rich waters."
-    },
-    Planktonica: { // Genus
-      info: "Tiny floating plankton, base of aquatic food chains."
-    }
-  },
-
-  Bryophyta: { // Phylum
-    info: "Mosses and liverworts; non-vascular plants that thrive in damp environments.",
-    Sphagnum: { // Genus
-      info: "Peat moss, forms bogs and wetlands."
-    },
-    Polytrichum: { // Genus
-      info: "Haircap moss, common in forests."
-    }
-  },
-
-  Pteridophyta: { // Phylum
-    info: "Ferns and horsetails; vascular plants reproducing via spores.",
-    Pteris: { // Genus
-      info: "Brake ferns, decorative and common in shaded areas."
-    },
-    Equisetum: { // Genus
-      info: "Horsetails, ancient vascular plants with silica-rich stems."
-    }
-  },
-
-  Magnoliophyta: { // Phylum
-    info: "Flowering plants with vascular systems.",
-    Rosopsida: { // Class
-      info: "Most flowering plants: trees, shrubs, herbs, crops, and flowers.",
-
-      Solanales: { // Order
-        info: "Nightshade family plants.",
-        Solanaceae: { // Family
-          info: "Tomatoes, potatoes, peppers, eggplants.",
-          Solanum: { // Genus
-            info: "Potatoes and eggplants.",
-            "Solanum tuberosum": { info: "Potato, starchy tuber." },
-            "Solanum melongena": { info: "Eggplant, edible fruit." }
-          },
-          Capsicum: { // Genus
-            info: "Peppers.",
-            "Capsicum annuum": { info: "Bell peppers, chili peppers." },
-            "Capsicum frutescens": { info: "Hot chili peppers." }
-          },
-          Lycopersicon: { // Genus
-            info: "Tomatoes.",
-            "Lycopersicon esculentum": { info: "Common tomato crop." }
-          }
-        }
-      },
-
-      Cucurbitales: { // Order
-        info: "Gourds, squashes, melons, and cucumbers.",
-        Cucurbitaceae: { // Family
-          info: "Squashes, pumpkins, melons, cucumbers.",
-          Cucumis: { // Genus
-            info: "Melons and cucumbers.",
-            "Cucumis sativus": { info: "Cucumber, edible fresh or pickled." },
-            "Cucumis melo": { info: "Melons like cantaloupe and honeydew." }
-          },
-          Cucurbita: { // Genus
-            info: "Squash and pumpkins.",
-            "Cucurbita pepo": { info: "Pumpkins and zucchini." },
-            "Cucurbita maxima": { info: "Giant squash and pumpkin varieties." },
-            "Cucurbita moschata": { info: "Butternut and hubbard squash." }
-          }
-        }
-      },
-
-      Fabales: { // Order
-        info: "Legume-bearing plants.",
-        Fabaceae: { // Family
-          info: "Beans, peas, soybeans.",
-          Pisum: { // Genus
-            info: "Peas.",
-            "Pisum sativum": { info: "Garden pea, edible pods and seeds." }
-          },
-          Phaseolus: { // Genus
-            info: "Common beans.",
-            "Phaseolus vulgaris": { info: "Kidney, black, and pinto beans." },
-            "Phaseolus coccineus": { info: "Runner bean, edible and ornamental." }
-          },
-          Glycine: { // Genus
-            info: "Soybeans.",
-            "Glycine max": { info: "Domesticated soybean crop, protein-rich legume." }
-          }
-        }
-      },
-
-      Fagales: { // Order
-        info: "Oak, beech, and chestnut trees.",
-        Fagaceae: { // Family
-          info: "Oak, beech, chestnut.",
-          Quercus: { // Genus
-            info: "Oaks.",
-            "Quercus robur": { info: "English oak." },
-            "Quercus alba": { info: "White oak, North America." }
-          },
-          Castanea: { // Genus
-            info: "Chestnuts.",
-            "Castanea sativa": { info: "Sweet chestnut tree, edible nuts." }
-          },
-          Fagus: { // Genus
-            info: "Beech trees.",
-            "Fagus sylvatica": { info: "European beech." }
-          }
-        }
-      },
-
-      Rosales: { // Order
-        info: "Roses, apples, cherries, pears, strawberries.",
-        Rosaceae: { // Family
-          info: "Fruit trees and ornamental plants.",
-          Malus: { // Genus
-            info: "Apples.",
-            "Malus domestica": { info: "Cultivated apple varieties." }
-          },
-          Prunus: { // Genus
-            info: "Stone fruits.",
-            "Prunus persica": { info: "Peach tree." },
-            "Prunus avium": { info: "Sweet cherry." },
-            "Prunus domestica": { info: "Plum tree." }
-          },
-          Rosa: { // Genus
-            info: "Roses.",
-            "Rosa chinensis": { info: "China rose, ornamental." },
-            "Rosa gallica": { info: "Gallic rose, deep red flowers." }
-          },
-          Fragaria: { // Genus
-            info: "Strawberries.",
-            "Fragaria × ananassa": { info: "Garden strawberry." }
-          }
-        }
-      },
-
-      Asterales: { // Order
-        info: "Daisy and sunflower family.",
-        Asteraceae: { // Family
-          info: "Sunflowers, daisies, lettuce, chamomile.",
-          Helianthus: { // Genus
-            info: "Sunflowers.",
-            "Helianthus annuus": { info: "Common sunflower." }
-          },
-          Lactuca: { // Genus
-            info: "Lettuce.",
-            "Lactuca sativa": { info: "Garden lettuce." }
-          },
-          Taraxacum: { // Genus
-            info: "Dandelions.",
-            "Taraxacum officinale": { info: "Edible leaves and flowers." }
-          },
-          Chrysanthemum: { // Genus
-            info: "Ornamental flowers.",
-            "Chrysanthemum morifolium": { info: "Garden chrysanthemum." }
-          }
-        }
-      },
-
-      Liliales: { // Order
-        info: "Lilies and other monocots.",
-        Liliaceae: { // Family
-          info: "True lilies and flowering bulbs.",
-          Lilium: { // Genus
-            info: "Lilies.",
-            "Lilium candidum": { info: "Madonna lily, white fragrant flowers." },
-            "Lilium lancifolium": { info: "Tiger lily, orange with spots." }
-          }
-        }
-      },
-
-      Lamiales: { // Order
-        info: "Mint, basil, lavender family.",
-        Lamiaceae: { // Family
-          info: "Aromatic herbs.",
-          Mentha: { // Genus
-            info: "Mint genus.",
-            "Mentha spicata": { info: "Spearmint." },
-            "Mentha piperita": { info: "Peppermint." }
-          },
-          Ocimum: { // Genus
-            info: "Basil genus.",
-            "Ocimum basilicum": { info: "Sweet basil." }
-          },
-          Lavandula: { // Genus
-            info: "Lavender genus.",
-            "Lavandula angustifolia": { info: "English lavender." }
-          },
-          Rosmarinus: { // Genus
-            info: "Rosemary.",
-            "Rosmarinus officinalis": { info: "Culinary herb." }
-          }
-        }
-      },
-
-      Cactales: { // Order
-        info: "Cactus plants adapted to deserts.",
-        Cactaceae: { // Family
-          info: "Succulent, spiny desert plants.",
-          Carnegiea: { // Genus
-            info: "Giant saguaro cactus.",
-            "Carnegiea gigantea": { info: "Saguaro, huge desert cactus." }
-          },
-          Opuntia: { // Genus
-            info: "Prickly pear cacti.",
-            "Opuntia ficus-indica": { info: "Edible cactus pads and fruits." }
-          },
-          Echinocactus: { // Genus
-            info: "Barrel cacti.",
-            "Echinocactus grusonii": { info: "Golden barrel cactus." }
-          }
-        }
-      },
-
-      Ericaceae: { // Order
-        info: "Heath plants, berries.",
-        Vaccinium: { // Genus
-          info: "Blueberries and cranberries.",
-          "Vaccinium corymbosum": { info: "Highbush blueberry." },
-          "Vaccinium macrocarpon": { info: "Cranberry." }
-        },
-        Rhododendron: { // Genus
-          info: "Ornamental shrubs.",
-          "Rhododendron ponticum": { info: "Common rhododendron." }
-        }
-      },
-
-      // Alien plant
-      Balloonia: { // Genus
-        info: "Giant floating plant with air sacs, drifts above water, eaten by flying leviathans.",
-        "Balloonia gigantea": { // Species
-          info: "Hundreds of meters in size, filled with light gas, nutrient-rich food source."
-        }
-      }
-    }
-  }
-},
-
-
-Fungi: { // Kingdom
-  info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Decomposers that recycle organic matter and nutrients.</li>
-    <li>Include microscopic yeasts, molds, and giant mushrooms.</li>
-    <li>Some are edible, medicinal, or used in fermentation.</li>
-    <li>Others form symbiotic relationships with plants or animals.</li>
-  </ul>
-</section>
-`,
-
-  Basidiomycota: { // Phylum
-    info: "Mushroom-forming fungi with complex spore systems.",
-    Agaricales: { // Order
-      info: "Typical gilled mushrooms.",
-      Agaricaceae: { // Family
-        info: "Edible and common forest mushrooms.",
-        Agaricus: { // Genus
-          info: "Classic mushrooms.",
-          "Agaricus bisporus": { info: "Button, cremini, portobello mushrooms." }
-        },
-        Lepiota: { // Genus
-          info: "Parasol mushrooms.",
-          "Lepiota procera": { info: "Edible, tall with umbrella cap." }
-        }
-      },
-      Amanitaceae: { // Family
-        info: "Deadly and colorful mushrooms.",
-        Amanita: { // Genus
-          info: "Poisonous and iconic mushrooms.",
-          "Amanita muscaria": { info: "Fly agaric, red cap with white spots." },
-          "Amanita phalloides": { info: "Death cap, extremely toxic." }
-        }
-      }
-    },
-
-    Polyporales: { // Order
-      info: "Shelf or bracket fungi on trees.",
-      Polyporaceae: { // Family
-        info: "Wood-decaying fungi.",
-        Ganoderma: { // Genus
-          info: "Medicinal reishi mushrooms.",
-          "Ganoderma lucidum": { info: "Reishi, shiny red-brown shelf mushroom." }
-        },
-        Fomitopsis: { // Genus
-          info: "Tinder fungi for fire starting.",
-          "Fomitopsis pinicola": { info: "Red-belted conk, grows on dead trees." }
-        }
-      }
-    },
-
-    Boletales: { // Order
-      info: "Pored mushrooms, often edible.",
-      Boletaceae: { // Family
-        info: "Boletes with sponge-like pores.",
-        Boletus: { // Genus
-          info: "Edible forest mushrooms.",
-          "Boletus edulis": { info: "Porcini, prized edible mushroom." }
-        }
-      }
-    }
-  },
-
-  Ascomycota: { // Phylum
-    info: "Sac fungi producing spores in specialized structures.",
-    Saccharomycetales: { // Order
-      info: "Yeasts used in baking and brewing.",
-      Saccharomycetaceae: { // Family
-        info: "Baker's and brewer's yeasts.",
-        Saccharomyces: { // Genus
-          info: "Single-celled fermentation fungi.",
-          "Saccharomyces cerevisiae": { info: "Baker's yeast." },
-          "Saccharomyces pastorianus": { info: "Brewer's yeast for lagers." }
-        }
-      }
-    },
-
-    Pezizales: { // Order
-      info: "Cup fungi, often brightly colored.",
-      Pezizaceae: { // Family
-        info: "Edible or decorative cup fungi.",
-        Peziza: { // Genus
-          info: "Cup-shaped fungi.",
-          "Peziza vesiculosa": { info: "Common cup fungus on soil or dung." }
-        }
-      }
-    },
-
-    Tuberales: { // Order
-      info: "Truffles, underground edible fungi.",
-      Tuberaceae: { // Family
-        info: "Highly prized truffles.",
-        Tuber: { // Genus
-          info: "Edible subterranean fungi.",
-          "Tuber melanosporum": { info: "Black truffle." },
-          "Tuber magnatum": { info: "White truffle, extremely valuable." }
-        }
-      }
-    }
-  },
-
-  Mucoromycota: { // Phylum
-    info: "Fast-growing molds often on food or soil.",
-    Mucorales: { // Order
-      info: "Common bread and soil molds.",
-      Mucoraceae: { // Family
-        info: "Mold colonies with sporangia.",
-        Mucor: { // Genus
-          info: "Common mold genus.",
-          "Mucor racemosus": { info: "Soil and bread mold." }
-        },
-        Rhizopus: { // Genus
-          info: "Bread molds.",
-          "Rhizopus stolonifer": { info: "Black bread mold." }
-        }
-      }
-    }
-  },
-
-  Chytridiomycota: { // Phylum
-    info: "Aquatic fungi with motile spores.",
-    Chytridiales: { // Order
-      info: "Simple aquatic fungi.",
-      Chytridiaceae: { // Family
-        info: "Parasitic or saprophytic chytrids.",
-        Batrachochytrium: { // Genus
-          info: "Amphibian skin parasite.",
-          "Batrachochytrium dendrobatidis": { info: "Causes chytridiomycosis in frogs." }
-        }
-      }
-    }
-  },
-
-  Glomeromycota: { // Phylum
-    info: "Symbiotic fungi forming arbuscular mycorrhizae with plants.",
-    Glomerales: { // Order
-      info: "Root-associated fungi.",
-      Glomeraceae: { // Family
-        info: "Helps plants absorb nutrients.",
-        Glomus: { // Genus
-          info: "Symbiotic root fungi.",
-          "Glomus intraradices": { info: "Common arbuscular mycorrhizal species." }
-        }
-      }
-    },
-  }
-}
-},
-
-Prokarya: { // Domain
-  info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Single-celled organisms without nuclei, extremely diverse in metabolism and habitat.</li>
-    <li>Include bacteria, cyanobacteria, archaea, and other microscopic life forms.</li>
-    <li>Crucial for nutrient cycling, symbiosis, and forming the base of many ecosystems.</li>
-  </ul>
-</section>
-`,
-
-  Bacteria: { // Kingdom
-    info: "Prokaryotic cells with diverse metabolic capabilities.",
-
-    Eubacteria: { // Phylum
-      info: "Common prokaryotic cells, some pathogenic, some beneficial.",
-
-      Bacillales: { // Order
-        info: "Rod-shaped bacteria, some produce antibiotics.",
-        Bacillaceae: { // Family
-          info: "Rod-shaped, spore-forming bacteria.",
-          Bacillus: { // Genus
-            info: "Common soil and lab bacteria.",
-            "Bacillus subtilis": { info: "Soil bacteria used in research and fermentation." },
-            "Bacillus anthracis": { info: "Anthrax-causing bacterium." }
-          }
-        }
-      },
-
-      Lactobacillales: { // Order
-        info: "Lactic acid bacteria used in food fermentation.",
-        Lactobacillaceae: { // Family
-          info: "Probiotics and yogurt bacteria.",
-          Lactobacillus: { // Genus
-            info: "Ferment sugars into lactic acid.",
-            "Lactobacillus acidophilus": { info: "Common in dairy fermentation and gut flora." }
-          }
-        }
-      },
-
-      Enterobacteriales: { // Order
-        info: "Gut bacteria, some pathogenic.",
-        Enterobacteriaceae: { // Family
-          info: "Rod-shaped, facultative anaerobes.",
-          Escherichia: { // Genus
-            info: "Common intestinal bacteria.",
-            "Escherichia coli": { info: "Some strains harmless, others pathogenic." }
-          },
-          Salmonella: { // Genus
-            info: "Pathogenic bacteria causing food poisoning.",
-            "Salmonella enterica": { info: "Common cause of salmonellosis." }
-          }
-        }
-      }
-    },
-
-    Cyanobacteria: { // Phylum
-      info: "Photosynthetic bacteria producing oxygen and nutrients.",
-
-      Chroococcales: { // Order
-        info: "Single-celled and colonial cyanobacteria.",
-        Chroococcaceae: { // Family
-          info: "Coccoid cyanobacteria forming colonies.",
-          Microcystis: { // Genus
-            info: "Forms toxic blooms in freshwater.",
-            "Microcystis aeruginosa": { info: "Produces harmful cyanotoxins in lakes and rivers." }
-          }
-        }
-      },
-
-      Nostocales: { // Order
-        info: "Filamentous cyanobacteria, often nitrogen-fixing.",
-        Nostocaceae: { // Family
-          info: "Nitrogen-fixing cyanobacteria.",
-          Nostoc: { // Genus
-            info: "Forms colonies in soil or water.",
-            "Nostoc commune": { info: "Edible and forms gelatinous colonies." }
-          },
-          Anabaena: { // Genus
-            info: "Filamentous cyanobacteria.",
-            "Anabaena sp.": { info: "Nitrogen-fixing, sometimes toxic." }
-          }
-        }
-      }
-    },
-
-    // Alien bacteria
-    Aerovivax: { // Genus
-      info: "Floating atmospheric bacteria, unique to Panategwa d.",
-      "Aerovivax zephyri": { // Species
-        info: "Microscopic gas-filled cells drifting in the upper atmosphere, occasionally forming nutrient clouds for flying leviathans."
-      }
-    }
-  }
-},
-Archaea: { // Domain
+  "Prokheevanians": { // Ethnotype
     info: `
-<section>
-  <h2>Overview</h2>
-  <ul>
-    <li>Extremophiles with unique biochemistry, surviving in harsh and extreme environments.</li>
-    <li>Include heat-, salt-, and acid-loving microorganisms.</li>
-    <li>Often form symbiotic relationships and contribute to geochemical cycles.</li>
-  </ul>
-</section>
-`,
 
-    Thermophila: { // Phylum
-      info: "Heat-loving microorganisms thriving in extreme temperatures.",
+  <br>
+  <section>
+    <h2>General</h2>
+    <dl>
+  <dt>General Description:</dt>
+    <dd>
+      Desc
+    </dd>
+  </section>
+  `,
+}, // End of Prokheevanians
+  "Karateobidians": { // Ethnotype
+    info: `
 
-      Thermococcales: { // Order
-        info: "Hyperthermophiles in hot springs and hydrothermal vents.",
-        Thermococcaceae: { // Family
-          info: "Rod-shaped, anaerobic archaea.",
-          Thermococcus: { // Genus
-            info: "Deep-sea vent archaeon.",
-            "Thermococcus litoralis": { info: "Used in high-temperature DNA polymerase research." }
+  <br>
+  <section>
+    <h2>General</h2>
+    <dl>
+  <dt>General Description:</dt>
+    <dd>
+      Desc
+    </dd>
+  </section>
+  `,
+} // end of Karateobidians
+  }, // End of Pitosialis
+
+"Archalis": { // Clade
+    info: `
+
+  <br>
+  <section>
+    <h2>Info here</h2>
+  </section>
+
+
+  `,
+  "Archiburgs": { // Ethnotype
+    info: `
+
+  <br>
+  <section>
+    <h2>General</h2>
+    <dl>
+  <dt>General Description:</dt>
+    <dd>
+      Desc
+    </dd>
+  </section>
+  `
+}, // End of Archiburgs
+
+  "Camebaperitiseron": { // Ethnotype
+    info: `
+
+  <br>
+  <section>
+    <h2>General</h2>
+    <dl>
+  <dt>General Description:</dt>
+    <dd>
+      Desc
+    </dd>
+  </section>
+  `,
+}, // End of Prokheevanians
+  "Karateobidians": { // Ethnotype
+    info: `
+
+  <br>
+  <section>
+    <h2>General</h2>
+    <dl>
+  <dt>General Description:</dt>
+    <dd>
+      Desc
+    </dd>
+  </section>
+  `,
+} // end of Karateobidians
+  }, // End of Archalis
+    }, // End of Anthropoi civilis pitosianus
+
+  "Anthropoi civilis fortnus": { // Subspecies
+    info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>The wealthiest and most strategically organized race of Anthropoi civilis, adapted to hot climates with efficient heat and water management.</li>
+      <li>Known for discipline, trade, and resource management; culturally moderate with strong hierarchical structures.</li>
+      <li>Six fingers, ambidextrous; olive-brown skin color.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Lifestyle</h2>
+    <ul>
+      <li><strong>Population:</strong> ~3.5 billion</li>
+      <li><strong>Habitat:</strong> Hot climates; deserts and arid regions with efficient water management systems</li>
+      <li><strong>Diet:</strong> Omnivorous; elites consume Leviathan-derived nutrients for extended lifespan; skilled farmers and traders</li>
+      <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually twins or triplets</li>
+      <li><strong>Lifespan:</strong> Poor ~200–300 years; rich ~500–1,000+ years; leaders tens of thousands</li>
+      <li><strong>Behavior:</strong> Disciplined, strategic, hierarchical; elder sacrifices culturally expected</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Extras</h2>
+    <ul>
+      <li>High wealth concentration; leaders monopolize luxury resources for longevity</li>
+      <li>Soldiers form a large part of society; organized communities with strong defense systems</li>
+      <li>Skilled farmers, traders, and resource managers; value stability and strategic planning</li>
+      <li>Culture emphasizes loyalty, survival, and respect for elders and leaders</li>
+    </ul>
+  </section>
+  `,
+  "Rashooties": { info: `
+    <section>
+      <h2>Info</h2>
+        <ul>
+          <li>Leader: Rashoot</li>
+          <li>Population: ~1.5 billion</li>
+          <li>Known for trade, irrigation systems, and military organization.</li>
+        </ul>
+    </section>` },
+  "Jamuhairies": { info: `
+    <section>
+      <h2>Nation 4</h2>
+        <ul><li>Leader: Muheri</li>
+          <li>Population: ~2 billion</li>
+          <li>Specializes in desert cities, strategic commerce, and disciplined armies.</li>
+        </ul>
+    </section>` }
+  }, // End of Anthropoi civilis fortnus
+
+  "Anthropoi civilis arifatonus": { // Subspecies
+    info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>The most populous and culturally rich race of Anthropoi civilis, adapted to warm and temperate climates.</li>
+      <li>Known for cooperation, tradition, and strong community bonds; socially cohesive despite lower wealth concentration.</li>
+      <li>Six fingers, ambidextrous; light-bear-brown skin color.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Lifestyle</h2>
+    <ul>
+      <li><strong>Population:</strong> ~5 billion</li>
+      <li><strong>Habitat:</strong> Warm and temperate climates; forests, grasslands, and agricultural regions</li>
+      <li><strong>Diet:</strong> Omnivorous; diet focuses on local agriculture and hunting; few elites consume Leviathan-derived nutrients</li>
+      <li><strong>Reproduction:</strong> Viviparous, ~6-month gestation, usually twins or triplets</li>
+      <li><strong>Lifespan:</strong> Poor ~200–300 years; rich ~500–1,000+ years; leaders tens of thousands</li>
+      <li><strong>Behavior:</strong> Cooperative, culturally cohesive, hierarchical; elder sacrifices culturally expected</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Extras</h2>
+    <ul>
+      <li>Most populous race; soldiers form ~25% of population; strong communal enforcement</li>
+      <li>Culturally rich with emphasis on traditions and cooperation; moderate technological advancement</li>
+      <li>High social cohesion; leaders essential for survival and community organization</li>
+      <li>Culture emphasizes loyalty, survival, and respect for elders and leaders</li>
+    </ul>
+  </section>
+  `,
+  "Arifalums": { info: `
+    <section>
+      <h2>Nation 5</h2>
+        <ul>
+          <li>Capital: Glenora</li>
+          <li>Population: 4.5 billion</li>
+          <li>Famous for farming, traditions, and education.</li>
+        </ul>
+    </section>` },
+  "Neevekians": { info: `
+    <section>
+      <h2>Nation 6</h2>
+        <ul>
+          <li>Capital: Brystol</li>
+          <li>Population: 500 million</li>
+          <li>Centers on cooperative communities, craft, and culture.</li>
+        </ul>
+      </section>` } // End of The Neevekian Kingdom
+  } // End of Anthropoi civilis arifatonus
+                  } // End of Anthropoi civilis
+                  
+                } // End of Anthropoi
+              } // End of Anthropida
+            } // End of Dorsuprata
+          } // End of Cognitiva
+        }, // End of Spondylota
+
+  Exosclerata: { // Phylum  
+    info: `
+  <section> 
+                                                                                      
+    <h2>Overview</h2>
+    <ul>
+      <li>Organisms with external skeletons, primarily terrestrial walkers.</li>
+      <li>Exhibit social coordination and tool usage in some species.</li>
+    </ul>
+  </section>
+  `,
+    Arthropoda: { // Class
+      info: "Exoskeleton-bearing species with diverse adaptations.",
+      Insecta: { // Order
+        info: "Small, winged or wingless species with segmented bodies and exoskeletons.",
+        Coleoptera: { // Family
+          info: "Beetle-like species with hardened forewings for protection.",
+          Scarabaeidae: { // Genus
+            info: "Dung beetles and large ground beetles with strong mandibles.",
+            Scarabaeus: { // Species
+              info: "Ground-dwelling dung beetles known for rolling and burying organic matter.",
+              "Scarabaeus sacer": { // Subspecies
+                info: "Sacred beetle, culturally important in some civilizations.",
+                "Scarabaeus sacer aurum": { // Subspecies
+                  info: "Golden-hued variant of beetles found in desert ecosystems."
+                
+                }
+              }
+            }
+          }
+        },
+        Lepidoptera: { // Order
+          info: "Butterfly- and moth-like species with scaled wings.",
+          Nymphalidae: { // Family
+            info: "Colorful butterflies with diverse patterns.",
+            Danaus: { // Genus
+              info: "Milkweed butterflies, migratory and highly social.",
+              "Danaus plexippus": { // Species
+                info: "Monarch butterfly analog, known for long migrations."
+              }
+            }
+          }
+        }
+      },
+      Arachnida: { // Class
+        info: "Spider-like and scorpion-like species, usually terrestrial predators.",
+        Araneae: {
+          info: "True spiders with silk-producing abilities.",
+          Theridiidae: {
+            info: "Cobweb and tangle-web spiders.",
+            Latrodectus: {
+              info: "Widow spiders, highly venomous with distinct markings.",
+              "Latrodectus nigricauda": {
+                info: "Black widow analog, prefers warm regions."
+              }
+            }
+          }
+        }
+      },
+      Formicidae: { // Class
+        info: "Ant-like organisms with complex social structures.",
+        Atta: { // Genus
+          info: "Leafcutter ants, known for farming fungus.",
+          "Atta cephalotes": { // Species
+            info: "Common leafcutter ant species in tropical forests."
           }
         }
       }
     },
 
-    Halophila: { // Phylum
-      info: "Salt-adapted microorganisms inhabiting hypersaline environments.",
-
-      Halobacteriales: { // Order
-        info: "Extreme salt-loving archaea.",
-        Halobacteriaceae: { // Family
-          info: "Found in salt flats and brines.",
-          Halobacterium: { // Genus
-            info: "Rod-shaped halophilic archaea.",
-            "Halobacterium salinarum": { info: "Bright red, survives saturated salt solutions." }
-          }
-        }
-      }
-    },
-
-    Acidophila: { // Phylum
-      info: "Acid-loving archaea thriving in low pH environments.",
-
-      Sulfolobales: { // Order
-        info: "Sulfur-oxidizing archaea in hot acidic springs.",
-        Sulfolobaceae: { // Family
-          info: "Rod-shaped or irregular cells.",
-          Sulfolobus: { // Genus
-            info: "Archaea surviving in extreme acid and heat.",
-            "Sulfolobus acidocaldarius": { info: "Model organism for acidophilic studies." }
+    Crustacea: { // Class
+      info: "Aquatic and semi-aquatic exoskeleton species.",
+      Malacostraca: { // Order
+        info: "Large crustaceans like crabs, lobsters, and shrimp.",
+        Decapoda: { // Family
+          info: "Ten-legged crustaceans, many with advanced social behavior.",
+          Portunidae: { // Genus
+            info: "Swimming crabs with flattened hind legs.",
+            Xenoptera: { // Order
+              info: "Alien arthropods with transparent exoskeletons and bioluminescent organs. Capable of gliding between forest canopies using wing-like extensions.",
+              Luminaridae: { // Family
+                info: "Families of gliding xenopterans, highly social and communicate via light signals.",
+                Luminara: { // Genus
+                  info: "Large, colony-forming xenopterans.",
+                  "Luminara spectra": { // Species
+                    info: "Gliding arthropod, up to 30 cm long, emits colored light pulses to coordinate group movement and deter predators."
+                  }
+                }
+              }
+            },
+            Callinectes: { // Species
+              info: "Blue crab analog, agile swimmers.",
+            }
           }
         }
       }
     }
-  }
-};
+  },
 
-// ================= RANKS (PLURAL) =================
-const rankNames = [
-  "Domains",
-  "Kingdoms",
-  "Phyla",
-  "Classes",
-  "Orders",
-  "Families",
-  "Genera",
-  "Species",
-  "Subspecies",
-  "Nations"
-];
 
-// ================= RANKS (SINGULAR) =================
-const rankSingle = [
-  "Domain",
-  "Kingdom",
-  "Phylum",
-  "Class",
-  "Order",
-  "Family",
-  "Genus",
-  "Species",
-  "Subspecies",
-  "Nation"
-];
-
-// ================= SEARCH FILTER STATE =================
-let excludedRanks = new Set();
-
-// ================= STATE =================
-let currentPath = [];
-let currentNode = taxonomy;
-let searchResults = [];
-let expanded = true;
-const defaultShowCount = 4;
-
-// ================= ADVANCED SEARCH SETUP =================
-function setupExcludeOptions() {
-  const container = document.getElementById("exclude-options");
-  if (!container) return;
-
-  container.innerHTML = "";
-
-  rankSingle.forEach((rank, index) => {
-    const label = document.createElement("label");
-    label.style.display = "block";
-
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = true;
-    checkbox.dataset.rankIndex = index;
-
-    checkbox.onchange = () => {
-      const includeAll = document.getElementById("include-all");
-
-      if (!checkbox.checked) {
-        excludedRanks.add(index);
-      } else {
-        excludedRanks.delete(index);
+  Leviathanata: { // Phylum
+    info: `
+  <section>
+    <h2>Overview</h2>
+    <ul>
+      <li>Extremely large aquatic and aerial organisms occupying top ecological niches.</li>
+      <li>Characterized by slow metabolisms, reinforced skeletal structures, and long lifespans.</li>
+      <li>Display varying degrees of intelligence, social coordination, and environmental adaptation.</li>
+    </ul>
+  </section>
+  `,
+    Pelagotheria: { // Class
+      info: "Large-bodied pelagic leviathans adapted for open-ocean life.",
+      Luminocetiformes: { // Order
+        info: "Slow-moving filter-feeding leviathans utilizing bioluminescence.",
+        Luminocetidae: { // Family
+          info: "Massive bioluminescent oceanic organisms forming loose social groups.",
+          Luminocetus: { // Genus
+            info: "Extremely large pelagic filter-feeders with patterned light organs.",
+            "Luminocetus magnus": { // Species
+              info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>Reaches lengths of up to 4 km.</li>
+      <li>Feeds primarily on planktonic megafauna.</li>
+      <li>Uses rhythmic bioluminescent pulses for intraspecies communication.</li>
+    </ul>
+  </section>
+  `
+            },
+            "Luminocetus borealis": { // Species
+              info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>Slightly smaller relative, averaging 2.8 km in length.</li>
+      <li>Inhabits colder, deeper waters.</li>
+      <li>Displays slower movement and dimmer light emission.</li>
+    </ul>
+  </section>
+  `
+            }
+          }
+        }
       }
+    },
 
-      // Sync Include All box
-      includeAll.checked = excludedRanks.size === 0;
+    Aerotheria: { // Class
+      info: "Gigantic aerial leviathans capable of sustained flight.",
+      Gravivoluciformes: { // Order
+        info: "Flying leviathans using gas-filled skeletal cavities for lift.",
+        Caelavidae: { // Family
+          info: "Highly intelligent airborne predators with vast territories.",
+          Caelavus: { // Genus
+            info: "Large sky-dominating leviathans with elongated wings.",
+            "Caelavus imperator": { // Species
+              info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>Wingspan exceeding 1.9 km.</li>
+      <li>Capable of remaining airborne for several days.</li>
+      <li>Preys on smaller aerial and surface-dwelling organisms.</li>
+    </ul>
+  </section>
+  `
+            },
+            "Caelavus minor": { // Species
+              info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>Smaller species with a wingspan around 1.2 km.</li>
+      <li>More agile and faster than larger relatives.</li>
+      <li>Often observed in loose migratory formations.</li>
+    </ul>
+  </section>
+  `
+            }
+          }
+        }
+      }
+    },
+
+    Bathytheria: { // Class
+      info: "Deep-sea leviathans adapted to extreme pressure and darkness.",
+      Abyssotheriiformes: { // Order
+        info: "Gigantic trench-dwelling organisms with low metabolic rates.",
+        Abyssotheriidae: { // Family
+          info: "Slow-moving deep-ocean leviathans with internal light organs.",
+          Abyssotherium: { // Genus
+            info: "Massive abyssal leviathans rarely observed alive.",
+            "Abyssotherium longum": { // Species
+              info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>Measured lengths exceeding 25 km.</li>
+      <li>Transparent outer tissues reduce structural stress.</li>
+      <li>Feeds on deep-sea megafauna and organic falls.</li>
+    </ul>
+  </section>
+  `
+            },
+            "Abyssotherium lentum": { // Species
+              info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>Shorter species averaging 18 km in length.</li>
+      <li>Extremely slow movement conserves energy.</li>
+      <li>Emits faint constant bioluminescence.</li>
+    </ul>
+  </section>
+  `
+            }
+          }
+        }
+      }
+    }
+  },
+
+
+
+  Veriforma: { // Phylum
+    info: `
+  <section>
+    <h2>Overview</h2>
+    <ul>
+      <li>Worm-like or elongated organisms, mostly underground or in water.</li>
+      <li>Some are predatory, hunting small animals or aquatic life.</li>
+      <li>Adapted to digging, swimming, or slithering through tight spaces.</li>
+    </ul>
+  </section>
+  `,
+    Serpentica: { // Class
+      info: "Slender, intelligent worm-like predators.",
+      infoPredators: "Burrowers that can sense vibrations to hunt prey.",
+      "Earthwormia": { // Genus
+        info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>Medium-sized predatory worm, ~1–2 meters long.</li>
+      <li>Burrows through soil to ambush insects and small animals.</li>
+      <li>Some have small sensory eyes and tiny fang-like structures to grasp prey.</li>
+    </ul>
+  </section>
+  `
+      },
+      Aqualis: { // Genus
+        info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>Water-dwelling worm, ~1–3 meters long, swims using muscular waves.</li>
+      <li>Feeds on small fish, plankton, and other aquatic creatures.</li>
+      <li>Often forms small packs to herd prey into shallow areas.</li>
+    </ul>
+  </section>
+  `
+      }
+    },
+    Tubularis: { // Class
+      info: "Flexible, burrowing worms that adapt to many environments.",
+      "Sandlurker": { // Genus
+        info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>Lives in sandy deserts or riverbanks, ~0.5–1 meter long.</li>
+      <li>Ambushes small rodents and insects, moving just below the surface.</li>
+      <li>Skin can change slightly in color to blend with the environment.</li>
+    </ul>
+  </section>
+  `
+      },
+      Mudcrawler: { // Genus
+        info: `
+  <section>
+    <h2>General Description</h2>
+    <ul>
+      <li>Thick-bodied worm, ~2 meters long, lives in muddy swamps or wetlands.</li>
+      <li>Swims slowly, grabs small aquatic prey with sucker-like mouth.</li>
+      <li>Often found alone, but sometimes in small groups hunting cooperatively.</li>
+    </ul>
+  </section>
+  `
+        }
+      }
+    }
+  },
+
+
+  Plantae: { // Kingdom
+    info: `
+  <section>
+    <h2>Overview</h2>
+    <ul>
+      <li>Photosynthetic organisms forming the base of ecosystems.</li>
+      <li>Range from microscopic plankton to massive trees and flowering plants.</li>
+      <li>Provide food, oxygen, shelter, and habitats for countless species.</li>
+      <li>Some are edible, medicinal, ornamental, or even used as building materials.</li>
+    </ul>
+  </section>
+  `,
+
+    Chlorophyta: { // Phylum
+      info: "Green algae and simple aquatic plants.",
+      Ulva: { // Genus
+        info: "Sea lettuce; edible, grows in shallow waters."
+      },
+      Chlorella: { // Genus
+        info: "Microscopic green algae; used as supplement."
+      },
+      Spirogyra: { // Genus
+        info: "Filamentous freshwater algae forming green mats."
+      },
+      Codium: { // Genus
+        info: "Soft, branching seaweed; forms underwater forests."
+      },
+      Cladophora: { // Genus
+        info: "Thread-like algae, often in nutrient-rich waters."
+      },
+      Planktonica: { // Genus
+        info: "Tiny floating plankton, base of aquatic food chains."
+      }
+    },
+
+    Bryophyta: { // Phylum
+      info: "Mosses and liverworts; non-vascular plants that thrive in damp environments.",
+      Sphagnum: { // Genus
+        info: "Peat moss, forms bogs and wetlands."
+      },
+      Polytrichum: { // Genus
+        info: "Haircap moss, common in forests."
+      }
+    },
+
+    Pteridophyta: { // Phylum
+      info: "Ferns and horsetails; vascular plants reproducing via spores.",
+      Pteris: { // Genus
+        info: "Brake ferns, decorative and common in shaded areas."
+      },
+      Equisetum: { // Genus
+        info: "Horsetails, ancient vascular plants with silica-rich stems."
+      }
+    },
+
+    Magnoliophyta: { // Phylum
+      info: "Flowering plants with vascular systems.",
+      Rosopsida: { // Class
+        info: "Most flowering plants: trees, shrubs, herbs, crops, and flowers.",
+        Solanales: { // Order
+          info: "Nightshade family plants.",
+          Solanaceae: { // Family
+            info: "Tomatoes, potatoes, peppers, eggplants.",
+            Solanum: { // Genus
+              info: "Potatoes and eggplants.",
+              "Solanum tuberosum": { info: "Potato, starchy tuber." },
+              "Solanum melongena": { info: "Eggplant, edible fruit." }
+            },
+            Capsicum: { // Genus
+              info: "Peppers.",
+              "Capsicum annuum": { info: "Bell peppers, chili peppers." },
+              "Capsicum frutescens": { info: "Hot chili peppers." }
+            },
+            Lycopersicon: { // Genus
+              info: "Tomatoes.",
+              "Lycopersicon esculentum": { info: "Common tomato crop." }
+            }
+          }
+        },
+
+        Cucurbitales: { // Order
+          info: "Gourds, squashes, melons, and cucumbers.",
+          Cucurbitaceae: { // Family
+            info: "Squashes, pumpkins, melons, cucumbers.",
+            Cucumis: { // Genus
+              info: "Melons and cucumbers.",
+              "Cucumis sativus": { info: "Cucumber, edible fresh or pickled." },
+              "Cucumis melo": { info: "Melons like cantaloupe and honeydew." }
+            },
+            Cucurbita: { // Genus
+              info: "Squash and pumpkins.",
+              "Cucurbita pepo": { info: "Pumpkins and zucchini." },
+              "Cucurbita maxima": { info: "Giant squash and pumpkin varieties." },
+              "Cucurbita moschata": { info: "Butternut and hubbard squash." }
+            }
+          }
+        },
+
+        Fabales: { // Order
+          info: "Legume-bearing plants.",
+          Fabaceae: { // Family
+            info: "Beans, peas, soybeans.",
+            Pisum: { // Genus
+              info: "Peas.",
+              "Pisum sativum": { info: "Garden pea, edible pods and seeds." }
+            },
+            Phaseolus: { // Genus
+              info: "Common beans.",
+              "Phaseolus vulgaris": { info: "Kidney, black, and pinto beans." },
+              "Phaseolus coccineus": { info: "Runner bean, edible and ornamental." }
+            },
+            Glycine: { // Genus
+              info: "Soybeans.",
+              "Glycine max": { info: "Domesticated soybean crop, protein-rich legume." }
+            }
+          }
+        },
+
+        Fagales: { // Order
+          info: "Oak, beech, and chestnut trees.",
+          Fagaceae: { // Family
+            info: "Oak, beech, chestnut.",
+            Quercus: { // Genus
+              info: "Oaks.",
+              "Quercus robur": { info: "English oak." },
+              "Quercus alba": { info: "White oak, North America." }
+            },
+            Castanea: { // Genus
+              info: "Chestnuts.",
+              "Castanea sativa": { info: "Sweet chestnut tree, edible nuts." }
+            },
+            Fagus: { // Genus
+              info: "Beech trees.",
+              "Fagus sylvatica": { info: "European beech." }
+            }
+          }
+        },
+
+        Rosales: { // Order
+          info: "Roses, apples, cherries, pears, strawberries.",
+          Rosaceae: { // Family
+            info: "Fruit trees and ornamental plants.",
+            Malus: { // Genus
+              info: "Apples.",
+              "Malus domestica": { info: "Cultivated apple varieties." }
+            },
+            Prunus: { // Genus
+              info: "Stone fruits.",
+              "Prunus persica": { info: "Peach tree." },
+              "Prunus avium": { info: "Sweet cherry." },
+              "Prunus domestica": { info: "Plum tree." }
+            },
+            Rosa: { // Genus
+              info: "Roses.",
+              "Rosa chinensis": { info: "China rose, ornamental." },
+              "Rosa gallica": { info: "Gallic rose, deep red flowers." }
+            },
+            Fragaria: { // Genus
+              info: "Strawberries.",
+              "Fragaria × ananassa": { info: "Garden strawberry." }
+            }
+          }
+        },
+
+        Asterales: { // Order
+          info: "Daisy and sunflower family.",
+          Asteraceae: { // Family
+            info: "Sunflowers, daisies, lettuce, chamomile.",
+            Helianthus: { // Genus
+              info: "Sunflowers.",
+              "Helianthus annuus": { info: "Common sunflower." }
+            },
+            Lactuca: { // Genus
+              info: "Lettuce.",
+              "Lactuca sativa": { info: "Garden lettuce." }
+            },
+            Taraxacum: { // Genus
+              info: "Dandelions.",
+              "Taraxacum officinale": { info: "Edible leaves and flowers." }
+            },
+            Chrysanthemum: { // Genus
+              info: "Ornamental flowers.",
+              "Chrysanthemum morifolium": { info: "Garden chrysanthemum." }
+            }
+          }
+        },
+
+        Liliales: { // Order
+          info: "Lilies and other monocots.",
+          Liliaceae: { // Family
+            info: "True lilies and flowering bulbs.",
+            Lilium: { // Genus
+              info: "Lilies.",
+              "Lilium candidum": { info: "Madonna lily, white fragrant flowers." },
+              "Lilium lancifolium": { info: "Tiger lily, orange with spots." }
+            }
+          }
+        },
+
+        Lamiales: { // Order
+          info: "Mint, basil, lavender family.",
+          Lamiaceae: { // Family
+            info: "Aromatic herbs.",
+            Mentha: { // Genus
+              info: "Mint genus.",
+              "Mentha spicata": { info: "Spearmint." },
+              "Mentha piperita": { info: "Peppermint." }
+            },
+            Ocimum: { // Genus
+              info: "Basil genus.",
+              "Ocimum basilicum": { info: "Sweet basil." }
+            },
+            Lavandula: { // Genus
+              info: "Lavender genus.",
+              "Lavandula angustifolia": { info: "English lavender." }
+            },
+            Rosmarinus: { // Genus
+              info: "Rosemary.",
+              "Rosmarinus officinalis": { info: "Culinary herb." }
+            }
+          }
+        },
+
+        Cactales: { // Order
+          info: "Cactus plants adapted to deserts.",
+          Cactaceae: { // Family
+            info: "Succulent, spiny desert plants.",
+            Carnegiea: { // Genus
+              info: "Giant saguaro cactus.",
+              "Carnegiea gigantea": { info: "Saguaro, huge desert cactus." }
+            },
+            Opuntia: { // Genus
+              info: "Prickly pear cacti.",
+              "Opuntia ficus-indica": { info: "Edible cactus pads and fruits." }
+            },
+            Echinocactus: { // Genus
+              info: "Barrel cacti.",
+              "Echinocactus grusonii": { info: "Golden barrel cactus." }
+            }
+          }
+        },
+
+        Ericaceae: { // Order
+          info: "Heath plants, berries.",
+          Vaccinium: { // Genus
+            info: "Blueberries and cranberries.",
+            "Vaccinium corymbosum": { info: "Highbush blueberry." },
+            "Vaccinium macrocarpon": { info: "Cranberry." }
+          },
+          Rhododendron: { // Genus
+            info: "Ornamental shrubs.",
+            "Rhododendron ponticum": { info: "Common rhododendron." }
+          }
+        },
+
+        // Alien plant
+        Balloonia: { // Genus
+          info: "Giant floating plant with air sacs, drifts above water, eaten by flying leviathans.",
+          "Balloonia gigantea": { // Species
+            info: "Hundreds of meters in size, filled with light gas, nutrient-rich food source."
+          }
+        }
+      }
+    }
+  },
+
+
+  Fungi: { // Kingdom
+    info: `
+  <section>
+    <h2>Overview</h2>
+    <ul>
+      <li>Decomposers that recycle organic matter and nutrients.</li>
+      <li>Include microscopic yeasts, molds, and giant mushrooms.</li>
+      <li>Some are edible, medicinal, or used in fermentation.</li>
+      <li>Others form symbiotic relationships with plants or animals.</li>
+    </ul>
+  </section>
+  `,
+
+    Basidiomycota: { // Phylum
+      info: "Mushroom-forming fungi with complex spore systems.",
+      Agaricales: { // Order
+        info: "Typical gilled mushrooms.",
+        Agaricaceae: { // Family
+          info: "Edible and common forest mushrooms.",
+          Agaricus: { // Genus
+            info: "Classic mushrooms.",
+            "Agaricus bisporus": { info: "Button, cremini, portobello mushrooms." }
+          },
+          Lepiota: { // Genus
+            info: "Parasol mushrooms.",
+            "Lepiota procera": { info: "Edible, tall with umbrella cap." }
+          }
+        },
+        Amanitaceae: { // Family
+          info: "Deadly and colorful mushrooms.",
+          Amanita: { // Genus
+            info: "Poisonous and iconic mushrooms.",
+            "Amanita muscaria": { info: "Fly agaric, red cap with white spots." },
+            "Amanita phalloides": { info: "Death cap, extremely toxic." }
+          }
+        }
+      },
+
+      Polyporales: { // Order
+        info: "Shelf or bracket fungi on trees.",
+        Polyporaceae: { // Family
+          info: "Wood-decaying fungi.",
+          Ganoderma: { // Genus
+            info: "Medicinal reishi mushrooms.",
+            "Ganoderma lucidum": { info: "Reishi, shiny red-brown shelf mushroom." }
+          },
+          Fomitopsis: { // Genus
+            info: "Tinder fungi for fire starting.",
+            "Fomitopsis pinicola": { info: "Red-belted conk, grows on dead trees." }
+          }
+        }
+      },
+
+      Boletales: { // Order
+        info: "Pored mushrooms, often edible.",
+        Boletaceae: { // Family
+          info: "Boletes with sponge-like pores.",
+          Boletus: { // Genus
+            info: "Edible forest mushrooms.",
+            "Boletus edulis": { info: "Porcini, prized edible mushroom." }
+          }
+        }
+      }
+    },
+
+    Ascomycota: { // Phylum
+      info: "Sac fungi producing spores in specialized structures.",
+      Saccharomycetales: { // Order
+        info: "Yeasts used in baking and brewing.",
+        Saccharomycetaceae: { // Family
+          info: "Baker's and brewer's yeasts.",
+          Saccharomyces: { // Genus
+            info: "Single-celled fermentation fungi.",
+            "Saccharomyces cerevisiae": { info: "Baker's yeast." },
+            "Saccharomyces pastorianus": { info: "Brewer's yeast for lagers." }
+          }
+        }
+      },
+
+      Pezizales: { // Order
+        info: "Cup fungi, often brightly colored.",
+        Pezizaceae: { // Family
+          info: "Edible or decorative cup fungi.",
+          Peziza: { // Genus
+            info: "Cup-shaped fungi.",
+            "Peziza vesiculosa": { info: "Common cup fungus on soil or dung." }
+          }
+        }
+      },
+
+      Tuberales: { // Order
+        info: "Truffles, underground edible fungi.",
+        Tuberaceae: { // Family
+          info: "Highly prized truffles.",
+          Tuber: { // Genus
+            info: "Edible subterranean fungi.",
+            "Tuber melanosporum": { info: "Black truffle." },
+            "Tuber magnatum": { info: "White truffle, extremely valuable." }
+          }
+        }
+      }
+    },
+
+    Mucoromycota: { // Phylum
+      info: "Fast-growing molds often on food or soil.",
+      Mucorales: { // Order
+        info: "Common bread and soil molds.",
+        Mucoraceae: { // Family
+          info: "Mold colonies with sporangia.",
+          Mucor: { // Genus
+            info: "Common mold genus.",
+            "Mucor racemosus": { info: "Soil and bread mold." }
+          },
+          Rhizopus: { // Genus
+            info: "Bread molds.",
+            "Rhizopus stolonifer": { info: "Black bread mold." }
+          }
+        }
+      }
+    },
+
+    Chytridiomycota: { // Phylum
+      info: "Aquatic fungi with motile spores.",
+      Chytridiales: { // Order
+        info: "Simple aquatic fungi.",
+        Chytridiaceae: { // Family
+          info: "Parasitic or saprophytic chytrids.",
+          Batrachochytrium: { // Genus
+            info: "Amphibian skin parasite.",
+            "Batrachochytrium dendrobatidis": { info: "Causes chytridiomycosis in frogs." }
+          }
+        }
+      }
+    },
+
+    Glomeromycota: { // Phylum
+      info: "Symbiotic fungi forming arbuscular mycorrhizae with plants.",
+      Glomerales: { // Order
+        info: "Root-associated fungi.",
+        Glomeraceae: { // Family
+          info: "Helps plants absorb nutrients.",
+          Glomus: { // Genus
+            info: "Symbiotic root fungi.",
+            "Glomus intraradices": { info: "Common arbuscular mycorrhizal species." }
+          }
+        }
+      },
+    }
+  }
+  },
+
+  Prokarya: { // Domain
+    info: `
+  <section>
+    <h2>Overview</h2>
+    <ul>
+      <li>Single-celled organisms without nuclei, extremely diverse in metabolism and habitat.</li>
+      <li>Include bacteria, cyanobacteria, archaea, and other microscopic life forms.</li>
+      <li>Crucial for nutrient cycling, symbiosis, and forming the base of many ecosystems.</li>
+    </ul>
+  </section>
+  `,
+
+    Bacteria: { // Kingdom
+      info: "Prokaryotic cells with diverse metabolic capabilities.",
+
+      Eubacteria: { // Phylum
+        info: "Common prokaryotic cells, some pathogenic, some beneficial.",
+
+        Bacillales: { // Order
+          info: "Rod-shaped bacteria, some produce antibiotics.",
+          Bacillaceae: { // Family
+            info: "Rod-shaped, spore-forming bacteria.",
+            Bacillus: { // Genus
+              info: "Common soil and lab bacteria.",
+              "Bacillus subtilis": { info: "Soil bacteria used in research and fermentation." },
+              "Bacillus anthracis": { info: "Anthrax-causing bacterium." }
+            }
+          }
+        },
+
+        Lactobacillales: { // Order
+          info: "Lactic acid bacteria used in food fermentation.",
+          Lactobacillaceae: { // Family
+            info: "Probiotics and yogurt bacteria.",
+            Lactobacillus: { // Genus
+              info: "Ferment sugars into lactic acid.",
+              "Lactobacillus acidophilus": { info: "Common in dairy fermentation and gut flora." }
+            }
+          }
+        },
+
+        Enterobacteriales: { // Order
+          info: "Gut bacteria, some pathogenic.",
+          Enterobacteriaceae: { // Family
+            info: "Rod-shaped, facultative anaerobes.",
+            Escherichia: { // Genus
+              info: "Common intestinal bacteria.",
+              "Escherichia coli": { info: "Some strains harmless, others pathogenic." }
+            },
+            Salmonella: { // Genus
+              info: "Pathogenic bacteria causing food poisoning.",
+              "Salmonella enterica": { info: "Common cause of salmonellosis." }
+            }
+          }
+        }
+      },
+
+      Cyanobacteria: { // Phylum
+        info: "Photosynthetic bacteria producing oxygen and nutrients.",
+
+        Chroococcales: { // Order
+          info: "Single-celled and colonial cyanobacteria.",
+          Chroococcaceae: { // Family
+            info: "Coccoid cyanobacteria forming colonies.",
+            Microcystis: { // Genus
+              info: "Forms toxic blooms in freshwater.",
+              "Microcystis aeruginosa": { info: "Produces harmful cyanotoxins in lakes and rivers." }
+            }
+          }
+        },
+
+        Nostocales: { // Order
+          info: "Filamentous cyanobacteria, often nitrogen-fixing.",
+          Nostocaceae: { // Family
+            info: "Nitrogen-fixing cyanobacteria.",
+            Nostoc: { // Genus
+              info: "Forms colonies in soil or water.",
+              "Nostoc commune": { info: "Edible and forms gelatinous colonies." }
+            },
+            Anabaena: { // Genus
+              info: "Filamentous cyanobacteria.",
+              "Anabaena sp.": { info: "Nitrogen-fixing, sometimes toxic." }
+            }
+          }
+        }
+      },
+
+      // Alien bacteria
+      Aerovivax: { // Genus
+        info: "Floating atmospheric bacteria, unique to Panategwa d.",
+        "Aerovivax zephyri": { // Species
+          info: "Microscopic gas-filled cells drifting in the upper atmosphere, occasionally forming nutrient clouds for flying leviathans."
+        }
+      }
+    }
+  },
+  Archaea: { // Domain
+      info: `
+  <section>
+    <h2>Overview</h2>
+    <ul>
+      <li>Extremophiles with unique biochemistry, surviving in harsh and extreme environments.</li>
+      <li>Include heat-, salt-, and acid-loving microorganisms.</li>
+      <li>Often form symbiotic relationships and contribute to geochemical cycles.</li>
+    </ul>
+  </section>
+  `,
+
+      Thermophila: { // Phylum
+        info: "Heat-loving microorganisms thriving in extreme temperatures.",
+
+        Thermococcales: { // Order
+          info: "Hyperthermophiles in hot springs and hydrothermal vents.",
+          Thermococcaceae: { // Family
+            info: "Rod-shaped, anaerobic archaea.",
+            Thermococcus: { // Genus
+              info: "Deep-sea vent archaeon.",
+              "Thermococcus litoralis": { info: "Used in high-temperature DNA polymerase research." }
+            }
+          }
+        }
+      },
+
+      Halophila: { // Phylum
+        info: "Salt-adapted microorganisms inhabiting hypersaline environments.",
+
+        Halobacteriales: { // Order
+          info: "Extreme salt-loving archaea.",
+          Halobacteriaceae: { // Family
+            info: "Found in salt flats and brines.",
+            Halobacterium: { // Genus
+              info: "Rod-shaped halophilic archaea.",
+              "Halobacterium salinarum": { info: "Bright red, survives saturated salt solutions." }
+            }
+          }
+        }
+      },
+
+      Acidophila: { // Phylum
+        info: "Acid-loving archaea thriving in low pH environments.",
+
+        Sulfolobales: { // Order
+          info: "Sulfur-oxidizing archaea in hot acidic springs.",
+          Sulfolobaceae: { // Family
+            info: "Rod-shaped or irregular cells.",
+            Sulfolobus: { // Genus
+              info: "Archaea surviving in extreme acid and heat.",
+              "Sulfolobus acidocaldarius": { info: "Model organism for acidophilic studies." }
+            }
+          }
+        }
+      }
+    }
+  };
+
+  // ================= RANKS (PLURAL) =================
+  const rankNames = [
+    "Domains",
+    "Kingdoms",
+    "Phyla",
+    "Classes",
+    "Orders",
+    "Families",
+    "Genera",
+    "Species",
+    "Subspecies",
+    "Clades",
+    "Ethnotypes"
+  ];
+
+  // ================= RANKS (SINGULAR) =================
+  const rankSingle = [
+    "Domain",
+    "Kingdom",
+    "Phylum",
+    "Class",
+    "Order",
+    "Family",
+    "Genus",
+    "Species",
+    "Subspecies",
+    "Clade",
+    "Ethnotype"
+  ];
+
+  // ================= SEARCH FILTER STATE =================
+  let excludedRanks = new Set();
+
+  // ================= STATE =================
+  let currentPath = [];
+  let currentNode = taxonomy;
+  let searchResults = [];
+  let expanded = true;
+  const defaultShowCount = 4;
+
+  // ================= ADVANCED SEARCH SETUP =================
+  function setupExcludeOptions() {
+    const container = document.getElementById("exclude-options");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    rankSingle.forEach((rank, index) => {
+      const label = document.createElement("label");
+      label.style.display = "block";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = true;
+      checkbox.dataset.rankIndex = index;
+
+      checkbox.onchange = () => {
+        const includeAll = document.getElementById("include-all");
+
+        if (!checkbox.checked) {
+          excludedRanks.add(index);
+        } else {
+          excludedRanks.delete(index);
+        }
+
+        // Sync Include All box
+        includeAll.checked = excludedRanks.size === 0;
+
+        // Optional: force re-search if there's a query
+        const searchInput = document.getElementById("search-bar");
+        if (searchInput.value.trim()) {
+          searchResults = findMatches(searchInput.value.toLowerCase());
+          renderSearchResults();
+        }
+      };
+
+      label.appendChild(checkbox);
+      label.append(" " + rank);
+      container.appendChild(label);
+    });
+
+    // Initialize Include All box
+    const includeAllBox = document.getElementById("include-all");
+    includeAllBox.addEventListener("change", () => {
+      const checkboxes = document.querySelectorAll("#exclude-options input");
+      if (includeAllBox.checked) {
+        excludedRanks.clear();
+        checkboxes.forEach(cb => cb.checked = true);
+      } else {
+        excludedRanks.clear();
+        rankSingle.forEach((_, i) => excludedRanks.add(i));
+        checkboxes.forEach(cb => cb.checked = false);
+      }
 
       // Optional: force re-search if there's a query
       const searchInput = document.getElementById("search-bar");
@@ -1351,220 +1462,194 @@ function setupExcludeOptions() {
         searchResults = findMatches(searchInput.value.toLowerCase());
         renderSearchResults();
       }
-    };
-
-    label.appendChild(checkbox);
-    label.append(" " + rank);
-    container.appendChild(label);
-  });
-
-  // Initialize Include All box
-  const includeAllBox = document.getElementById("include-all");
-  includeAllBox.addEventListener("change", () => {
-    const checkboxes = document.querySelectorAll("#exclude-options input");
-    if (includeAllBox.checked) {
-      excludedRanks.clear();
-      checkboxes.forEach(cb => cb.checked = true);
-    } else {
-      excludedRanks.clear();
-      rankSingle.forEach((_, i) => excludedRanks.add(i));
-      checkboxes.forEach(cb => cb.checked = false);
-    }
-
-    // Optional: force re-search if there's a query
-    const searchInput = document.getElementById("search-bar");
-    if (searchInput.value.trim()) {
-      searchResults = findMatches(searchInput.value.toLowerCase());
-      renderSearchResults();
-    }
-  });
-}
-
-
-// ================= ADVANCED TOGGLE =================
-const advancedToggle = document.getElementById("advanced-toggle");
-if (advancedToggle) {
-  advancedToggle.onclick = () => {
-    const panel = document.getElementById("advanced-panel");
-    panel.style.display = panel.style.display === "none" ? "block" : "none";
-  };
-}
-
-// ================= RENDER =================
-function renderLevel(node) {
-  const container = document.getElementById("taxonomy-container");
-  container.innerHTML = "";
-
-  const level = currentPath.length;
-  const labelName = rankNames[level] || "";
-
-  if (labelName) {
-    const label = document.createElement("div");
-    label.className = "taxonomy-label";
-    label.textContent = labelName + ":";
-    container.appendChild(label);
+    });
   }
 
-  Object.keys(node).forEach(key => {
-    if (key === "info") return;
 
-    const btn = document.createElement("button");
-    btn.textContent = key;
-
-    btn.onclick = () => {
-      currentPath.push(key);
-      currentNode = node[key];
-      renderLevel(currentNode);
-      updateUI();
+  // ================= ADVANCED TOGGLE =================
+  const advancedToggle = document.getElementById("advanced-toggle");
+  if (advancedToggle) {
+    advancedToggle.onclick = () => {
+      const panel = document.getElementById("advanced-panel");
+      panel.style.display = panel.style.display === "none" ? "block" : "none";
     };
-
-    container.appendChild(btn);
-  });
-}
-
-// ================= NATION NAVIGATION =================
-function goToNation(nationName) {
-  const results = findMatches(nationName.toLowerCase());
-  if (results.length === 0) return;
-
-  const target = results.find(r => r.path[r.path.length - 1] === nationName);
-  if (!target) return;
-
-  currentPath = target.path;
-  currentNode = target.node;
-
-  renderLevel(currentNode);
-  updateUI();
-}
-
-// ================= UI =================
-function updateUI() {
-  const title = document.getElementById("current-title");
-  const info = document.getElementById("info-box");
-  const breadcrumbs = document.getElementById("breadcrumbs");
-  const currentRank = document.getElementById("current-rank");
-
-  if (!title || !info || !breadcrumbs || !currentRank) return;
-
-  breadcrumbs.textContent = currentPath.join(" > ");
-
-  if (currentPath.length === 0) {
-    title.innerHTML = `<h2>Domains</h2>`;
-    currentRank.textContent = "";
-    info.textContent = "Select a taxonomy rank to begin.";
-    return;
   }
 
-  const level = currentPath.length - 1;
-  const name = currentPath[level];
-  const rank = rankSingle[level] || "Unknown Rank";
+  // ================= RENDER =================
+  function renderLevel(node) {
+    const container = document.getElementById("taxonomy-container");
+    container.innerHTML = "";
 
-  currentRank.textContent = rankNames.slice(0, level + 1).join(" > ");
-  title.innerHTML = `<h2>${name} <span class="taxonomy-type">(${rank})</span></h2>`;
-  info.innerHTML = currentNode.info || "No info available.";
+    const level = currentPath.length;
+    const labelName = rankNames[level] || "";
 
-  document.querySelectorAll(".nation-link").forEach(el => {
-    el.onclick = () => {
-      const nation = el.dataset.nation;
-      goToNation(nation);
-    };
-  });
-}
-
-// ================= SEARCH =================
-function findMatches(query, node = taxonomy, path = []) {
-  if (!query.trim()) return [];
-
-  let matches = [];
-
-  for (let key in node) {
-    if (key === "info") continue;
-
-    const newPath = [...path, key];
-    const level = newPath.length - 1;
-
-    if (key.toLowerCase().includes(query) && !excludedRanks.has(level)) {
-      matches.push({ path: newPath, node: node[key] });
+    if (labelName) {
+      const label = document.createElement("div");
+      label.className = "taxonomy-label";
+      label.textContent = labelName + ":";
+      container.appendChild(label);
     }
 
-    if (typeof node[key] === "object") {
-      matches = matches.concat(findMatches(query, node[key], newPath));
-    }
+    Object.keys(node).forEach(key => {
+      if (key === "info") return;
+
+      const btn = document.createElement("button");
+      btn.textContent = key;
+
+      btn.onclick = () => {
+        currentPath.push(key);
+        currentNode = node[key];
+        renderLevel(currentNode);
+        updateUI();
+      };
+
+      container.appendChild(btn);
+    });
   }
 
-  return matches;
-}
+  // ================= NATION NAVIGATION =================
+  function goToNation(nationName) {
+    const results = findMatches(nationName.toLowerCase());
+    if (results.length === 0) return;
 
-function renderSearchResults() {
-  const container = document.getElementById("search-results");
-  container.innerHTML = "";
+    const target = results.find(r => r.path[r.path.length - 1] === nationName);
+    if (!target) return;
 
-  const shown = expanded
-    ? searchResults
-    : searchResults.slice(0, defaultShowCount);
+    currentPath = target.path;
+    currentNode = target.node;
 
-  shown.forEach(item => {
-    const level = item.path.length - 1;
-    const name = item.path[level];
+    renderLevel(currentNode);
+    updateUI();
+  }
+
+  // ================= UI =================
+  function updateUI() {
+    const title = document.getElementById("current-title");
+    const info = document.getElementById("info-box");
+    const breadcrumbs = document.getElementById("breadcrumbs");
+    const currentRank = document.getElementById("current-rank");
+
+    if (!title || !info || !breadcrumbs || !currentRank) return;
+
+    breadcrumbs.textContent = currentPath.join(" > ");
+
+    if (currentPath.length === 0) {
+      title.innerHTML = `<h2>Domains</h2>`;
+      currentRank.textContent = "";
+      info.textContent = "Select a taxonomy rank to begin.";
+      return;
+    }
+
+    const level = currentPath.length - 1;
+    const name = currentPath[level];
     const rank = rankSingle[level] || "Unknown Rank";
 
-    const btn = document.createElement("button");
-    btn.className = "search-button";
-    btn.innerHTML = `
-      <span class="search-main">${name} (${rank})</span>
-      <span class="search-path">(${item.path.join(" > ")})</span>
-    `;
+    currentRank.textContent = rankNames.slice(0, level + 1).join(" > ");
+    title.innerHTML = `<h2>${name} <span class="taxonomy-type">(${rank})</span></h2>`;
+    info.innerHTML = currentNode.info || "No info available.";
 
-    btn.onclick = () => {
-      currentPath = item.path;
-      currentNode = item.node;
-      renderLevel(currentNode);
-      updateUI();
-      container.innerHTML = "";
-      document.getElementById("search-bar").value = "";
-    };
+    document.querySelectorAll(".nation-link").forEach(el => {
+      el.onclick = () => {
+        const nation = el.dataset.nation;
+        goToNation(nation);
+      };
+    });
+  }
 
-    container.appendChild(btn);
+  // ================= SEARCH =================
+  function findMatches(query, node = taxonomy, path = []) {
+    if (!query.trim()) return [];
+
+    let matches = [];
+
+    for (let key in node) {
+      if (key === "info") continue;
+
+      const newPath = [...path, key];
+      const level = newPath.length - 1;
+
+      if (key.toLowerCase().includes(query) && !excludedRanks.has(level)) {
+        matches.push({ path: newPath, node: node[key] });
+      }
+
+      if (typeof node[key] === "object") {
+        matches = matches.concat(findMatches(query, node[key], newPath));
+      }
+    }
+
+    return matches;
+  }
+
+  function renderSearchResults() {
+    const container = document.getElementById("search-results");
+    container.innerHTML = "";
+
+    const shown = expanded
+      ? searchResults
+      : searchResults.slice(0, defaultShowCount);
+
+    shown.forEach(item => {
+      const level = item.path.length - 1;
+      const name = item.path[level];
+      const rank = rankSingle[level] || "Unknown Rank";
+
+      const btn = document.createElement("button");
+      btn.className = "search-button";
+      btn.innerHTML = `
+        <span class="search-main">${name} (${rank})</span>
+        <span class="search-path">(${item.path.join(" > ")})</span>
+      `;
+
+      btn.onclick = () => {
+        currentPath = item.path;
+        currentNode = item.node;
+        renderLevel(currentNode);
+        updateUI();
+        container.innerHTML = "";
+        document.getElementById("search-bar").value = "";
+      };
+
+      container.appendChild(btn);
+    });
+
+    if (searchResults.length > defaultShowCount) {
+      const toggle = document.createElement("button");
+      toggle.className = "search-button more-less-button";
+      toggle.textContent = expanded ? "Show Less" : "Show More";
+      toggle.onclick = () => {
+        expanded = !expanded;
+        renderSearchResults();
+      };
+      container.appendChild(toggle);
+    }
+  }
+
+  // ================= EVENTS =================
+  document.getElementById("search-bar").addEventListener("input", e => {
+    searchResults = findMatches(e.target.value.toLowerCase());
+    expanded = false;
+    renderSearchResults();
   });
 
-  if (searchResults.length > defaultShowCount) {
-    const toggle = document.createElement("button");
-    toggle.className = "search-button more-less-button";
-    toggle.textContent = expanded ? "Show Less" : "Show More";
-    toggle.onclick = () => {
-      expanded = !expanded;
-      renderSearchResults();
-    };
-    container.appendChild(toggle);
-  }
-}
+  document.getElementById("reset-button").addEventListener("click", () => {
+    currentPath = [];
+    currentNode = taxonomy;
+    renderLevel(currentNode);
+    updateUI();
+    document.getElementById("search-results").innerHTML = "";
+    document.getElementById("search-bar").value = "";
+  });
 
-// ================= EVENTS =================
-document.getElementById("search-bar").addEventListener("input", e => {
-  searchResults = findMatches(e.target.value.toLowerCase());
-  expanded = false;
-  renderSearchResults();
-});
-
-document.getElementById("reset-button").addEventListener("click", () => {
-  currentPath = [];
-  currentNode = taxonomy;
+  // ================= INIT =================
+  setupExcludeOptions();
   renderLevel(currentNode);
   updateUI();
-  document.getElementById("search-results").innerHTML = "";
-  document.getElementById("search-bar").value = "";
-});
-
-// ================= INIT =================
-setupExcludeOptions();
-renderLevel(currentNode);
-updateUI();
-</script>
+  </script>
 
 
 
 
 
 
-</body>
-</html>
+  </body>
+  </html>

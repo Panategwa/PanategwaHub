@@ -8,7 +8,8 @@ body {
   padding-top: 200px;
   line-height: 1.6;
   min-height: 100vh;
-  background: rgb(25, 25, 50)
+  background: rgb(25, 25, 50);
+  margin-left: 200px; /* same as sidebar width to avoid overlap */
 }
 
 img {
@@ -42,15 +43,7 @@ h3 {
   margin-bottom: 0.5rem;
 }
 
-p {
-  font-size: 1.2rem;
-  margin-bottom: 1rem;
-  font-family: 'Rubik', sans-serif;
-}
-
-
-
-li {
+p, li {
   font-size: 1.2rem;
   margin-bottom: 1rem;
   font-family: 'Rubik', sans-serif;
@@ -84,13 +77,12 @@ a, .nation-link {
   cursor: pointer;         /* hand cursor */
   font-weight: 500;
   transition: color 0.15s ease, background-color 0.15s ease;
+  font-weight: bold;
 }
 
 a:hover, .nation-link:hover,
 a:focus {
-  color: #1f7ad9;
-  background-color: rgba(74, 163, 255, 0.12);
-  border-radius: 4px;
+  color: rgb(25, 125, 175);
 }
 
 .nation-link:active {
@@ -116,13 +108,11 @@ button {
 
 button:hover {
   filter: brightness(0.75);
-  transform: scale(1.03);
 }
 
 button.active,
 button:disabled {
   filter: brightness(0.25);
-  transform: scale(1.05);
 }
 
 /* ===== Menu (Left Sidebar) ===== */
@@ -158,10 +148,6 @@ button:disabled {
   color: rgb(230, 230, 230);
 }
 
-/* ===== Main Content Push ===== */
-body {
-  margin-left: 200px; /* same as sidebar width to avoid overlap */
-}
 
 
 /* ===== Main Content Area ===== */

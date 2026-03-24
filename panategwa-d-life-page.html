@@ -264,15 +264,27 @@
   <h2>History</h2>
   <dl>
     <dt>Origins:</dt>
-    <dd>
-      The Pitosians originated from the continent of Pitosia, where poverty and harsh conditions forced them to seek new lands.
-      They sent expeditions to Yurfiv, hoping to migrate there in the future.
-      In Yurfiv, their growing population and advanced technology allowed them to overpower the native civilisations, enslaving many while others became reluctant allies.
-      As resentment grew and other nations prepared to rise against them, the Pitosians abolished slavery and tried to rebuild trust.
-      It was too late — the War of the Fifth Millennia broke out shortly afterward, and their allies abandoned them, some even joined the enemies of the Pitosians.
-      Even after the Pitosians returned to their homeland, the conflict continued for years through invasions and long-range attacks.
-      Eventually, the fighting ended, leaving the Pitosians isolated but hardened.
-      Since then, the Pitosians have built their empire around self-reliance, strict order, and military dominance, knowing that survival can never depend on the reliance of others.
+    <dd>&nbsp;
+      The Pitosians are from the continent of Pitosia. Life there was very difficult. The land was harsh, resources were limited, and many people lived in deep poverty.
+      Because of these problems, they began searching for new lands where their people could thrive. After many explorations, they discovered the region of Ayayi Eses.
+      Seeing opportunity, they sent expeditions to study the land and prepare for a possible full migration in the future.
+        <br>&nbsp;
+      When the first groups of Pitosians arrived in Ayayi Eses, they quickly began to expand. Their population was growing fast, and their technology was far more advanced than that of the locals living there.
+      Using this advantage, the Pitosians defeated many native civilizations. Some were forced into slavery, while others chose to cooperate with the newcomers to avoid destruction. For a time, the Pitosians believed their control over Ayayi Eses was secure.
+        <br>&nbsp;
+      However, beneath the surface, anger was building. Many of the native civilisations deeply resented Pitosian rule, especially the system of slavery. Over the years, tension increased across the region. Pitosians eventually realized that their harsh policies were creating dangerous enemies.
+      In response, they officially abolished slavery and attempted to repair relations with the nations of Ayayi Eses. They offered negotiations, trade agreements, and promises of fair treatment.
+        <br>&nbsp;
+      Unfortunately for the Pitosians, these efforts came too late. Fear and resentment had spread too far. Eventually, a massive conflict known as the War of the Fifth Millennium erupted.
+      Many former allies abandoned the Pitosians, and some even joined the opposing coalition against them. What the Pitosians expected to be a short conflict turned into a long destructive war.
+        <br>&nbsp;
+      Even when Pitosian forces withdrew back to their original homeland, the war did not fully stop. Enemy nations continued to launch invasions, raids, and long-range attacks against Pitosian territory.
+      For years, both sides suffered heavy losses. Cities were damaged, resources were drained, and the Pitosian people were forced to adapt to constant pressure and danger.
+        <br>&nbsp;
+      Eventually, the war finally came to an end, but there was no clear victory. The aftermath left the Pitosians politically isolated and deeply cautious of other nations. However, the long struggle also made them tougher and more disciplined as a society.
+        <br>&nbsp;
+      Since that time, the Pitosians have rebuilt their civilization around three core ideas: self-reliance, strict disipline and order, and overwhelming military strength.
+      Their leader Pitos firmly believes that depending on other nations is too risky. In Pitosian culture today, survival is seen as something that must be guaranteed by their own power alone, no matter the cost.
     </dd>
   </dl>
 </section>
@@ -351,7 +363,7 @@
   `
 }, // End of Archiburgs
 
-  "Camebaperitiseron": { // Ethnotype
+  "Camebaperitiserons": { // Ethnotype
     info: `
 
   <br>
@@ -365,20 +377,6 @@
   </section>
   `,
 }, // End of Prokheevanians
-  "Karateobidians": { // Ethnotype
-    info: `
-
-  <br>
-  <section>
-    <h2>General</h2>
-    <dl>
-  <dt>General Description:</dt>
-    <dd>
-      Desc
-    </dd>
-  </section>
-  `,
-} // end of Karateobidians
   }, // End of Archalis
     }, // End of Anthropoi civilis pitosianus
 
@@ -1507,20 +1505,48 @@
     });
   }
 
-  // ================= NATION NAVIGATION =================
-  function goToNation(nationName) {
-    const results = findMatches(nationName.toLowerCase());
-    if (results.length === 0) return;
+// ================= ETHNOTYPE NAVIGATION =================
+function goToEthnotype(ethnotypeName) {
+  function search(node, path = []) {
+    if (typeof node !== "object" || node === null) return null;
 
-    const target = results.find(r => r.path[r.path.length - 1] === nationName);
-    if (!target) return;
+    for (const key in node) {
+      if (key === "info") continue; // ignore info fields
 
-    currentPath = target.path;
-    currentNode = target.node;
+      const newPath = [...path, key];
 
-    renderLevel(currentNode);
-    updateUI();
+      if (key.toLowerCase() === ethnotypeName.toLowerCase()) {
+        return { node: node[key], path: newPath };
+      }
+
+      const result = search(node[key], newPath);
+      if (result) return result;
+    }
+
+    return null;
   }
+
+  const result = search(taxonomy);
+
+  if (!result) {
+    alert(`Ethnotype "${ethnotypeName}" not found in taxonomy!`);
+    return;
+  }
+
+  currentNode = result.node;
+  currentPath = result.path;
+  renderLevel(currentNode);
+  updateUI();
+}
+
+// ================= AUTO-NAVIGATE FROM URL =================
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const ethnotype = params.get("ethnotype"); // e.g. "pitosians"
+  if (ethnotype) {
+    goToEthnotype(ethnotype);
+  }
+})();
 
   // ================= UI =================
   function updateUI() {
@@ -1548,12 +1574,13 @@
     title.innerHTML = `<h2>${name} <span class="taxonomy-type">(${rank})</span></h2>`;
     info.innerHTML = currentNode.info || "No info available.";
 
-    document.querySelectorAll(".nation-link").forEach(el => {
-      el.onclick = () => {
-        const nation = el.dataset.nation;
-        goToNation(nation);
-      };
-    });
+document.querySelectorAll(".ethnotype").forEach(el => {
+  el.onclick = (e) => {
+    e.preventDefault(); // prevent any default link behavior
+    const ethnotype = el.dataset.ethnotype;
+    if (ethnotype) goToEthnotype(ethnotype);
+  };
+});
   }
 
   // ================= SEARCH =================
@@ -1645,11 +1672,5 @@
   renderLevel(currentNode);
   updateUI();
   </script>
-
-
-
-
-
-
   </body>
   </html>

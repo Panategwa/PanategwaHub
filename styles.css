@@ -91,19 +91,18 @@ a:focus {
 
 /* ===== Buttons ===== */
 button {
-  background-color: rgb(75, 150, 75, 0.5);
-  color: rgb(255, 255, 255, 0.75);
-  border: 2px solid rgb(0, 0, 0);
+  background-color: rgba(75,150,75,0.5);
+  color: rgba(255,255,255,0.75);
+  border: 2px solid #000;
   padding: 1.25rem 2rem;
   border-radius: 8px;
   cursor: pointer;
   font-weight: bold;
   font-family: 'Rubik', sans-serif;
   font-size: 1.2rem;
-  transition: background-color 0.2s, transform 0.2s;
   margin: 1rem 0;
   display: block;
-  transition: background-color 2s, transform 2s;
+  transition: background-color 0.2s, transform 0.2s, filter 0.2s;
 }
 
 button:hover {
@@ -134,7 +133,7 @@ button:disabled {
 }
 
 .menu-button {
-  background-color: rgba(175, 275, 75, 0.25);
+  background-color: rgba(175, 200, 75, 0.25);
   color: rgba(0, 0, 0, 0.8);
   transition: background-color 0.2s, transform 0.2s;
   font-weight: bold;
@@ -416,4 +415,44 @@ main {
   border-radius: 10px;
   box-shadow: 0 0 10px rgba(255,255,255,0.2);
   user-select: none;
+}
+
+/* ===== Map Container ===== */
+.container {
+  position: relative;
+  width: 1200px;
+  height: 900px;
+  margin: 80px auto;
+  display: flex;
+  justify-content: center; /* keeps inner content centered if needed */
+}
+
+/* ===== Map Image ===== */
+#map-image {
+  width: 1200px;
+  height: 900px;
+  display: block;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(255,255,255,0.2);
+  user-select: none;
+  max-width: 100%; /* keeps it responsive */
+}
+
+/* ===== Ethnotype Buttons on Map ===== */
+.ethnotype {
+  position: absolute;
+  padding: 10px 16px;
+  background-color: rgb(255, 255, 255, 0.25);
+  color: rgb(0, 0, 0);
+  text-decoration: none;
+  font-weight: bolder;
+  border-radius: 6px;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.ethnotype:hover {
+  background-color: rgb(225, 225, 255, 0.75);
+  color: rgb(0, 0, 0);
 }

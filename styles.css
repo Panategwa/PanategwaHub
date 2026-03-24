@@ -456,3 +456,19 @@ main {
   background-color: rgb(225, 225, 255, 0.75);
   color: rgb(0, 0, 0);
 }
+
+/* Map ethnotype links */
+.ethnotype,
+.ethnotype:link,
+.ethnotype:visited {
+  color: rgb(0,0,0);
+  text-decoration: none;
+}
+
+.ethnotype:hover {
+  color: rgb(0,0,0);
+}
+
+.ethnotype:active {
+  color: rgb(0,0,0);
+}

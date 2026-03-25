@@ -472,3 +472,21 @@ main {
 .ethnotype:active {
   color: rgb(0,0,0);
 }
+
+.yt-icon{
+  height: 3em;
+  width: auto;
+  margin-right: 5px;
+  vertical-align: middle;
+  border-radius: 0;
+}
+
+.yt-button{
+  background-color: rgb(175, 0, 0, 0.5);
+  color: white;
+  border: 2px solid rgb(100, 0, 0, 0.75);
+}
+
+.yt-button:hover{
+  filter: brightness(0.85);
+}

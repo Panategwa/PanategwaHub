@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Panategwa Hub - Ideologies</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="menu-loader.js" defer></script>
+</head>
+
+<body>
+
+<div id="menu-container"></div>
+
+<button id="go-back-btn" onclick="goBack()">← Go Back</button>
+
+<h1 id="page-title">Panategwa d Ideologies</h1>
+
+<div id="ideology-list" class="ideology-buttons">
+
+  <button class="ideology-button" data-ideology="Pitosialism">
+    Pitosialism
+  </button>
+
+  <button class="ideology-button" data-ideology="Rashootianism">
+    Rashootianism
+  </button>
+
+</div>
+
+<!-- IDEOLOGY CONTENT -->
+<div id="ideology-display"></div>
+
+<script>
+
+// --- Button click logic (LIKE MAP PAGE) ---
+document.querySelectorAll(".ideology-button").forEach(el => {
+  el.addEventListener("click", () => {
+    const ideology = el.dataset.ideology;
+    if (ideology) {
+      window.location.href = `panategwa-d-ideologies-page.html?ideology=${ideology}`;
+    }
+  });
+});
+
+// --- Ideology data (NO TITLES HERE) ---
+const ideologies = {
+  "Pitosialism": `
+    <p>Main ideology of the Pitosians, focused on trade, seafaring, and strong community bonds.</p>
+  `,
+  "Rashootianism": `
+    <p>Focused on culture, storytelling, and artistic expression.</p>
+  `
+};
+
+// --- Get URL param ---
+function getParam(name) {
+  const params = new URLSearchParams(window.location.search);
+  return params.get(name);
+}
+
+// --- Go Back function ---
+function goBack() {
+  window.location.href = "panategwa-d-ideologies-page.html";
+}
+
+// --- Show ideology ---
+const ideologyParam = getParam("ideology");
+
+if (ideologyParam && ideologies[ideologyParam]) {
+
+  // AUTO TITLE GENERATED HERE
+  document.getElementById("ideology-display").innerHTML = `
+    <section>
+      <h2>${ideologyParam}</h2>
+      ${ideologies[ideologyParam]}
+    </section>
+  `;
+
+  // hide list + title
+  document.getElementById("ideology-list").style.display = "none";
+  document.getElementById("page-title").style.display = "none";
+
+  // show back button
+  document.getElementById("go-back-btn").style.display = "block";
+
+} else {
+  // hide back button if not inside ideology
+  document.getElementById("go-back-btn").style.display = "none";
+}
+
+</script>
+
+</body>
+</html>

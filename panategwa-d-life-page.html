@@ -182,7 +182,45 @@ info: `
 "Pitosialis": { // Clade
 info:`<section><h2>Pitosialis Clade</h2></section>`,
 
-"Pitosians": { info:`<section><h2>Pitosians</h2></section>` },
+"Pitosians": {
+  info: `
+<section>
+  <ul>
+    <li><strong>Leader:</strong> Pitos</li>
+    <li><strong>Ideology:</strong> 
+<li><!-- Pitosians ideology button on your funcion page -->
+<a class="ideology-button pitosians" data-ideology="Pitosialism" href="panategwa-d-ideologies-page.html?ideology=Pitosialism">
+  Pitosialism
+</a></li>
+    </li>
+    <li><strong>Population:</strong> ~5.9 billion</li>
+    <li><strong>Territory:</strong> ~70 million km²</li>
+    <li><strong>Regions:</strong> Coastal warm areas and cold mountainous zones</li>
+    <li><strong>Culture:</strong> Seafaring and trade-focused</li>
+    <li><strong>History:</strong> Seafaring and trade-focused</li>
+    <li><strong>Origins:</strong> Coastal roots, expanded via maritime trade and colonization</li>
+    <li><strong>Relations:</strong>
+      <ul>
+        <li><strong>Allies:</strong>
+          <ul>
+            <li><a href="#" onclick="goToEthnotype('Rashooties')">Rashooties</a></li>
+            <li><a href="#" onclick="goToEthnotype('Jamuhairies')">Jamuhairies</a></li>
+            <li><a href="#" onclick="goToEthnotype('Prokheevanians')">Prokheevanians</a></li>
+            <li><a href="#" onclick="goToEthnotype('Mazunians')">Mazunians</a></li>
+          </ul>
+        </li>
+        <li><strong>Enemies:</strong>
+          <ul>
+            <li>None</li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</section>
+`
+},
+
 "Prokheevanians": { info:`<section><h2>Prokheevanians</h2></section>` }
 
 },
@@ -1326,6 +1364,20 @@ function goToEthnotype(ethnotypeName) {
   renderLevel(currentNode);
   updateUI();
 }
+
+
+// ---------------------- Ideologies ----------------------
+
+document.querySelectorAll(".ideology-button").forEach(el => {
+  el.addEventListener("click", e => {
+    e.preventDefault();
+    const ideology = el.dataset.ideology;
+    if (ideology) {
+      // send to ideology page with param
+      window.location.href = `panategwa-d-ideologies-page.html?ideology=${ideology}`;
+    }
+  });
+});
 
 // ================= AUTO-NAVIGATE FROM URL =================
 (function() {

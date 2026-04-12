@@ -523,3 +523,12 @@ main {
 #go-back-btn:hover {
   filter: brightness(0.8);
 }
+
+.pito-date {
+  font-size: 0.7em;      /* smaller than title automatically */
+  opacity: 0.6;
+  font-weight: normal;
+  margin-left: 10px;
+  vertical-align: middle;
+  font-family: 'Rubik', sans-serif;
+}

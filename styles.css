@@ -1,15 +1,12 @@
-/* styles.css */
-
 /* ===== Body & Global Styles ===== */
 body {
   color: #e0e0e0;
-  margin: 0;
   padding: 0 2rem;
   padding-top: 200px;
   line-height: 1.6;
   min-height: 100vh;
   background: rgb(25, 25, 50);
-  margin-left: 200px; /* same as sidebar width to avoid overlap */
+  margin-left: 200px;
 }
 
 img {
@@ -119,7 +116,8 @@ button:disabled {
   position: fixed;
   top: 0;
   left: 0;
-  width: 200px; /* sidebar width */
+  min-width: 175px;     /* still keeps your original size as a base */
+  max-width: 225px;     /* still keeps your original size as a base */
   height: 100vh; /* full height */
   background-color: rgba(100, 150, 125, 0.5);
   padding: 1rem;
@@ -127,7 +125,6 @@ button:disabled {
   box-sizing: border-box;
   display: flex;
   flex-direction: column; /* stack buttons vertically */
-  gap: 0.5rem;
   z-index: 9999;
   backdrop-filter: blur(10px);
 }
@@ -531,4 +528,38 @@ main {
   margin-left: 10px;
   vertical-align: middle;
   font-family: 'Rubik', sans-serif;
+}
+
+.lang-buttons {
+  display: inline-block;
+  margin-left: 10px;
+}
+
+.lang-buttons button {
+  margin: 2px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  #lang-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+#lang-buttons {
+  display: none;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+#lang-buttons.open {
+  display: grid;
+}
+
+#lang-buttons button {
+  padding: 16px;
+  border-radius: 8px;
+  cursor: pointer;
 }

@@ -10,30 +10,45 @@
 </head>
 
 <body>
-
 <div id="menu-container"></div>
 
-<h1>Settings</h1>
-<br><br>
+<h1> Settings </h1>
+
 <section class="settings-box">
-  <button onclick="toggleLanguages()">
-    🌍 Language 
-  </button>
-    <div id="lang-message" style="display: none; margin: 10px 0; padding: 10px; color: rgba(255, 255, 255, 0.75);">
-     Select your preferred language. <br>
-    (Changes take effect after a few seconds during each page load).
+
+  <div class="settings-main-container">
+
+    <div class="settings-group">
+      <button class="settings-main" onclick="toggleLanguages()">
+        🌍 Language
+      </button>
+
+      <div id="lang-message" style="display:none;">
+        Select your preferred language.<br>
+        (Changes take effect after a few seconds)
+      </div>
+
+      <div id="lang-buttons" class="settings-options" style="display:none;"></div>
+    </div>
+
+    <div class="settings-group">
+      <button class="settings-main" onclick="toggleTextSizes()">
+        Text Size
+      </button>
+
+      <div id="textsize-message" style="display:none;">
+        Choose your preferred text size.
+      </div>
+
+      <div id="textsize-buttons" class="settings-options" style="display:none;">
+        <button onclick="setTextSize('small')">Small</button>
+        <button onclick="setTextSize('medium')">Medium</button>
+        <button onclick="setTextSize('large')">Large</button>
+      </div>
+    </div>
+
   </div>
-  <div id="lang-buttons"></div>
 
-<button onclick="toggleTextSize()">
-  Text Size
-</button>
-
-<div id="textsize-buttons" style="display: none; margin-top: 10px;">
-  <button onclick="setTextSize('small')">Small</button>
-  <button onclick="setTextSize('medium')">Medium</button>
-  <button onclick="setTextSize('large')">Large</button>
-</div>
 </section>
 
 </body>

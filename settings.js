@@ -375,6 +375,9 @@ function buildLanguageButtons() {
 
   container.innerHTML = "";
 
+  // 👇 start hidden
+  container.style.display = "none";
+
   LANGS.forEach(lang => {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -400,7 +403,7 @@ function startNavigationObserver() {
 window.addEventListener("DOMContentLoaded", () => {
   // FONT SIZE FIRST
   applyFontSize(getTextSize());
-
+  document.getElementById("textsize-buttons").style.display = "none";
   // LANGUAGE UI
   buildLanguageButtons();
   syncNavigationForLanguage();
@@ -474,10 +477,45 @@ function setLanguageGlobal(lang) {
   localStorage.setItem("lang", lang);
 }
 
-function toggleTextSize() {
+function toggleTextSizes() {
+  const buttons = document.getElementById("textsize-buttons");
+  const message = document.getElementById("textsize-message");
+
+  if (!buttons || !message) return;
+
+  const isOpen = buttons.style.display === "block";
+
+  buttons.style.display = isOpen ? "none" : "block";
+  message.style.display = isOpen ? "none" : "block";
+}
+
+function toggleLanguages() {
+  const buttons = document.getElementById("lang-buttons");
+  const message = document.getElementById("lang-message");
+
+  if (!buttons || !message) return;
+
+  const isOpen = buttons.style.display === "block";
+
+  buttons.style.display = isOpen ? "none" : "block";
+  message.style.display = isOpen ? "none" : "block";
+}
+
+function toggleTextSizes() {
+  const buttons = document.getElementById("textsize-buttons");
+  const message = document.getElementById("textsize-message");
+
+  if (!buttons || !message) return;
+
+  const isOpen = buttons.style.display === "block";
+
+  buttons.style.display = isOpen ? "none" : "block";
+  message.style.display = isOpen ? "none" : "block";
+}
+
+function buildTextSizeButtons() {
   const container = document.getElementById("textsize-buttons");
   if (!container) return;
 
-  const isOpen = container.style.display === "block";
-  container.style.display = isOpen ? "none" : "block";
+  container.style.display = "none";
 }

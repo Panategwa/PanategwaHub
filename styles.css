@@ -573,36 +573,67 @@ main {
   font-family: 'Rubik', sans-serif;
 }
 
-.lang-buttons {
-  display: inline-block;
-  margin-left: 10px;
+
+/* =========================
+  SETTINGS MAIN BUTTONS
+========================= */
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* keeps ONLY X axis centered */
+  gap: 12px;
 }
 
-.lang-buttons button {
-  margin: 2px;
-  padding: 5px 8px;
-  font-size: 12px;
+/* main buttons (Language / Text Size) */
+.settings-main {
+  width: 250px;
+  height: 150px;
+  text-align: center;
+  font-size: 20px;
+  cursor: pointer;
 }
 
-@media (max-width: 600px) {
-  #lang-buttons {
-    grid-template-columns: repeat(2, 1fr);
-  }
+/* =========================
+  OPTIONS CONTAINERS
+========================= */
+
+.settings-options {
+  width: 100%;
+  max-width: 600px;
+  text-align: left; /* NOT centered */
+  align-self: stretch; /* makes it left aligned inside group */
 }
+
+/* =========================
+  LANGUAGE GRID
+========================= */
 
 #lang-buttons {
-  display: none;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-top: 10px;
-}
-
-#lang-buttons.open {
   display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+
+  width: 100%;
+  max-width: 600px;
+
+  margin-top: 10px;
+
+  justify-content: start;     /* prevents weird centering */
+  align-items: start;
 }
 
+/* language buttons */
 #lang-buttons button {
-  padding: 16px;
+  padding: 12px;
+  font-size: 14px;
   border-radius: 8px;
   cursor: pointer;
+}
+
+/* mobile fallback */
+@media (max-width: 600px) {
+  #lang-buttons {
+   grid-template-columns: repeat(2, 1fr);
+  }
 }

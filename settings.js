@@ -1,33 +1,35 @@
 const LANGS = [
-  { code: "en", name: "English" },
-  { code: "el", name: "Ελληνικά" },
-  { code: "ru", name: "Русский" },
-  { code: "es", name: "Español" },
-  { code: "fr", name: "Français" },
-  { code: "de", name: "Deutsch" },
-  { code: "it", name: "Italiano" },
-  { code: "pt", name: "Português" },
-  { code: "pl", name: "Polski" },
-  { code: "uk", name: "Українська" },
-  { code: "tr", name: "Türkçe" },
-  { code: "ar", name: "العربية" },
-  { code: "hi", name: "हिन्दी" },
-  { code: "bn", name: "বাংলা" },
-  { code: "ur", name: "اردو" },
-  { code: "zh", name: "中文" },
-  { code: "ja", name: "日本語" },
-  { code: "ko", name: "한국어" },
-  { code: "id", name: "Bahasa Indonesia" },
-  { code: "vi", name: "Tiếng Việt" },
-  { code: "bg", name: "Български" },
-  { code: "ro", name: "Română" },
-  { code: "he", name: "עברית" },
-  { code: "fa", name: "فارسی" }
+
+  { code: "en", name: "🇬🇧 English" },
+  { code: "el", name: "🇬🇷 Ελληνικά" },
+  { code: "ru", name: "🇷🇺 Русский" },
+  { code: "es", name: "🇪🇸 Español" },
+  { code: "fr", name: "🇫🇷 Français" },
+  { code: "de", name: "🇩🇪 Deutsch" },
+  { code: "it", name: "🇮🇹 Italiano" },
+  { code: "pt", name: "🇵🇹 Português" },
+  { code: "pl", name: "🇵🇱 Polski" },
+  { code: "uk", name: "🇺🇦 Українська" },
+  { code: "tr", name: "🇹🇷 Türkçe" },
+  { code: "ar", name: "🇸🇦 العربية" },
+  { code: "hi", name: "🇮🇳 हिन्दी" },
+  { code: "bn", name: "🇧🇩 বাংলা" },
+  { code: "ur", name: "🇵🇰 اردو" },
+  { code: "zh", name: "🇨🇳 中文" },
+  { code: "ja", name: "🇯🇵 日本語" },
+  { code: "ko", name: "🇰🇷 한국어" },
+  { code: "id", name: "🇮🇩 Bahasa Indonesia" },
+  { code: "vi", name: "🇻🇳 Tiếng Việt" },
+  { code: "bg", name: "🇧🇬 Български" },
+  { code: "ro", name: "🇷🇴 Română" },
+  { code: "he", name: "🇮🇱 עברית" },
+  { code: "fa", name: "🇮🇷 فارسی" }
 ];
+
+const SAFE_SPACE = "\u00A0";
 
 const PANTEGWA_RULES = {
   en: { base: "Panategwa", suffixes: ["", " b", " c", " d", " e", " f", " g"] },
-
   el: { base: "Πανατίγκουα", suffixes: ["", " β", " γ", " δ", " ε", " ζ", " η"] },
   ru: { base: "Панатегва", suffixes: ["", " б", " в", " г", " д", " е", " ж"] },
   es: { base: "Panategua", suffixes: ["", " b", " c", " d", " e", " f", " g"] },
@@ -41,7 +43,7 @@ const PANTEGWA_RULES = {
 
   ar: { base: "باناتيغوا", suffixes: ["", " ب", " ج", " د", " هـ", " و", " ز"] },
   hi: { base: "पानातिग्वा", suffixes: ["", " ब", " स", " द", " ए", " फ", " ग"] },
-  bn: { base: "পানাতিগওয়া", suffixes: ["", " ব", " স", " দ", " এ", " ফ", " গ"] },
+  bn: { base: "পানাতিগওয়া", suffixes: ["", " ব", " স", " দ", " এ", " ফ", " ग"] },
   ur: { base: "پاناتگوا", suffixes: ["", " ب", " ج", " د", " ہ", " و", " ز"] },
 
   zh: { base: "帕纳提格瓦", suffixes: ["", " 二", " 三", " 四", " 五", " 六", " 七"] },
@@ -72,8 +74,14 @@ function buildManualTranslations() {
 
   for (const [lang, cfg] of Object.entries(PANTEGWA_RULES)) {
     out[lang] = {};
+
     keys.forEach((key, i) => {
-      out[lang][key] = `${cfg.base}${cfg.suffixes[i]}`;
+      let value = `${cfg.base}${cfg.suffixes[i]}`;
+
+      // 🔥 FIX 1: protect colon spacing
+      value = value.replace(/:\s*/g, ":" + SAFE_SPACE);
+
+      out[lang][key] = value;
     });
   }
 
@@ -230,9 +238,18 @@ async function translatePage(lang) {
     // Protect Panategwa names inside longer sentences.
     const protectedInfo = protectPhrases(original, lang);
     const translated = await googleTranslate(protectedInfo.output, lang);
-    const restored = restorePhrases(translated, protectedInfo.replacements);
+let restored = restorePhrases(translated, protectedInfo.replacements);
 
-    applyText(node, restored);
+// 🔥 FORCE FIX: punctuation spacing cleanup
+restored = restored
+  .replace(/:\s*/g, ": ")
+  .replace(/,\s*/g, ", ")
+  .replace(/;\s*/g, "; ");
+
+// 🔥 optional extra safety (kills glue cases like :word)
+restored = restored.replace(/:([^\s])/g, ": $1");
+
+applyText(node, restored);
   }
 
   syncNavigationForLanguage();
@@ -338,9 +355,18 @@ function setLang(lang) {
 
 function toggleLanguages() {
   const container = document.getElementById("lang-buttons");
-  if (!container) return;
+  const msg = document.getElementById("lang-message");
+
+  if (!container || !msg) return;
 
   container.classList.toggle("open");
+
+  // show message only when opened
+  if (container.classList.contains("open")) {
+    msg.style.display = "block";
+  } else {
+    msg.style.display = "none";
+  }
 }
 
 function buildLanguageButtons() {
@@ -372,9 +398,23 @@ function startNavigationObserver() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
+  // FONT SIZE FIRST
+  applyFontSize(getTextSize());
+
+  // LANGUAGE UI
   buildLanguageButtons();
   syncNavigationForLanguage();
   startNavigationObserver();
+
+  // ORIGINAL TEXT LOCK
+  markOriginals();
+
+  // TRANSLATE AFTER INIT
+  const lang = getCurrentLang();
+  if (lang !== "en") {
+    setTimeout(() => translatePage(lang), 50);
+  }
+});
 
   const lang = getCurrentLang();
   markOriginals();
@@ -382,4 +422,62 @@ window.addEventListener("DOMContentLoaded", () => {
   if (lang !== "en") {
     setTimeout(() => translatePage(lang), 50);
   }
-});
+
+
+/* =========================
+   TEXT SIZE SYSTEM (CLEAN + WORKING)
+========================= */
+
+const FONT_SIZES = {
+  small: "14px",
+  medium: "16px",
+  large: "18px"
+};
+
+function getTextSize() {
+  const url = new URLSearchParams(window.location.search).get("textsize");
+  const saved = localStorage.getItem("textsize");
+  return url || saved || "medium";
+}
+
+function applyFontSize(size, updateUrl = false) {
+  const valid = FONT_SIZES[size] ? size : "medium";
+
+  // apply to site
+  document.documentElement.style.setProperty(
+    "--global-font-size",
+    FONT_SIZES[valid]
+  );
+
+  // save
+  localStorage.setItem("textsize", valid);
+
+  // sync URL
+  if (updateUrl) {
+    const url = new URL(window.location.href);
+
+    if (valid === "medium") {
+      url.searchParams.delete("textsize");
+    } else {
+      url.searchParams.set("textsize", valid);
+    }
+
+    window.history.replaceState({}, "", url);
+  }
+}
+
+function setTextSize(size) {
+  applyFontSize(size, true);
+}
+
+function setLanguageGlobal(lang) {
+  localStorage.setItem("lang", lang);
+}
+
+function toggleTextSize() {
+  const container = document.getElementById("textsize-buttons");
+  if (!container) return;
+
+  const isOpen = container.style.display === "block";
+  container.style.display = isOpen ? "none" : "block";
+}

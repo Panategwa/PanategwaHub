@@ -22,12 +22,13 @@ document.addEventListener("DOMContentLoaded", function () {
     return url;
   }
 
-  let menuHTML = "";
+  let menuHTML = `<div class="menu-inner">`;
 
-  // PAGES
+  // =========================
+  // PAGE BUTTONS
+  // =========================
   pages.forEach(page => {
     const isActive = page.url === current;
-
     const url = buildUrl(page.url);
 
     menuHTML += `
@@ -39,7 +40,9 @@ document.addEventListener("DOMContentLoaded", function () {
     `;
   });
 
+  // =========================
   // BACK TO TOP
+  // =========================
   menuHTML += `
     <button class="menu-button"
       onclick="window.scrollTo({top:0, behavior:'smooth'})">
@@ -47,7 +50,9 @@ document.addEventListener("DOMContentLoaded", function () {
     </button>
   `;
 
-  // SETTINGS BUTTON (NEW)
+  // =========================
+  // SETTINGS
+  // =========================
   menuHTML += `
     <button class="menu-button"
       onclick="window.location.href='settings-page.html${currentLang !== "en" ? "?lang=" + currentLang : ""}'">
@@ -55,5 +60,73 @@ document.addEventListener("DOMContentLoaded", function () {
     </button>
   `;
 
+  // =========================
+  // RESIZE HANDLE
+  // =========================
+  menuHTML += `<div id="resize-handle"></div>`;
+
+  menuHTML += `</div>`;
+
   menuContainer.innerHTML = menuHTML;
+
+  // =========================
+  // RESIZE LOGIC
+  // =========================
+
+  const handle = document.getElementById("resize-handle");
+
+  let isResizing = false;
+
+  const MIN_WIDTH = 160;
+  const MAX_WIDTH = 500;
+  const DEFAULT_WIDTH = 220;
+
+  // load saved width
+  let savedWidth = localStorage.getItem("menuWidth");
+
+  if (savedWidth) {
+    savedWidth = parseInt(savedWidth);
+    menuContainer.style.width = savedWidth + "px";
+    document.body.style.paddingLeft = savedWidth + "px";
+  } else {
+    document.body.style.paddingLeft = DEFAULT_WIDTH + "px";
+  }
+
+  handle.addEventListener("mousedown", () => {
+    isResizing = true;
+    document.body.style.userSelect = "none";
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isResizing) return;
+
+    let newWidth = e.clientX;
+
+    // clamp width
+    if (newWidth < MIN_WIDTH) newWidth = MIN_WIDTH;
+    if (newWidth > MAX_WIDTH) newWidth = MAX_WIDTH;
+
+    menuContainer.style.width = newWidth + "px";
+    document.body.style.paddingLeft = newWidth + "px";
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (!isResizing) return;
+
+    isResizing = false;
+    document.body.style.userSelect = "auto";
+
+    const finalWidth = menuContainer.offsetWidth;
+    localStorage.setItem("menuWidth", finalWidth);
+  });
+
+  // =========================
+  // DOUBLE CLICK RESET
+  // =========================
+  handle.addEventListener("dblclick", () => {
+    menuContainer.style.width = DEFAULT_WIDTH + "px";
+    document.body.style.paddingLeft = DEFAULT_WIDTH + "px";
+
+    localStorage.setItem("menuWidth", DEFAULT_WIDTH);
+  });
 });

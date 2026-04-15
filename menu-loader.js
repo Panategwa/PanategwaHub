@@ -9,7 +9,8 @@ document.addEventListener("DOMContentLoaded", function () {
     { name: "Panategwa d", url: "panategwa-d-page.html" },
     { name: "Panategwa e", url: "panategwa-e-page.html" },
     { name: "Panategwa f", url: "panategwa-f-page.html" },
-    { name: "Panategwa g", url: "panategwa-g-page.html" }
+    { name: "Panategwa g", url: "panategwa-g-page.html" },
+    { name: "⚙️ Settings", url: "settings-page.html" }
   ];
 
   const current = window.location.pathname.split("/").pop() || "index.html";
@@ -47,16 +48,6 @@ document.addEventListener("DOMContentLoaded", function () {
     <button class="menu-button"
       onclick="window.scrollTo({top:0, behavior:'smooth'})">
       Back to Top
-    </button>
-  `;
-
-  // =========================
-  // SETTINGS
-  // =========================
-  menuHTML += `
-    <button class="menu-button"
-      onclick="window.location.href='settings-page.html${currentLang !== "en" ? "?lang=" + currentLang : ""}'">
-      ⚙️ Settings
     </button>
   `;
 

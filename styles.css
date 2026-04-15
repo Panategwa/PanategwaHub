@@ -104,7 +104,7 @@ button {
   font-family: 'Rubik', sans-serif;
   margin: 1rem 0;
   display: block;
-  transition: background-color 0.2s, transform 0.2s, filter 0.2s;
+  transition: background-color 0.2s, transform 0.2s, filter 0.2s; 
 }
 
 button:hover {
@@ -575,65 +575,42 @@ main {
 
 
 /* =========================
-  SETTINGS MAIN BUTTONS
+   SETTINGS LAYOUT FIX
 ========================= */
 
 .settings-group {
   display: flex;
   flex-direction: column;
-  align-items: center; /* keeps ONLY X axis centered */
-  gap: 12px;
+  align-items: center;
+  gap: 10px;
 }
 
-/* main buttons (Language / Text Size) */
+/* main buttons */
 .settings-main {
   width: 250px;
-  height: 150px;
-  text-align: center;
+  height: 120px;
   font-size: 20px;
   cursor: pointer;
 }
 
-/* =========================
-  OPTIONS CONTAINERS
-========================= */
-
+/* container */
+/* 3 buttons per row for settings options */
 .settings-options {
-  width: 100%;
-  max-width: 600px;
-  text-align: left; /* NOT centered */
-  align-self: stretch; /* makes it left aligned inside group */
-}
-
-/* =========================
-  LANGUAGE GRID
-========================= */
-
-#lang-buttons {
-  display: grid;
+  display: none;            /* keep your toggle logic */
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-
-  width: 100%;
-  max-width: 600px;
-
+  gap: 10px;
+  max-width: 700px;
   margin-top: 10px;
-
-  justify-content: start;     /* prevents weird centering */
-  align-items: start;
 }
 
-/* language buttons */
-#lang-buttons button {
-  padding: 12px;
-  font-size: 14px;
-  border-radius: 8px;
-  cursor: pointer;
+/* when open */
+.settings-options.open {
+  display: grid;
 }
 
-/* mobile fallback */
-@media (max-width: 600px) {
-  #lang-buttons {
-   grid-template-columns: repeat(2, 1fr);
-  }
+/* button sizing inside grid */
+.settings-options button {
+  width: 100%;
+  margin: 0;               /* removes overflow spacing issues */
+  box-sizing: border-box;
 }

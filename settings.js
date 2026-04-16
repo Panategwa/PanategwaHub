@@ -532,7 +532,10 @@ const THEMES = [
       "--menu-bg": "rgba(50, 50, 75, 0.75)",
       "--menu-button": "rgba(175, 200, 75, 0.25)",
       "--link-color": "rgb(150, 175, 200)",
-      "--button-text": "rgba(255,255,255,0.85)"
+      "--button-text": "rgba(255,255,255,0.85)",
+
+      "--preview-bg": "rgba(25, 25, 50, 0.9)",
+      "--preview-text": "#e0e0e0"
     }
   },
 
@@ -544,7 +547,10 @@ const THEMES = [
       "--menu-bg": "rgba(20, 20, 25, 0.9)",
       "--menu-button": "rgba(80, 80, 80, 0.4)",
       "--link-color": "rgb(120, 180, 255)",
-      "--button-text": "#ffffff"
+      "--button-text": "#ffffff",
+
+      "--preview-bg": "rgb(10, 10, 15)",
+      "--preview-text": "#f0f0f0"
     }
   },
 
@@ -556,7 +562,10 @@ const THEMES = [
       "--menu-bg": "rgba(240, 240, 240, 0.9)",
       "--menu-button": "rgba(200, 200, 200, 0.5)",
       "--link-color": "rgb(0, 100, 200)",
-      "--button-text": "#000000"
+      "--button-text": "#000000",
+
+      "--preview-bg": "#ffffff",
+      "--preview-text": "#111111"
     }
   },
 
@@ -568,7 +577,10 @@ const THEMES = [
       "--menu-bg": "rgba(0, 60, 100, 0.6)",
       "--menu-button": "rgba(0, 140, 180, 0.3)",
       "--link-color": "#4dd0e1",
-      "--button-text": "#e0f7ff"
+      "--button-text": "#e0f7ff",
+
+      "--preview-bg": "#061a2b",
+      "--preview-text": "#d0f0ff"
     }
   },
 
@@ -580,7 +592,10 @@ const THEMES = [
       "--menu-bg": "rgba(10, 10, 10, 0.9)",
       "--menu-button": "rgba(255, 0, 255, 0.25)",
       "--link-color": "#00ffff",
-      "--button-text": "#39ff14"
+      "--button-text": "#39ff14",
+
+      "--preview-bg": "#050505",
+      "--preview-text": "#39ff14"
     }
   },
 
@@ -592,56 +607,72 @@ const THEMES = [
       "--menu-bg": "rgba(20, 25, 45, 0.8)",
       "--menu-button": "rgba(90, 100, 180, 0.3)",
       "--link-color": "#9bbcff",
-      "--button-text": "#ffffff"
+      "--button-text": "#ffffff",
+
+      "--preview-bg": "#0b0f1a",
+      "--preview-text": "#c7d2ff"
     }
   },
+
   {
-  name: "Sunset",
-  vars: {
-    "--bg-color": "rgb(30, 10, 25)",
-    "--text-color": "#ffe6d5",
-    "--menu-bg": "rgba(120, 40, 60, 0.5)",
-    "--menu-button": "rgba(255, 120, 80, 0.25)",
-    "--link-color": "#ff9a76",
-    "--button-text": "#fff0e6"
-  }
-},
+    name: "Sunset",
+    vars: {
+      "--bg-color": "rgb(30, 10, 25)",
+      "--text-color": "#ffe6d5",
+      "--menu-bg": "rgba(120, 40, 60, 0.5)",
+      "--menu-button": "rgba(255, 120, 80, 0.25)",
+      "--link-color": "#ff9a76",
+      "--button-text": "#fff0e6",
 
-{
-  name: "Forest",
-  vars: {
-    "--bg-color": "#0b1f14",
-    "--text-color": "#d7f7e3",
-    "--menu-bg": "rgba(20, 60, 40, 0.7)",
-    "--menu-button": "rgba(60, 140, 90, 0.25)",
-    "--link-color": "#7cf2b3",
-    "--button-text": "#eafff4"
-  }
-},
+      "--preview-bg": "rgb(30, 10, 25)",
+      "--preview-text": "#ffe6d5"
+    }
+  },
 
-{
-  name: "Ice",
-  vars: {
-    "--bg-color": "#0a1a2a",
-    "--text-color": "#d9f2ff",
-    "--menu-bg": "rgba(180, 220, 255, 0.15)",
-    "--menu-button": "rgba(120, 200, 255, 0.25)",
-    "--link-color": "#8ad7ff",
-    "--button-text": "#e8f7ff"
-  }
-},
+  {
+    name: "Forest",
+    vars: {
+      "--bg-color": "#0b1f14",
+      "--text-color": "#d7f7e3",
+      "--menu-bg": "rgba(20, 60, 40, 0.7)",
+      "--menu-button": "rgba(60, 140, 90, 0.25)",
+      "--link-color": "#7cf2b3",
+      "--button-text": "#eafff4",
 
-{
-  name: "Midnight Blue",
-  vars: {
-    "--bg-color": "#050816",
-    "--text-color": "#cbd5ff",
-    "--menu-bg": "rgba(10, 20, 60, 0.85)",
-    "--menu-button": "rgba(70, 90, 200, 0.25)",
-    "--link-color": "#7aa2ff",
-    "--button-text": "#ffffff"
+      "--preview-bg": "#0b1f14",
+      "--preview-text": "#d7f7e3"
+    }
+  },
+
+  {
+    name: "Ice",
+    vars: {
+      "--bg-color": "#0a1a2a",
+      "--text-color": "#d9f2ff",
+      "--menu-bg": "rgba(180, 220, 255, 0.15)",
+      "--menu-button": "rgba(120, 200, 255, 0.25)",
+      "--link-color": "#8ad7ff",
+      "--button-text": "#e8f7ff",
+
+      "--preview-bg": "#0a1a2a",
+      "--preview-text": "#d9f2ff"
+    }
+  },
+
+  {
+    name: "Midnight Blue",
+    vars: {
+      "--bg-color": "#050816",
+      "--text-color": "#cbd5ff",
+      "--menu-bg": "rgba(10, 20, 60, 0.85)",
+      "--menu-button": "rgba(70, 90, 200, 0.25)",
+      "--link-color": "#7aa2ff",
+      "--button-text": "#ffffff",
+
+      "--preview-bg": "#050816",
+      "--preview-text": "#cbd5ff"
+    }
   }
-}
 ];
 
 function applyTheme(theme) {
@@ -661,14 +692,20 @@ function setTheme(name) {
 
 function buildThemeButtons() {
   const container = document.getElementById("theme-buttons");
-  if (!container) return;
-
   container.innerHTML = "";
 
   THEMES.forEach(theme => {
     const btn = document.createElement("button");
+    btn.className = "theme-button";
+
     btn.textContent = theme.name;
-    btn.onclick = () => setTheme(theme.name);
+
+    // apply preview colors
+    btn.style.background = theme.vars["--preview-bg"];
+    btn.style.color = theme.vars["--preview-text"];
+
+    btn.onclick = () => applyTheme(theme);
+
     container.appendChild(btn);
   });
 }

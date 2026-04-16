@@ -21,14 +21,11 @@
 body {
   color: var(--text-color);
   background: var(--bg-color);
-
   padding: 0 2rem;
   padding-top: 200px;
   padding-left: 220px;
-
   line-height: 1.6;
   min-height: 100vh;
-
   font-size: var(--global-font-size);
 }
 
@@ -104,21 +101,15 @@ button {
   font-size: var(--global-font-size);
   padding: calc(var(--global-font-size) * 0.8)
            calc(var(--global-font-size) * 1.2);
-
   border-radius: calc(var(--global-font-size) * 0.3);
-
   background-color: rgba(75,150,75,0.5);
   color: var(--button-text);
-
   border: 2px solid #000;
   cursor: pointer;
-
   font-weight: bold;
   font-family: 'Rubik', sans-serif;
-
   margin: 1rem 0;
-  display: block;
-
+  display: inline-block;
   transition: background-color 0.2s, transform 0.2s, filter 0.2s;
 }
 
@@ -136,6 +127,66 @@ button:disabled {
   vertical-align: middle;
 }
 
+/* ===== Map Container ===== */
+.container {
+  position: relative;
+  width: 900px;
+  height: 675px;
+  margin: 80px auto;
+  margin-left: 0;
+  display: flex;
+  justify-content: center;
+}
+
+/* ===== Map Image ===== */
+#map-image {
+  width: 900px;
+  height: 675px;
+  display: block;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(255,255,255,0.2);
+  user-select: none;
+  max-width: 100%; /* keeps it responsive */
+}
+
+/* ===== Ethnotype Buttons on Map ===== */
+.ethnotype {
+  position: absolute;
+  padding: 10px 16px;
+  background-color: rgb(255, 255, 255, 0.25);
+  color: rgb(0, 0, 0);
+  text-decoration: none;
+  font-weight: bolder;
+  border-radius: 6px;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.ethnotype:hover {
+  background-color: rgb(225, 225, 255, 0.75);
+  color: rgb(0, 0, 0);
+}
+
+/* Map ethnotype links */
+.ethnotype,
+.ethnotype:link,
+.ethnotype:visited {
+  color: rgb(0,0,0);
+  text-decoration: none;
+}
+
+.ethnotype:hover {
+  color: rgb(0,0,0);
+}
+
+.ethnotype:active {
+  color: rgb(0,0,0);
+}
+
+
+
+
 /* =========================
    MENU SIDEBAR
 ========================= */
@@ -144,14 +195,11 @@ button:disabled {
   position: fixed;
   top: 0;
   left: 0;
-
   width: 220px;
   min-width: 160px;
   max-width: 500px;
   height: 100%;
-
   background: var(--menu-bg);
-
   overflow: hidden;
   z-index: 1000;
 }
@@ -169,21 +217,15 @@ button:disabled {
 .menu-button {
   width: 100%;
   box-sizing: border-box;
-
   padding: 0.8rem 1rem;
   margin-bottom: 6px;
-
   background-color: var(--menu-button);
   color: var(--button-text);
-
   border: none;
   border-radius: 6px;
-
   cursor: pointer;
   font-weight: bold;
-
   font-size: var(--global-font-size);
-
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -196,12 +238,9 @@ button:disabled {
   position: absolute;
   top: 0;
   right: 0;
-
   width: 6px;
   height: 100%;
-
   cursor: ew-resize;
-
   background: rgba(0, 0, 25, 0.75);
 }
 
@@ -216,10 +255,8 @@ button:disabled {
 main {
   margin-top: 100px;
   max-width: 900px;
-
   margin-left: auto;
   margin-right: auto;
-
   padding: 1rem 0;
   padding-bottom: 3rem;
 }
@@ -231,23 +268,15 @@ main {
 #search-bar {
   width: 100%;
   max-width: 420px;
-
   padding: 12px 14px;
-
   font-size: 1rem;
-
   border-radius: 6px;
   border: 1px solid #000;
-
   background-color: rgba(200, 240, 200, 0.75);
-
   outline: none;
-
   margin: 15px 0;
   font-family: 'Rubik', sans-serif;
-
   font-weight: 500;
-
   transition: background-color 2s, box-shadow 1s, transform 1s;
 }
 
@@ -258,15 +287,10 @@ main {
 #search-results button {
   background-color: rgb(100, 100, 100);
   color: #fff;
-
   border: 4px solid rgb(40, 40, 40);
-
   padding: 0.6rem 1.2rem;
-
   border-radius: 8px;
-
   margin: 10px 0;
-
   width: 100%;
 }
 
@@ -292,4 +316,14 @@ main {
   width: 100%;
   margin: 0;
   box-sizing: border-box;
+}
+
+.theme-button {
+  width: 100%;
+  margin: 5px 0;
+  padding: 10px;
+  border-radius: 8px;
+  border: 2px solid rgba(0,0,0,0.4);
+  cursor: pointer;
+  font-weight: bold;
 }

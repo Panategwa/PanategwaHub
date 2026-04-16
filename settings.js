@@ -40,19 +40,15 @@ const PANTEGWA_RULES = {
   pl: { base: "Panategwa", suffixes: ["", " b", " c", " d", " e", " f", " g"] },
   uk: { base: "Панатегва", suffixes: ["", " б", " в", " г", " д", " е", " ж"] },
   tr: { base: "Panategva", suffixes: ["", " b", " c", " d", " e", " f", " g"] },
-
   ar: { base: "باناتيغوا", suffixes: ["", " ب", " ج", " د", " هـ", " و", " ز"] },
   hi: { base: "पानातिग्वा", suffixes: ["", " ब", " स", " द", " ए", " फ", " ग"] },
   bn: { base: "পানাতিগওয়া", suffixes: ["", " ব", " স", " দ", " এ", " ফ", " ग"] },
   ur: { base: "پاناتگوا", suffixes: ["", " ب", " ج", " د", " ہ", " و", " ز"] },
-
   zh: { base: "帕纳提格瓦", suffixes: ["", " 二", " 三", " 四", " 五", " 六", " 七"] },
   ja: { base: "パナティグワ", suffixes: ["", " 二", " 三", " 四", " 五", " 六", " 七"] },
   ko: { base: "파나티그와", suffixes: ["", " 이", " 삼", " 사", " 오", " 육", " 칠"] },
-
   id: { base: "Panategwa", suffixes: ["", " b", " c", " d", " e", " f", " g"] },
   vi: { base: "Panategwa", suffixes: ["", " b", " c", " d", " e", " f", " g"] },
-
   bg: { base: "Панатегва", suffixes: ["", " б", " в", " г", " д", " е", " ж"] },
   ro: { base: "Panategua", suffixes: ["", " b", " c", " d", " e", " f", " g"] },
   he: { base: "פנאטגווה", suffixes: ["", " ב", " ג", " ד", " ה", " ו", " ז"] },
@@ -401,6 +397,12 @@ function startNavigationObserver() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
+  buildThemeButtons();
+
+const savedTheme = localStorage.getItem("theme");
+if (savedTheme) {
+  setTheme(savedTheme);
+}
   // FONT SIZE FIRST
   applyFontSize(getTextSize());
   document.getElementById("textsize-buttons").style.display = "none";
@@ -518,4 +520,165 @@ function buildTextSizeButtons() {
   if (!container) return;
 
   container.style.display = "none";
+}
+
+
+const THEMES = [
+  {
+    name: "Panategwa Mode (Default)",
+    vars: {
+      "--bg-color": "rgb(25, 25, 50)",
+      "--text-color": "#e0e0e0",
+      "--menu-bg": "rgba(50, 50, 75, 0.75)",
+      "--menu-button": "rgba(175, 200, 75, 0.25)",
+      "--link-color": "rgb(150, 175, 200)",
+      "--button-text": "rgba(255,255,255,0.85)"
+    }
+  },
+
+  {
+    name: "Dark Mode",
+    vars: {
+      "--bg-color": "rgb(10, 10, 15)",
+      "--text-color": "#f0f0f0",
+      "--menu-bg": "rgba(20, 20, 25, 0.9)",
+      "--menu-button": "rgba(80, 80, 80, 0.4)",
+      "--link-color": "rgb(120, 180, 255)",
+      "--button-text": "#ffffff"
+    }
+  },
+
+  {
+    name: "Light Mode",
+    vars: {
+      "--bg-color": "#ffffff",
+      "--text-color": "#111111",
+      "--menu-bg": "rgba(240, 240, 240, 0.9)",
+      "--menu-button": "rgba(200, 200, 200, 0.5)",
+      "--link-color": "rgb(0, 100, 200)",
+      "--button-text": "#000000"
+    }
+  },
+
+  {
+    name: "Ocean",
+    vars: {
+      "--bg-color": "#061a2b",
+      "--text-color": "#d0f0ff",
+      "--menu-bg": "rgba(0, 60, 100, 0.6)",
+      "--menu-button": "rgba(0, 140, 180, 0.3)",
+      "--link-color": "#4dd0e1",
+      "--button-text": "#e0f7ff"
+    }
+  },
+
+  {
+    name: "Neon",
+    vars: {
+      "--bg-color": "#050505",
+      "--text-color": "#39ff14",
+      "--menu-bg": "rgba(10, 10, 10, 0.9)",
+      "--menu-button": "rgba(255, 0, 255, 0.25)",
+      "--link-color": "#00ffff",
+      "--button-text": "#39ff14"
+    }
+  },
+
+  {
+    name: "Space",
+    vars: {
+      "--bg-color": "#0b0f1a",
+      "--text-color": "#c7d2ff",
+      "--menu-bg": "rgba(20, 25, 45, 0.8)",
+      "--menu-button": "rgba(90, 100, 180, 0.3)",
+      "--link-color": "#9bbcff",
+      "--button-text": "#ffffff"
+    }
+  },
+  {
+  name: "Sunset",
+  vars: {
+    "--bg-color": "rgb(30, 10, 25)",
+    "--text-color": "#ffe6d5",
+    "--menu-bg": "rgba(120, 40, 60, 0.5)",
+    "--menu-button": "rgba(255, 120, 80, 0.25)",
+    "--link-color": "#ff9a76",
+    "--button-text": "#fff0e6"
+  }
+},
+
+{
+  name: "Forest",
+  vars: {
+    "--bg-color": "#0b1f14",
+    "--text-color": "#d7f7e3",
+    "--menu-bg": "rgba(20, 60, 40, 0.7)",
+    "--menu-button": "rgba(60, 140, 90, 0.25)",
+    "--link-color": "#7cf2b3",
+    "--button-text": "#eafff4"
+  }
+},
+
+{
+  name: "Ice",
+  vars: {
+    "--bg-color": "#0a1a2a",
+    "--text-color": "#d9f2ff",
+    "--menu-bg": "rgba(180, 220, 255, 0.15)",
+    "--menu-button": "rgba(120, 200, 255, 0.25)",
+    "--link-color": "#8ad7ff",
+    "--button-text": "#e8f7ff"
+  }
+},
+
+{
+  name: "Midnight Blue",
+  vars: {
+    "--bg-color": "#050816",
+    "--text-color": "#cbd5ff",
+    "--menu-bg": "rgba(10, 20, 60, 0.85)",
+    "--menu-button": "rgba(70, 90, 200, 0.25)",
+    "--link-color": "#7aa2ff",
+    "--button-text": "#ffffff"
+  }
+}
+];
+
+function applyTheme(theme) {
+  for (const [key, value] of Object.entries(theme.vars)) {
+    document.documentElement.style.setProperty(key, value);
+  }
+
+  localStorage.setItem("theme", theme.name);
+}
+
+function setTheme(name) {
+  const theme = THEMES.find(t => t.name === name);
+  if (!theme) return;
+
+  applyTheme(theme);
+}
+
+function buildThemeButtons() {
+  const container = document.getElementById("theme-buttons");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  THEMES.forEach(theme => {
+    const btn = document.createElement("button");
+    btn.textContent = theme.name;
+    btn.onclick = () => setTheme(theme.name);
+    container.appendChild(btn);
+  });
+}
+
+function toggleThemes() {
+  const container = document.getElementById("theme-buttons");
+  const msg = document.getElementById("theme-message");
+
+  const open = container.style.display === "block";
+
+  container.style.display = open ? "none" : "block";
+  msg.style.display = open ? "none" : "block";
 }

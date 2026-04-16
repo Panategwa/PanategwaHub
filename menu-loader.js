@@ -55,15 +55,26 @@ document.addEventListener("DOMContentLoaded", function () {
   // RESIZE HANDLE
   // =========================
   menuHTML += `<div id="resize-handle"></div>`;
-
   menuHTML += `</div>`;
 
   menuContainer.innerHTML = menuHTML;
 
   // =========================
+  // 🔥 FIX: WRAP PAGE CONTENT
+  // =========================
+  const wrapper = document.createElement("div");
+  wrapper.id = "page-content";
+
+  const elements = [...document.body.children];
+  elements.forEach(el => {
+    if (el !== menuContainer) wrapper.appendChild(el);
+  });
+
+  document.body.appendChild(wrapper);
+
+  // =========================
   // RESIZE LOGIC
   // =========================
-
   const handle = document.getElementById("resize-handle");
 
   let isResizing = false;
@@ -72,15 +83,14 @@ document.addEventListener("DOMContentLoaded", function () {
   const MAX_WIDTH = 500;
   const DEFAULT_WIDTH = 220;
 
-  // load saved width
   let savedWidth = localStorage.getItem("menuWidth");
 
   if (savedWidth) {
     savedWidth = parseInt(savedWidth);
     menuContainer.style.width = savedWidth + "px";
-    document.body.style.paddingLeft = savedWidth + "px";
+    wrapper.style.paddingLeft = savedWidth + "px";
   } else {
-    document.body.style.paddingLeft = DEFAULT_WIDTH + "px";
+    wrapper.style.paddingLeft = DEFAULT_WIDTH + "px";
   }
 
   handle.addEventListener("mousedown", () => {
@@ -93,12 +103,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
     let newWidth = e.clientX;
 
-    // clamp width
     if (newWidth < MIN_WIDTH) newWidth = MIN_WIDTH;
     if (newWidth > MAX_WIDTH) newWidth = MAX_WIDTH;
 
     menuContainer.style.width = newWidth + "px";
-    document.body.style.paddingLeft = newWidth + "px";
+    wrapper.style.paddingLeft = newWidth + "px";
   });
 
   document.addEventListener("mouseup", () => {
@@ -116,7 +125,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // =========================
   handle.addEventListener("dblclick", () => {
     menuContainer.style.width = DEFAULT_WIDTH + "px";
-    document.body.style.paddingLeft = DEFAULT_WIDTH + "px";
+    wrapper.style.paddingLeft = DEFAULT_WIDTH + "px";
 
     localStorage.setItem("menuWidth", DEFAULT_WIDTH);
   });

@@ -9,8 +9,7 @@ document.addEventListener("DOMContentLoaded", function () {
     { name: "Panategwa d", url: "panategwa-d-page.html" },
     { name: "Panategwa e", url: "panategwa-e-page.html" },
     { name: "Panategwa f", url: "panategwa-f-page.html" },
-    { name: "Panategwa g", url: "panategwa-g-page.html" },
-    { name: "⚙️ Settings", url: "settings-page.html" }
+    { name: "Panategwa g", url: "panategwa-g-page.html" }
   ];
 
   const current = window.location.pathname.split("/").pop() || "index.html";
@@ -23,7 +22,47 @@ document.addEventListener("DOMContentLoaded", function () {
     return url;
   }
 
+  const isSettings = current === "settings-page.html";
+
   let menuHTML = `<div class="menu-inner">`;
+
+  // =========================
+  // TITLE
+  // =========================
+  menuHTML += `
+    <div class="line">
+      <div class="menu-main-title">The Panategwa Hub</div>
+      <div class="menu-sub-title">Alpha</div>
+    </div>
+  `;
+
+// =========================
+// ICON ROW
+// =========================
+menuHTML += `
+  <div class="line icons">
+
+    <!-- SETTINGS -->
+    <button class="menu-icon-button ${isSettings ? "active-icon" : ""}"
+      ${isSettings ? "disabled" : ""}
+      onclick="window.location.href='${buildUrl("settings-page.html")}'">
+      ⚙️
+    </button>
+
+<!-- ACCOUNT -->
+<button class="menu-icon-button"
+  onclick="window.location.href='account-page.html'">
+  👤
+</button>
+
+<!-- SCROLL TO TOP -->
+<button class="menu-icon-button"
+  onclick="window.scrollTo({top:0, behavior:'smooth'})">
+  ⬆️
+    </button>
+
+  </div>
+`;
 
   // =========================
   // PAGE BUTTONS
@@ -41,26 +80,13 @@ document.addEventListener("DOMContentLoaded", function () {
     `;
   });
 
-  // =========================
-  // BACK TO TOP
-  // =========================
-  menuHTML += `
-    <button class="menu-button"
-      onclick="window.scrollTo({top:0, behavior:'smooth'})">
-      Back to Top
-    </button>
-  `;
-
-  // =========================
-  // RESIZE HANDLE
-  // =========================
   menuHTML += `<div id="resize-handle"></div>`;
   menuHTML += `</div>`;
 
   menuContainer.innerHTML = menuHTML;
 
   // =========================
-  // 🔥 FIX: WRAP PAGE CONTENT
+  // WRAP PAGE CONTENT
   // =========================
   const wrapper = document.createElement("div");
   wrapper.id = "page-content";
@@ -120,9 +146,6 @@ document.addEventListener("DOMContentLoaded", function () {
     localStorage.setItem("menuWidth", finalWidth);
   });
 
-  // =========================
-  // DOUBLE CLICK RESET
-  // =========================
   handle.addEventListener("dblclick", () => {
     menuContainer.style.width = DEFAULT_WIDTH + "px";
     wrapper.style.paddingLeft = DEFAULT_WIDTH + "px";

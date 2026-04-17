@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Panategwa Hub - Account</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+
+  <script src="menu-loader.js" defer></script>
+
+  <script src="settings/text-size.js" defer></script>
+  <script src="settings/color-theme.js" defer></script>
+  <script src="settings/translate.js" defer></script>
+  <script src="settings/settings.js" defer></script>
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js" defer></script>
+
+  <script src="auth/firebase-config.js" defer></script>
+  <script src="auth/auth.js" defer></script>
+  <script src="auth/account.js" defer></script>
+
+  <style>
+    .account-wrap {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .account-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 16px;
+      backdrop-filter: blur(6px);
+    }
+
+    .card h2 {
+      margin-top: 0;
+    }
+
+    .field-row {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .field-row input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 0, 0, 0.35);
+      font: inherit;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .button-row button {
+      margin: 0;
+    }
+
+    .danger {
+      background: rgba(180, 40, 40, 0.85);
+      color: white;
+    }
+
+    .status {
+      margin: 10px 0 0;
+      font-weight: 700;
+      opacity: 0.9;
+    }
+
+    .status[data-kind="error"] { color: #ffb3b3; }
+    .status[data-kind="success"] { color: #b6ffcb; }
+    .status[data-kind="info"] { color: inherit; }
+
+    @media (min-width: 900px) {
+      .account-grid {
+        grid-template-columns: 1.1fr 0.9fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="menu-container"></div>
+
+  <div class="account-wrap">
+    <h1>👤 Account</h1>
+
+    <p id="auth-status" class="status" data-kind="info">Loading account...</p>
+
+    <div class="account-grid">
+      <section class="card">
+        <h2>Sign in / Create account</h2>
+
+        <div class="field-row">
+          <input id="username" type="text" placeholder="Username" autocomplete="nickname" />
+          <input id="account-email" type="email" placeholder="Email" autocomplete="email" />
+          <input id="account-password" type="password" placeholder="Password" autocomplete="current-password" />
+        </div>
+
+        <div class="button-row">
+          <button id="google-login-btn" type="button">Continue with Google</button>
+          <button id="create-account-btn" type="button">Create account</button>
+          <button id="email-login-btn" type="button">Sign in with email</button>
+          <button id="resend-verification-btn" type="button">Resend verification email</button>
+        </div>
+
+        <p style="margin-top: 12px; opacity: 0.8;">
+          Email accounts use a verification link sent to your inbox.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Your info</h2>
+
+        <div id="user-info">
+          <p><b>Status:</b> Not logged in</p>
+          <p><b>Username:</b> —</p>
+          <p><b>Email:</b> —</p>
+          <p><b>Verified:</b> —</p>
+          <p><b>Provider:</b> —</p>
+          <p><b>Account ID:</b> —</p>
+          <p><b>Achievements:</b> Coming soon</p>
+          <p><b>Rank:</b> Explorer</p>
+        </div>
+
+        <div class="button-row" style="margin-top: 12px;">
+          <button id="save-username-btn" type="button">Save username</button>
+          <button id="logout-btn" type="button">Logout</button>
+        </div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top: 16px;">
+      <h2>Danger zone</h2>
+      <p style="margin-top: 0;">
+        Deleting an account may require you to sign in again first. That is normal for Firebase.
+      </p>
+      <button id="delete-account-btn" class="danger" type="button">Delete account</button>
+    </section>
+  </div>
+</body>
+</html>

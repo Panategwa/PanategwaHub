@@ -8,19 +8,19 @@
   <link rel="stylesheet" href="styles.css" />
 
   <script src="menu-loader.js" defer></script>
-
   <script src="settings/settings.js" defer></script>
-
   <script type="module" src="auth/account.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 
-        <script src="auth/firebase-config.js"></script>
-        <script src="auth/auth.js"></script>
   <style>
     .account-wrap {
       max-width: 900px;
       margin: 0 auto;
+    }
+
+    .account-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
     }
 
     .card {
@@ -29,13 +29,25 @@
       border-radius: 14px;
       padding: 16px;
       backdrop-filter: blur(6px);
-      margin-bottom: 16px;
+    }
+
+    .card h2 {
+      margin-top: 0;
     }
 
     .field-row {
       display: grid;
       gap: 10px;
       margin-bottom: 10px;
+    }
+
+    .field-row input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 0, 0, 0.35);
+      font: inherit;
     }
 
     .button-row {
@@ -65,9 +77,7 @@
 
     @media (min-width: 900px) {
       .account-grid {
-        display: grid;
         grid-template-columns: 1.1fr 0.9fr;
-        gap: 16px;
       }
     }
   </style>
@@ -85,13 +95,18 @@
       <section class="card">
         <h2>Sign in</h2>
 
+        <div class="field-row">
+          <input id="username" type="text" placeholder="Username" autocomplete="nickname" />
+        </div>
+
         <div class="button-row">
           <button id="google-login-btn" type="button">Continue with Google</button>
+          <button id="save-username-btn" type="button">Save username</button>
           <button id="logout-btn" type="button" style="display:none;">Logout</button>
         </div>
 
         <p style="margin-top: 12px; opacity: 0.8;">
-          Google login uses Firebase Auth popup sign-in.
+          Google sign-in uses the Firebase popup flow. If the popup is blocked, the code falls back to redirect.
         </p>
       </section>
 
@@ -100,7 +115,7 @@
 
         <div id="user-info">
           <p><b>Status:</b> Not logged in</p>
-          <p><b>Name:</b> —</p>
+          <p><b>Username:</b> —</p>
           <p><b>Email:</b> —</p>
           <p><b>Verified:</b> —</p>
           <p><b>Provider:</b> —</p>
@@ -111,10 +126,10 @@
       </section>
     </div>
 
-    <section class="card">
+    <section class="card" style="margin-top: 16px;">
       <h2>Danger zone</h2>
       <p style="margin-top: 0;">
-        Deleting an account may require a fresh Google sign-in first.
+        Deleting an account may require a fresh sign-in first.
       </p>
       <button id="delete-account-btn" class="danger" type="button" style="display:none;">Delete account</button>
     </section>

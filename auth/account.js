@@ -1,140 +1,201 @@
-import { auth, googleProvider } from "./firebase-config.js";
-
 import {
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged,
-  deleteUser,
-  updateProfile,
-  sendEmailVerification,
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  reauthenticateWithPopup
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+  loginWithGoogle,
+  completeRedirectLogin,
+  logout,
+  watchAuth,
+  getCurrentUser,
+  saveUsername,
+  deleteAccount
+} from "./auth.js";
 
 function $(id) {
   return document.getElementById(id);
 }
 
-function safeText(v) {
-  return String(v ?? "").replace(/[<>&"]/g, c => ({
+function safeText(value) {
+  return String(value ?? "").replace(/[<>&"]/g, ch => ({
     "<": "&lt;",
     ">": "&gt;",
     "&": "&amp;",
     "\"": "&quot;"
-  }[c]));
+  }[ch]));
 }
 
-function setStatus(msg, type = "info") {
+function setStatus(message, kind = "info") {
   const el = $("auth-status");
   if (!el) return;
-  el.textContent = msg;
-  el.dataset.kind = type;
+  el.textContent = message;
+  el.dataset.kind = kind;
 }
 
-/* ---------------- LOGIN ---------------- */
-
-async function loginWithGoogle() {
-  return await signInWithPopup(auth, googleProvider);
+function providerLabel(user) {
+  const provider = user?.providerData?.[0]?.providerId || "unknown";
+  if (provider === "google.com") return "Google";
+  return provider;
 }
-
-async function logout() {
-  return await signOut(auth);
-}
-
-/* ---------------- USER UI ---------------- */
 
 function renderUser(user) {
-  const box = $("user-info");
-  if (!box) return;
+  const info = $("user-info");
+  const usernameInput = $("username");
+  const loginBtn = $("google-login-btn");
+  const logoutBtn = $("logout-btn");
+  const saveBtn = $("save-username-btn");
+  const deleteBtn = $("delete-account-btn");
+
+  if (!info) return;
 
   if (!user) {
-    box.innerHTML = `
+    info.innerHTML = `
       <p><b>Status:</b> Not logged in</p>
       <p><b>Username:</b> —</p>
       <p><b>Email:</b> —</p>
       <p><b>Verified:</b> —</p>
+      <p><b>Provider:</b> —</p>
       <p><b>Account ID:</b> —</p>
       <p><b>Achievements:</b> Coming soon</p>
+      <p><b>Rank:</b> Explorer</p>
     `;
+
+    if (usernameInput) usernameInput.value = "";
+    if (loginBtn) loginBtn.style.display = "inline-block";
+    if (logoutBtn) logoutBtn.style.display = "none";
+    if (saveBtn) saveBtn.style.display = "none";
+    if (deleteBtn) deleteBtn.style.display = "none";
     return;
   }
 
-  box.innerHTML = `
-    <div style="display:flex; gap:12px; align-items:center;">
-      <img src="${user.photoURL || ""}" width="60" style="border-radius:50%">
+  const displayName = user.displayName || "";
+  const email = user.email || "—";
+  const verified = user.emailVerified ? "Yes" : "No";
+  const provider = providerLabel(user);
+
+  info.innerHTML = `
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom: 12px;">
+      <img
+        src="${safeText(user.photoURL || "")}"
+        alt="Profile photo"
+        style="width:64px; height:64px; border-radius:50%; object-fit:cover; background: rgba(255,255,255,0.12);"
+      >
       <div>
-        <b>${safeText(user.displayName || "No name")}</b><br>
-        <small>${safeText(user.email)}</small>
+        <p style="margin:0;"><b>${safeText(displayName || "No name")}</b></p>
+        <p style="margin:0; opacity:0.8;">${safeText(email)}</p>
       </div>
     </div>
 
     <p><b>Status:</b> Logged in</p>
-    <p><b>Verified:</b> ${user.emailVerified ? "Yes" : "No"}</p>
-    <p><b>Account ID:</b> ${user.uid}</p>
+    <p><b>Username:</b> ${safeText(displayName || "Not set")}</p>
+    <p><b>Email:</b> ${safeText(email)}</p>
+    <p><b>Verified:</b> ${verified}</p>
+    <p><b>Provider:</b> ${safeText(provider)}</p>
+    <p><b>Account ID:</b> ${safeText(user.uid)}</p>
     <p><b>Achievements:</b> Coming soon</p>
+    <p><b>Rank:</b> Explorer</p>
   `;
+
+  if (usernameInput) usernameInput.value = displayName;
+  if (loginBtn) loginBtn.style.display = "none";
+  if (logoutBtn) logoutBtn.style.display = "inline-block";
+  if (saveBtn) saveBtn.style.display = "inline-block";
+  if (deleteBtn) deleteBtn.style.display = "inline-block";
 }
 
-/* ---------------- ACTIONS ---------------- */
-
-window.loginWithGoogle = async () => {
+async function handleGoogleLogin() {
   try {
-    setStatus("Signing in...");
-    await loginWithGoogle();
-  } catch (e) {
-    console.error(e);
-    setStatus("Login failed", "error");
+    setStatus("Opening Google sign-in...", "info");
+    const result = await loginWithGoogle();
+
+    if (result) {
+      setStatus("Logged in with Google.", "success");
+    } else {
+      setStatus("Finishing sign-in...", "info");
+    }
+  } catch (error) {
+    console.error(error);
+    setStatus(error?.message || "Google sign-in failed.", "error");
+    alert(error?.message || "Google sign-in failed.");
   }
-};
+}
 
-window.logout = async () => {
-  await logout();
-};
-
-window.saveUsername = async () => {
-  const user = auth.currentUser;
-  const username = $("username")?.value;
-
-  if (!user) return alert("Not logged in");
-
-  await updateProfile(user, {
-    displayName: username
-  });
-
-  alert("Username saved!");
-};
-
-window.deleteAccount = async () => {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  if (!confirm("Delete account?")) return;
+async function handleSaveUsername() {
+  const username = $("username")?.value || "";
 
   try {
-    await deleteUser(user);
-    alert("Account deleted");
-  } catch (e) {
-    alert("You need to log in again to delete account");
+    setStatus("Saving username...", "info");
+    await saveUsername(username);
+    setStatus("Username saved.", "success");
+    alert("Username saved.");
+  } catch (error) {
+    console.error(error);
+    setStatus(error?.message || "Could not save username.", "error");
+    alert(error?.message || "Could not save username.");
   }
-};
+}
 
-/* ---------------- AUTH STATE ---------------- */
+async function handleLogout() {
+  try {
+    await logout();
+    setStatus("Logged out.", "info");
+    alert("Logged out.");
+  } catch (error) {
+    console.error(error);
+    setStatus(error?.message || "Logout failed.", "error");
+    alert(error?.message || "Logout failed.");
+  }
+}
 
-onAuthStateChanged(auth, (user) => {
-  renderUser(user);
+async function handleDeleteAccount() {
+  const user = getCurrentUser();
 
   if (!user) {
-    setStatus("Not logged in");
-  } else {
-    setStatus("Logged in", "success");
+    setStatus("Sign in first.", "error");
+    alert("Sign in first.");
+    return;
   }
-});
 
-/* ---------------- INIT BUTTONS ---------------- */
+  if (!confirm("Delete your account permanently?")) return;
 
-document.addEventListener("DOMContentLoaded", () => {
-  $("google-login-btn")?.addEventListener("click", window.loginWithGoogle);
-  $("logout-btn")?.addEventListener("click", window.logout);
-  $("delete-account-btn")?.addEventListener("click", window.deleteAccount);
+  try {
+    setStatus("Deleting account...", "info");
+    await deleteAccount();
+    setStatus("Account deleted.", "success");
+    alert("Account deleted.");
+    window.location.href = "index.html";
+  } catch (error) {
+    console.error(error);
+    setStatus(error?.message || "Delete failed.", "error");
+    alert(error?.message || "Delete failed.");
+  }
+}
+
+function bindButtons() {
+  $("google-login-btn")?.addEventListener("click", handleGoogleLogin);
+  $("save-username-btn")?.addEventListener("click", handleSaveUsername);
+  $("logout-btn")?.addEventListener("click", handleLogout);
+  $("delete-account-btn")?.addEventListener("click", handleDeleteAccount);
+}
+
+window.loginWithGoogle = handleGoogleLogin;
+window.saveUsername = handleSaveUsername;
+window.logout = handleLogout;
+window.deleteAccount = handleDeleteAccount;
+
+document.addEventListener("DOMContentLoaded", async () => {
+  bindButtons();
+
+  if (!window.panategwaAuth) {
+    setStatus("Firebase did not load correctly.", "error");
+    return;
+  }
+
+  await completeRedirectLogin();
+
+  watchAuth((user) => {
+    renderUser(user);
+
+    if (user) {
+      setStatus(user.emailVerified ? "Signed in and verified." : "Signed in.", "success");
+    } else {
+      setStatus("Not logged in.", "info");
+    }
+  });
 });

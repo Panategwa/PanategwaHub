@@ -9,28 +9,18 @@
 
   <script src="menu-loader.js" defer></script>
 
-  <script src="settings/text-size.js" defer></script>
-  <script src="settings/color-theme.js" defer></script>
-  <script src="settings/translate.js" defer></script>
   <script src="settings/settings.js" defer></script>
 
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js" defer></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js" defer></script>
+  <script type="module" src="auth/account.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 
-  <script src="auth/firebase-config.js" defer></script>
-  <script src="auth/auth.js" defer></script>
-  <script src="auth/account.js" defer></script>
-
+        <script src="auth/firebase-config.js"></script>
+        <script src="auth/auth.js"></script>
   <style>
     .account-wrap {
       max-width: 900px;
       margin: 0 auto;
-    }
-
-    .account-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 16px;
     }
 
     .card {
@@ -39,25 +29,13 @@
       border-radius: 14px;
       padding: 16px;
       backdrop-filter: blur(6px);
-    }
-
-    .card h2 {
-      margin-top: 0;
+      margin-bottom: 16px;
     }
 
     .field-row {
       display: grid;
       gap: 10px;
       margin-bottom: 10px;
-    }
-
-    .field-row input {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 12px 14px;
-      border-radius: 10px;
-      border: 1px solid rgba(0, 0, 0, 0.35);
-      font: inherit;
     }
 
     .button-row {
@@ -76,7 +54,7 @@
     }
 
     .status {
-      margin: 10px 0 0;
+      margin: 10px 0 16px;
       font-weight: 700;
       opacity: 0.9;
     }
@@ -87,7 +65,9 @@
 
     @media (min-width: 900px) {
       .account-grid {
+        display: grid;
         grid-template-columns: 1.1fr 0.9fr;
+        gap: 16px;
       }
     }
   </style>
@@ -103,23 +83,15 @@
 
     <div class="account-grid">
       <section class="card">
-        <h2>Sign in / Create account</h2>
-
-        <div class="field-row">
-          <input id="username" type="text" placeholder="Username" autocomplete="nickname" />
-          <input id="account-email" type="email" placeholder="Email" autocomplete="email" />
-          <input id="account-password" type="password" placeholder="Password" autocomplete="current-password" />
-        </div>
+        <h2>Sign in</h2>
 
         <div class="button-row">
           <button id="google-login-btn" type="button">Continue with Google</button>
-          <button id="create-account-btn" type="button">Create account</button>
-          <button id="email-login-btn" type="button">Sign in with email</button>
-          <button id="resend-verification-btn" type="button">Resend verification email</button>
+          <button id="logout-btn" type="button" style="display:none;">Logout</button>
         </div>
 
         <p style="margin-top: 12px; opacity: 0.8;">
-          Email accounts use a verification link sent to your inbox.
+          Google login uses Firebase Auth popup sign-in.
         </p>
       </section>
 
@@ -128,7 +100,7 @@
 
         <div id="user-info">
           <p><b>Status:</b> Not logged in</p>
-          <p><b>Username:</b> —</p>
+          <p><b>Name:</b> —</p>
           <p><b>Email:</b> —</p>
           <p><b>Verified:</b> —</p>
           <p><b>Provider:</b> —</p>
@@ -136,20 +108,15 @@
           <p><b>Achievements:</b> Coming soon</p>
           <p><b>Rank:</b> Explorer</p>
         </div>
-
-        <div class="button-row" style="margin-top: 12px;">
-          <button id="save-username-btn" type="button">Save username</button>
-          <button id="logout-btn" type="button">Logout</button>
-        </div>
       </section>
     </div>
 
-    <section class="card" style="margin-top: 16px;">
+    <section class="card">
       <h2>Danger zone</h2>
       <p style="margin-top: 0;">
-        Deleting an account may require you to sign in again first. That is normal for Firebase.
+        Deleting an account may require a fresh Google sign-in first.
       </p>
-      <button id="delete-account-btn" class="danger" type="button">Delete account</button>
+      <button id="delete-account-btn" class="danger" type="button" style="display:none;">Delete account</button>
     </section>
   </div>
 </body>

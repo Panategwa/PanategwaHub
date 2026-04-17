@@ -1,101 +1,75 @@
-import { auth, googleProvider } from "./firebase-config.js";
-import {
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
-  signOut,
-  onAuthStateChanged,
-  deleteUser,
-  reauthenticateWithPopup,
-  updateProfile
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+(function () {
+  const $ = (id) => document.getElementById(id);
 
-async function loginWithGoogle() {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
-  } catch (error) {
-    const code = error?.code || "";
+  function setStatus(msg) {
+    const el = $("auth-status");
+    if (el) el.textContent = msg;
+  }
 
-    if (
-      code === "auth/popup-blocked" ||
-      code === "auth/operation-not-supported-in-this-environment" ||
-      code === "auth/cancelled-popup-request" ||
-      code === "auth/popup-closed-by-user"
-    ) {
-      await signInWithRedirect(auth, googleProvider);
-      return null;
+  function renderUser(user) {
+    const box = $("user-info");
+    if (!box) return;
+
+    if (!user) {
+      box.innerHTML = `<p>Status: Not logged in</p>`;
+      return;
     }
 
-    throw error;
-  }
-}
+    box.innerHTML = `
+      <p>Status: Logged in</p>
+      <p>Username: ${user.displayName || "Not set"}</p>
+      <p>Email: ${user.email}</p>
+      <p>Verified: ${user.emailVerified}</p>
+      <p>ID: ${user.uid}</p>
+      <p>Achievements: Coming soon</p>
+    `;
 
-async function completeRedirectLogin() {
-  try {
-    const result = await getRedirectResult(auth);
-    return result?.user || null;
-  } catch (error) {
-    console.error("Redirect result error:", error);
-    return null;
-  }
-}
-
-async function logout() {
-  await signOut(auth);
-}
-
-function watchAuth(callback) {
-  return onAuthStateChanged(auth, callback);
-}
-
-function getCurrentUser() {
-  return auth.currentUser;
-}
-
-async function saveUsername(displayName) {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error("Not logged in.");
+    if ($("username")) {
+      $("username").value = user.displayName || "";
+    }
   }
 
-  const cleanName = String(displayName || "").trim();
-  if (!cleanName) {
-    throw new Error("Username cannot be empty.");
+  async function loginWithGoogle() {
+    try {
+      setStatus("Logging in...");
+      await window.panategwaAuthActions.loginWithGoogle();
+      setStatus("Logged in!");
+    } catch (e) {
+      console.error(e);
+      setStatus("Login failed: " + e.message);
+    }
   }
 
-  await updateProfile(user, { displayName: cleanName });
-  await user.reload();
-
-  return user;
-}
-
-async function deleteAccount() {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error("Not logged in.");
+  async function logout() {
+    await window.panategwaAuthActions.logout();
   }
 
-  try {
-    await deleteUser(user);
-    return true;
-  } catch (error) {
-    if (error?.code === "auth/requires-recent-login") {
-      await reauthenticateWithPopup(user, googleProvider);
-      await deleteUser(user);
-      return true;
+  async function saveUsername() {
+    const name = $("username")?.value;
+    await window.panategwaAuthActions.saveUsername(name);
+  }
+
+  async function deleteAccount() {
+    if (!confirm("Delete account?")) return;
+    await window.panategwaAuthActions.deleteAccount();
+    location.reload();
+  }
+
+  function bind() {
+    $("google-login-btn")?.addEventListener("click", loginWithGoogle);
+    $("logout-btn")?.addEventListener("click", logout);
+    $("save-username-btn")?.addEventListener("click", saveUsername);
+    $("delete-account-btn")?.addEventListener("click", deleteAccount);
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    bind();
+
+    if (!window.panategwaAuthActions) {
+      setStatus("Firebase not loaded");
+      return;
     }
 
-    throw error;
-  }
-}
-
-export {
-  loginWithGoogle,
-  completeRedirectLogin,
-  logout,
-  watchAuth,
-  getCurrentUser,
-  saveUsername,
-  deleteAccount
-};
+    window.panategwaAuthActions.onAuthStateChanged(renderUser);
+  });
+})();

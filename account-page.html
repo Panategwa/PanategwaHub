@@ -2,137 +2,48 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Panategwa Hub - Account</title>
-
+  <title>Account</title>
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
-
   <script src="menu-loader.js" defer></script>
+
+  <script src="settings/text-size.js" defer></script>
+  <script src="settings/color-theme.js" defer></script>
+  <script src="settings/translate.js" defer></script>
   <script src="settings/settings.js" defer></script>
-  <script type="module" src="auth/account.js"></script>
-
-  <style>
-    .account-wrap {
-      max-width: 900px;
-      margin: 0 auto;
-    }
-
-    .account-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 16px;
-    }
-
-    .card {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 14px;
-      padding: 16px;
-      backdrop-filter: blur(6px);
-    }
-
-    .card h2 {
-      margin-top: 0;
-    }
-
-    .field-row {
-      display: grid;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-
-    .field-row input {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 12px 14px;
-      border-radius: 10px;
-      border: 1px solid rgba(0, 0, 0, 0.35);
-      font: inherit;
-    }
-
-    .button-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .button-row button {
-      margin: 0;
-    }
-
-    .danger {
-      background: rgba(180, 40, 40, 0.85);
-      color: white;
-    }
-
-    .status {
-      margin: 10px 0 16px;
-      font-weight: 700;
-      opacity: 0.9;
-    }
-
-    .status[data-kind="error"] { color: #ffb3b3; }
-    .status[data-kind="success"] { color: #b6ffcb; }
-    .status[data-kind="info"] { color: inherit; }
-
-    @media (min-width: 900px) {
-      .account-grid {
-        grid-template-columns: 1.1fr 0.9fr;
-      }
-    }
-  </style>
+  
+  <!-- Firebase MUST be module -->
+<script type="module" src="auth/firebase-config.js"></script>
+<script defer src="auth/auth.js"></script>
 </head>
 
 <body>
-  <div id="menu-container"></div>
 
-  <div class="account-wrap">
-    <h1>👤 Account</h1>
+  <h1>👤 Account</h1>
 
-    <p id="auth-status" class="status" data-kind="info">Loading account...</p>
+  <div class="card">
 
-    <div class="account-grid">
-      <section class="card">
-        <h2>Sign in</h2>
+    <div id="auth-status">Not logged in</div>
 
-        <div class="field-row">
-          <input id="username" type="text" placeholder="Username" autocomplete="nickname" />
-        </div>
+    <div id="user-info"></div>
 
-        <div class="button-row">
-          <button id="google-login-btn" type="button">Continue with Google</button>
-          <button id="save-username-btn" type="button">Save username</button>
-          <button id="logout-btn" type="button" style="display:none;">Logout</button>
-        </div>
+    <hr>
 
-        <p style="margin-top: 12px; opacity: 0.8;">
-          Google sign-in uses the Firebase popup flow. If the popup is blocked, the code falls back to redirect.
-        </p>
-      </section>
+    <input id="username" placeholder="Username" />
+    <button id="save-username-btn">Save Username</button>
 
-      <section class="card">
-        <h2>Your info</h2>
+    <hr>
 
-        <div id="user-info">
-          <p><b>Status:</b> Not logged in</p>
-          <p><b>Username:</b> —</p>
-          <p><b>Email:</b> —</p>
-          <p><b>Verified:</b> —</p>
-          <p><b>Provider:</b> —</p>
-          <p><b>Account ID:</b> —</p>
-          <p><b>Achievements:</b> Coming soon</p>
-          <p><b>Rank:</b> Explorer</p>
-        </div>
-      </section>
-    </div>
+    <button id="google-login-btn">Continue with Google</button>
+    <button id="logout-btn">Logout</button>
 
-    <section class="card" style="margin-top: 16px;">
-      <h2>Danger zone</h2>
-      <p style="margin-top: 0;">
-        Deleting an account may require a fresh sign-in first.
-      </p>
-      <button id="delete-account-btn" class="danger" type="button" style="display:none;">Delete account</button>
-    </section>
+    <hr>
+
+    <button id="delete-account-btn" style="background:red;color:white;">
+      Delete Account
+    </button>
+
   </div>
+
 </body>
 </html>

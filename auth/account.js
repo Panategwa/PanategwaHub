@@ -1,201 +1,280 @@
+import { auth, db } from "./firebase-config.js";
 import {
+  login,
   loginWithGoogle,
-  completeRedirectLogin,
+  createAccount,
   logout,
-  watchAuth,
-  getCurrentUser,
   saveUsername,
-  deleteAccount
+  resendVerificationEmail,
+  requestPasswordReset,
+  deleteAccount,
+  watchAuth
 } from "./auth.js";
 
-function $(id) {
-  return document.getElementById(id);
-}
+import {
+  doc,
+  onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-function safeText(value) {
-  return String(value ?? "").replace(/[<>&"]/g, ch => ({
-    "<": "&lt;",
-    ">": "&gt;",
-    "&": "&amp;",
-    "\"": "&quot;"
-  }[ch]));
-}
+const $ = (id) => document.getElementById(id);
 
-function setStatus(message, kind = "info") {
+let profileUnsub = null;
+
+function setStatus(text, kind = "info") {
   const el = $("auth-status");
   if (!el) return;
-  el.textContent = message;
+  el.textContent = text;
   el.dataset.kind = kind;
 }
 
-function providerLabel(user) {
-  const provider = user?.providerData?.[0]?.providerId || "unknown";
-  if (provider === "google.com") return "Google";
-  return provider;
+function getRank(xp) {
+  if (xp < 5) return "Explorer";
+  if (xp < 20) return "Adventurer";
+  return "Veteran";
 }
 
-function renderUser(user) {
+function formatDate(value) {
+  if (!value) return "—";
+  if (typeof value === "number") return new Date(value).toLocaleString();
+  if (typeof value?.toDate === "function") return value.toDate().toLocaleString();
+  if (value instanceof Date) return value.toLocaleString();
+  return "—";
+}
+
+function showMode(mode) {
+  const loginPanel = $("login-panel");
+  const signupPanel = $("signup-panel");
+  const loginTab = $("tab-login");
+  const signupTab = $("tab-signup");
+
+  if (loginPanel) loginPanel.style.display = mode === "login" ? "block" : "none";
+  if (signupPanel) signupPanel.style.display = mode === "signup" ? "block" : "none";
+
+  if (loginTab) loginTab.classList.toggle("active", mode === "login");
+  if (signupTab) signupTab.classList.toggle("active", mode === "signup");
+}
+
+function renderUser(user, profile) {
   const info = $("user-info");
-  const usernameInput = $("username");
-  const loginBtn = $("google-login-btn");
+  const authCard = $("auth-card");
+  const accountCard = $("account-card");
   const logoutBtn = $("logout-btn");
-  const saveBtn = $("save-username-btn");
   const deleteBtn = $("delete-account-btn");
 
   if (!info) return;
 
   if (!user) {
+    if (authCard) authCard.style.display = "block";
+    if (accountCard) accountCard.style.display = "none";
+    if (logoutBtn) logoutBtn.style.display = "none";
+    if (deleteBtn) deleteBtn.style.display = "none";
+
     info.innerHTML = `
       <p><b>Status:</b> Not logged in</p>
       <p><b>Username:</b> —</p>
       <p><b>Email:</b> —</p>
       <p><b>Verified:</b> —</p>
-      <p><b>Provider:</b> —</p>
-      <p><b>Account ID:</b> —</p>
-      <p><b>Achievements:</b> Coming soon</p>
+      <p><b>XP:</b> 0</p>
       <p><b>Rank:</b> Explorer</p>
+      <p><b>Account ID:</b> —</p>
+      <p><b>Created:</b> —</p>
+      <p><b>Last login:</b> —</p>
     `;
 
-    if (usernameInput) usernameInput.value = "";
-    if (loginBtn) loginBtn.style.display = "inline-block";
-    if (logoutBtn) logoutBtn.style.display = "none";
-    if (saveBtn) saveBtn.style.display = "none";
-    if (deleteBtn) deleteBtn.style.display = "none";
     return;
   }
 
-  const displayName = user.displayName || "";
-  const email = user.email || "—";
+  if (authCard) authCard.style.display = "none";
+  if (accountCard) accountCard.style.display = "block";
+  if (logoutBtn) logoutBtn.style.display = "inline-block";
+  if (deleteBtn) deleteBtn.style.display = "inline-block";
+
+  const username = profile?.username || user.displayName || "Player";
+  const email = user.email || profile?.email || "—";
   const verified = user.emailVerified ? "Yes" : "No";
-  const provider = providerLabel(user);
+  const xp = typeof profile?.xp === "number" ? profile.xp : 0;
+  const rank = getRank(xp);
 
   info.innerHTML = `
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom: 12px;">
-      <img
-        src="${safeText(user.photoURL || "")}"
-        alt="Profile photo"
-        style="width:64px; height:64px; border-radius:50%; object-fit:cover; background: rgba(255,255,255,0.12);"
-      >
+    <div class="account-header">
+      ${
+        user.photoURL
+          ? `<img src="${user.photoURL}" alt="Avatar" class="account-avatar">`
+          : `<div class="account-avatar-placeholder">👤</div>`
+      }
       <div>
-        <p style="margin:0;"><b>${safeText(displayName || "No name")}</b></p>
-        <p style="margin:0; opacity:0.8;">${safeText(email)}</p>
+        <p style="margin:0;"><b>${username}</b></p>
+        <p style="margin:0; opacity:0.8;">${email}</p>
       </div>
     </div>
 
     <p><b>Status:</b> Logged in</p>
-    <p><b>Username:</b> ${safeText(displayName || "Not set")}</p>
-    <p><b>Email:</b> ${safeText(email)}</p>
+    <p><b>Username:</b> ${username}</p>
+    <p><b>Email:</b> ${email}</p>
     <p><b>Verified:</b> ${verified}</p>
-    <p><b>Provider:</b> ${safeText(provider)}</p>
-    <p><b>Account ID:</b> ${safeText(user.uid)}</p>
-    <p><b>Achievements:</b> Coming soon</p>
-    <p><b>Rank:</b> Explorer</p>
+    <p><b>XP:</b> ${xp}</p>
+    <p><b>Rank:</b> ${rank}</p>
+    <p><b>Account ID:</b> ${user.uid}</p>
+    <p><b>Created:</b> ${formatDate(profile?.createdAt)}</p>
+    <p><b>Last login:</b> ${formatDate(profile?.lastLoginAt)}</p>
   `;
 
-  if (usernameInput) usernameInput.value = displayName;
-  if (loginBtn) loginBtn.style.display = "none";
-  if (logoutBtn) logoutBtn.style.display = "inline-block";
-  if (saveBtn) saveBtn.style.display = "inline-block";
-  if (deleteBtn) deleteBtn.style.display = "inline-block";
-}
-
-async function handleGoogleLogin() {
-  try {
-    setStatus("Opening Google sign-in...", "info");
-    const result = await loginWithGoogle();
-
-    if (result) {
-      setStatus("Logged in with Google.", "success");
-    } else {
-      setStatus("Finishing sign-in...", "info");
-    }
-  } catch (error) {
-    console.error(error);
-    setStatus(error?.message || "Google sign-in failed.", "error");
-    alert(error?.message || "Google sign-in failed.");
-  }
-}
-
-async function handleSaveUsername() {
-  const username = $("username")?.value || "";
-
-  try {
-    setStatus("Saving username...", "info");
-    await saveUsername(username);
-    setStatus("Username saved.", "success");
-    alert("Username saved.");
-  } catch (error) {
-    console.error(error);
-    setStatus(error?.message || "Could not save username.", "error");
-    alert(error?.message || "Could not save username.");
-  }
-}
-
-async function handleLogout() {
-  try {
-    await logout();
-    setStatus("Logged out.", "info");
-    alert("Logged out.");
-  } catch (error) {
-    console.error(error);
-    setStatus(error?.message || "Logout failed.", "error");
-    alert(error?.message || "Logout failed.");
-  }
-}
-
-async function handleDeleteAccount() {
-  const user = getCurrentUser();
-
-  if (!user) {
-    setStatus("Sign in first.", "error");
-    alert("Sign in first.");
-    return;
-  }
-
-  if (!confirm("Delete your account permanently?")) return;
-
-  try {
-    setStatus("Deleting account...", "info");
-    await deleteAccount();
-    setStatus("Account deleted.", "success");
-    alert("Account deleted.");
-    window.location.href = "index.html";
-  } catch (error) {
-    console.error(error);
-    setStatus(error?.message || "Delete failed.", "error");
-    alert(error?.message || "Delete failed.");
-  }
+  const usernameInput = $("profile-username");
+  if (usernameInput) usernameInput.value = username;
 }
 
 function bindButtons() {
-  $("google-login-btn")?.addEventListener("click", handleGoogleLogin);
-  $("save-username-btn")?.addEventListener("click", handleSaveUsername);
-  $("logout-btn")?.addEventListener("click", handleLogout);
-  $("delete-account-btn")?.addEventListener("click", handleDeleteAccount);
+  $("tab-login")?.addEventListener("click", () => showMode("login"));
+  $("tab-signup")?.addEventListener("click", () => showMode("signup"));
+
+  $("login-btn")?.addEventListener("click", async () => {
+    try {
+      setStatus("Logging in...", "info");
+      await login($("login-email")?.value || "", $("login-password")?.value || "");
+      setStatus("Logged in.", "success");
+    } catch (error) {
+      console.error(error);
+      setStatus(error?.message || "Login failed.", "error");
+      alert(error?.message || "Login failed.");
+    }
+  });
+
+  $("google-btn")?.addEventListener("click", async () => {
+    try {
+      setStatus("Signing in with Google...", "info");
+      await loginWithGoogle();
+      setStatus("Logged in.", "success");
+    } catch (error) {
+      console.error(error);
+      setStatus(error?.message || "Google login failed.", "error");
+      alert(error?.message || "Google login failed.");
+    }
+  });
+
+  $("signup-btn")?.addEventListener("click", async () => {
+    try {
+      setStatus("Creating account...", "info");
+      await createAccount(
+        $("signup-email")?.value || "",
+        $("signup-password")?.value || "",
+        $("signup-username")?.value || ""
+      );
+      setStatus("Account created. Check your email for verification.", "success");
+      alert("Account created. Check your email for verification.");
+      showMode("login");
+    } catch (error) {
+      console.error(error);
+      setStatus(error?.message || "Sign up failed.", "error");
+      alert(error?.message || "Sign up failed.");
+    }
+  });
+
+  $("save-username-btn")?.addEventListener("click", async () => {
+    try {
+      setStatus("Saving name...", "info");
+      await saveUsername($("profile-username")?.value || "");
+      setStatus("Name saved.", "success");
+      alert("Name saved.");
+    } catch (error) {
+      console.error(error);
+      setStatus(error?.message || "Could not save name.", "error");
+      alert(error?.message || "Could not save name.");
+    }
+  });
+
+  $("reset-password-btn")?.addEventListener("click", async () => {
+    try {
+      setStatus("Sending reset email...", "info");
+      await requestPasswordReset(
+        $("login-email")?.value || $("signup-email")?.value || ""
+      );
+      setStatus("Password reset email sent.", "success");
+      alert("Password reset email sent.");
+    } catch (error) {
+      console.error(error);
+      setStatus(error?.message || "Could not send reset email.", "error");
+      alert(error?.message || "Could not send reset email.");
+    }
+  });
+
+  $("resend-verification-btn")?.addEventListener("click", async () => {
+    try {
+      const sent = await resendVerificationEmail();
+      if (sent === false) {
+        setStatus("Your email is already verified.", "info");
+        alert("Your email is already verified.");
+        return;
+      }
+
+      setStatus("Verification email sent.", "success");
+      alert("Verification email sent.");
+    } catch (error) {
+      console.error(error);
+      setStatus(error?.message || "Could not resend verification email.", "error");
+      alert(error?.message || "Could not resend verification email.");
+    }
+  });
+
+  $("logout-btn")?.addEventListener("click", async () => {
+    try {
+      await logout();
+      setStatus("Logged out.", "info");
+    } catch (error) {
+      console.error(error);
+      setStatus(error?.message || "Logout failed.", "error");
+      alert(error?.message || "Logout failed.");
+    }
+  });
+
+  $("delete-account-btn")?.addEventListener("click", async () => {
+    const password = $("delete-password")?.value || "";
+
+    if (!confirm("Delete your account permanently?")) return;
+
+    try {
+      setStatus("Deleting account...", "info");
+      await deleteAccount(password);
+      setStatus("Account deleted.", "success");
+      alert("Account deleted.");
+      window.location.reload();
+    } catch (error) {
+      console.error(error);
+      setStatus(error?.message || "Delete failed.", "error");
+      alert(error?.message || "Delete failed.");
+    }
+  });
 }
 
-window.loginWithGoogle = handleGoogleLogin;
-window.saveUsername = handleSaveUsername;
-window.logout = handleLogout;
-window.deleteAccount = handleDeleteAccount;
-
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
   bindButtons();
+  showMode("login");
+  setStatus("Checking account...", "info");
 
-  if (!window.panategwaAuth) {
-    setStatus("Firebase did not load correctly.", "error");
-    return;
-  }
-
-  await completeRedirectLogin();
-
-  watchAuth((user) => {
-    renderUser(user);
-
-    if (user) {
-      setStatus(user.emailVerified ? "Signed in and verified." : "Signed in.", "success");
-    } else {
+  setTimeout(() => {
+    const status = $("auth-status");
+    if (status && String(status.textContent || "").includes("Checking account")) {
       setStatus("Not logged in.", "info");
     }
+  }, 5000);
+
+  watchAuth((user, profile) => {
+    if (profileUnsub) {
+      profileUnsub();
+      profileUnsub = null;
+    }
+
+    if (!user) {
+      renderUser(null, null);
+      setStatus("Not logged in.", "info");
+      return;
+    }
+
+    renderUser(user, profile);
+    setStatus(user.emailVerified ? "Logged in and verified." : "Logged in.", "success");
+
+    profileUnsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      if (!snap.exists()) return;
+      renderUser(user, snap.data());
+    });
   });
 });

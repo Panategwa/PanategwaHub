@@ -370,3 +370,150 @@ main {
 .menu-icon-button:disabled {
   pointer-events: none;
 }
+
+/* =========================
+   ACCOUNT PAGE
+========================= */
+
+.account-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.account-hero {
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.10),
+    rgba(255, 255, 255, 0.04)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
+  margin-bottom: 16px;
+}
+
+.account-hero h1 {
+  margin: 0 0 8px 0;
+  text-align: left;
+}
+
+.account-subtle {
+  opacity: 0.82;
+  margin: 0;
+}
+
+.account-status {
+  margin: 10px 0 16px;
+  font-weight: 700;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.account-status[data-kind="error"] {
+  color: #ffb6b6;
+}
+
+.account-status[data-kind="success"] {
+  color: #bfffd0;
+}
+
+.account-status[data-kind="info"] {
+  color: inherit;
+}
+
+.account-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 960px) {
+  .account-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.account-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(8px);
+}
+
+.account-card h2 {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.account-field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.account-field label {
+  font-weight: 700;
+  opacity: 0.92;
+}
+
+.account-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-color);
+  font: inherit;
+}
+
+.account-field input::placeholder {
+  opacity: 0.7;
+}
+
+.account-field input:focus {
+  outline: none;
+  border-color: var(--link-color);
+  box-shadow: 0 0 0 3px rgba(100, 150, 255, 0.18);
+}
+
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.account-actions button {
+  margin: 0;
+}
+
+.account-note {
+  margin-top: 10px;
+  opacity: 0.8;
+  font-size: 0.95rem;
+}
+
+.account-danger {
+  background: rgba(170, 50, 50, 0.88);
+  color: #fff;
+}
+
+.account-danger:hover {
+  filter: brightness(0.9);
+}
+
+.account-info-list p {
+  margin: 6px 0;
+}
+
+.account-id {
+  word-break: break-all;
+  font-family: monospace;
+  opacity: 0.9;
+}

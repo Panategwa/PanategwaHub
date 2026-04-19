@@ -154,16 +154,49 @@ function syncUsernameInput(force = false) {
   }
 }
 
-function formatGroupMembers(chat) {
-  return (chat?.members || []).length
-    ? `${chat.members.length} members`
-    : "No members";
-}
-
 function friendMatchesSearch(friend, term) {
   const q = String(term || "").trim().toLowerCase();
   if (!q) return true;
   return String(friend?.username || "").toLowerCase().includes(q) || String(friend?.uid || "").toLowerCase().includes(q);
+}
+
+function copyText(value) {
+  return navigator.clipboard.writeText(String(value || ""));
+}
+
+function getCurrentXP(state) {
+  return typeof state?.profile?.xp === "number" ? state.profile.xp : 0;
+}
+
+function getRankInfo(xp) {
+  if (xp < 5) return { current: "Explorer", next: "Adventurer", start: 0, end: 5 };
+  if (xp < 20) return { current: "Adventurer", next: "Veteran", start: 5, end: 20 };
+  return { current: "Veteran", next: "Max rank", start: 20, end: 20 };
+}
+
+function progressForXp(xp) {
+  const rank = getRankInfo(xp);
+  if (xp >= 20) return { ...rank, pct: 100, remaining: 0 };
+
+  const range = Math.max(rank.end - rank.start, 1);
+  const inRank = Math.max(0, Math.min(xp - rank.start, range));
+  const pct = Math.max(0, Math.min(100, (inRank / range) * 100));
+  const remaining = Math.max(0, rank.end - xp);
+
+  return { ...rank, pct, remaining };
+}
+
+function filteredDirectMessages(state) {
+  const uid = state?.user?.uid;
+  let list = [...(state?.messages || [])].filter(m => m.toUid === uid || m.fromUid === uid);
+
+  if (currentDirectFilter === "system") {
+    list = list.filter(m => m.kind === "system");
+  } else if (currentDirectFilter === "friends") {
+    list = list.filter(m => m.kind !== "system");
+  }
+
+  return list;
 }
 
 function renderUser(state) {
@@ -222,7 +255,7 @@ function renderUser(state) {
   const username = profile?.username || user.displayName || "Player";
   const email = user.email || profile?.email || "—";
   const verified = user.emailVerified ? "Yes" : "No";
-  const xp = typeof profile?.xp === "number" ? profile.xp : 0;
+  const xp = getCurrentXP(state);
   const rank = getRank(xp);
 
   info.innerHTML = `
@@ -259,7 +292,7 @@ function renderUser(state) {
 
   const copyAfterRender = $("copy-user-id-btn");
   if (copyAfterRender) {
-    copyAfterRender.addEventListener("click", async () => {
+    copyAfterRender.onclick = async () => {
       try {
         await navigator.clipboard.writeText(user.uid);
         copyAfterRender.textContent = "Copied";
@@ -269,30 +302,77 @@ function renderUser(state) {
       } catch {
         prompt("Copy this ID:", user.uid);
       }
-    });
+    };
   }
 }
 
-function directMessagesForCurrentFilter(state) {
-  const messages = [...(state?.messages || [])];
-  const me = state?.user?.uid;
+function renderProgressSection(state) {
+  const xp = getCurrentXP(state);
+  const info = progressForXp(xp);
+  const leftRank = $("xp-left-rank");
+  const rightRank = $("xp-right-rank");
+  const bar = $("xp-bar-fill");
+  const total = $("xp-total");
+  const need = $("xp-need");
+  const count = $("xp-count");
+  const achievementCount = $("achievement-count");
 
-  const filtered = messages.filter(msg => {
-    if (msg.kind === "chat") {
-      if (currentDirectFilter === "system") return false;
-      if (currentDirectFilter === "friends") return true;
-      return true;
-    }
+  if (leftRank) leftRank.textContent = info.current;
+  if (rightRank) rightRank.textContent = info.next;
+  if (bar) bar.style.width = `${info.pct}%`;
+  if (total) total.textContent = String(xp);
+  if (need) need.textContent = info.remaining > 0 ? `${info.remaining} XP to next rank` : "Max rank reached";
+  if (count) count.textContent = String(xp);
+  if (achievementCount) achievementCount.textContent = String((state?.profile?.achievements || []).length);
+}
 
-    if (msg.kind === "system") return currentDirectFilter === "all" || currentDirectFilter === "system";
-    if (msg.kind === "friend-request" || msg.kind === "friend-accepted" || msg.kind === "friend-declined" || msg.kind === "friend-blocked") {
-      return currentDirectFilter === "all" || currentDirectFilter === "friends";
-    }
+function renderAchievementsSection(state) {
+  const container = $("achievements-list");
+  if (!container) return;
 
-    return currentDirectFilter === "all";
-  });
+  const achievements = Array.isArray(state?.profile?.achievements) ? state.profile.achievements : [];
+  const xp = getCurrentXP(state);
+  const unlocked = new Set(achievements);
 
-  return filtered.filter(m => m.toUid === me || m.fromUid === me || m.kind === "system");
+  const list = [
+    { id: "achievement_collector", name: "Achievement Collector", description: "Unlock 10 achievements.", secret: false },
+    { id: "all_planets", name: "Astronaut", description: "Visit all celestial bodies of the Panategwa system.", secret: false },
+    { id: "big_reader", name: "Need some glasses?", description: "Set text size to Large.", secret: true },
+    { id: "dark_mode", name: "Dark Night", description: "Use Dark Mode.", secret: false },
+    { id: "first_login", name: "First Contact", description: "Log in for the first time.", secret: false },
+    { id: "light_mode", name: "Sunshine", description: "Use Light Mode.", secret: false },
+    { id: "morning_person", name: "Morning Person", description: "Visit the site between 3am and 10am.", secret: true },
+    { id: "nocturnal", name: "Nocturnal", description: "Visit the site between 9pm and 3am.", secret: true },
+    { id: "ocean_mode", name: "Wavefinder", description: "Use the Ocean theme.", secret: false },
+    { id: "profile_name", name: "True Name", description: "Set your username.", secret: false },
+    { id: "space_mode", name: "Stargazer", description: "Use the Space theme.", secret: false },
+    { id: "theme_shifter", name: "Aesthetic Control", description: "Change your theme.", secret: false },
+    { id: "tiny_text", name: "Microscopic Text", description: "Set text size to Small.", secret: true },
+    { id: "verified_email", name: "Verified Signal", description: "Verify your email address.", secret: false },
+    { id: "veteran", name: "Veteran", description: "Reach 20 XP.", secret: false }
+  ].sort((a, b) => a.name.localeCompare(b.name));
+
+  const sorted = [
+    ...list.filter(a => unlocked.has(a.id)).sort((a, b) => a.name.localeCompare(b.name)),
+    ...list.filter(a => !unlocked.has(a.id)).sort((a, b) => a.name.localeCompare(b.name))
+  ];
+
+  container.innerHTML = sorted.map(a => {
+    const isUnlocked = unlocked.has(a.id);
+    const title = a.secret && !isUnlocked ? "Secret" : a.name;
+    const desc = a.secret && !isUnlocked ? "Hidden achievement" : a.description;
+    const icon = isUnlocked ? "🏆" : "🔒";
+
+    return `
+      <div class="achievement-card ${isUnlocked ? "unlocked" : "locked"}">
+        <div class="achievement-icon">${icon}</div>
+        <div>
+          <div class="achievement-name">${escapeHtml(title)}</div>
+          <div class="achievement-desc">${escapeHtml(desc)}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
 function renderFriendsSection(state) {
@@ -356,9 +436,7 @@ function renderFriendsSection(state) {
     const outgoing = state?.outgoingRequests || [];
 
     requestList.innerHTML = `
-      <div class="subsection-head">
-        <h3>Incoming</h3>
-      </div>
+      <div class="subsection-head"><h3>Incoming</h3></div>
       ${
         incoming.length
           ? incoming.map(req => `
@@ -380,9 +458,7 @@ function renderFriendsSection(state) {
           : `<div class="empty-state">No incoming requests.</div>`
       }
 
-      <div class="subsection-head" style="margin-top:16px;">
-        <h3>Outgoing</h3>
-      </div>
+      <div class="subsection-head" style="margin-top:16px;"><h3>Outgoing</h3></div>
       ${
         outgoing.length
           ? outgoing.map(req => `
@@ -500,7 +576,6 @@ function renderDirectMessagesSection(state) {
   const filterLabel = $("direct-filter-label");
   const search = String($("direct-message-friend-search")?.value || "").trim().toLowerCase();
 
-  const me = state?.user?.uid;
   const friends = (state?.friends || [])
     .map(uid => state.friendProfiles?.[uid] || { uid, username: uid })
     .filter(friend => friendMatchesSearch(friend, search));
@@ -556,11 +631,11 @@ function renderDirectMessagesSection(state) {
 
   if (!list) return;
 
-  const messages = directMessagesForCurrentFilter(state);
+  const messages = filteredDirectMessages(state);
 
   list.innerHTML = messages.length
     ? messages.map(msg => {
-        const unread = msg.toUid === me && !(msg.readBy || []).includes(me);
+        const unread = msg.toUid === state?.user?.uid && !(msg.readBy || []).includes(state?.user?.uid);
         const label = msg.kind === "chat"
           ? `Chat • ${msg.fromName || msg.fromUid}`
           : msg.kind === "friend-request"
@@ -600,9 +675,6 @@ function renderGroupsSection(state) {
   const chatList = $("group-chat-list");
   const chatView = $("group-chat-view");
   const inviteBox = $("group-invites-list");
-  const chatName = $("group-chat-name");
-  const chatMembers = $("group-chat-members");
-  const inviteUid = $("group-invite-uid");
   const groupSearch = String($("group-search-input")?.value || "").trim().toLowerCase();
 
   if (chatList) {
@@ -613,11 +685,11 @@ function renderGroupsSection(state) {
 
     chatList.innerHTML = filtered.length
       ? filtered.map(chat => `
-        <div class="social-item ${chat.id === selectedId ? "unread" : ""}" style="cursor:pointer;" data-action="group-select" data-id="${escapeHtml(chat.id)}">
+        <div class="social-item" style="cursor:pointer;" data-action="group-select" data-id="${escapeHtml(chat.id)}">
           <div class="social-icon">👥</div>
           <div class="social-main">
             <div class="social-title">${escapeHtml(chat.name || "Group chat")}</div>
-            <div class="social-sub">${escapeHtml(formatGroupMembers(chat))}</div>
+            <div class="social-sub">${escapeHtml((chat.members || []).length + " members")}</div>
           </div>
           <div class="social-actions">
             <button data-action="group-select" data-id="${escapeHtml(chat.id)}">Open</button>
@@ -642,7 +714,7 @@ function renderGroupsSection(state) {
               <div class="profile-name">${escapeHtml(selectedChat.name || "Group chat")}</div>
               <div class="profile-id">${escapeHtml(selectedChat.id)}</div>
             </div>
-            <div class="profile-badge">${escapeHtml(formatGroupMembers(selectedChat))}</div>
+            <div class="profile-badge">${escapeHtml((selectedChat.members || []).length + " members")}</div>
           </div>
 
           <div class="button-row">
@@ -715,7 +787,7 @@ function renderGroupsSection(state) {
         </div>
       </div>
 
-      <div class="setting-card">
+      <div class="setting-card" style="margin-top:12px;">
         <div class="setting-title">Invite a person to the selected group</div>
         <div class="field-row">
           <input id="group-invite-uid" type="text" placeholder="User ID to invite" />
@@ -726,59 +798,30 @@ function renderGroupsSection(state) {
       </div>
     `;
   }
-
-  if (chatName && selectedChat) chatName.value = selectedChat.name || "";
-  if (chatMembers) chatMembers.value = "";
-  if (inviteUid) inviteUid.value = "";
 }
 
 function renderMessagesSection(state) {
+  const summary = $("messages-summary");
   const directTab = $("message-subtab-direct");
   const groupsTab = $("message-subtab-groups");
   const invitesTab = $("message-subtab-invites");
-  if (directTab) directTab.classList.toggle("active", currentMessagesSubtab === "direct");
-  if (groupsTab) groupsTab.classList.toggle("active", currentMessagesSubtab === "groups");
-  if (invitesTab) invitesTab.classList.toggle("active", currentMessagesSubtab === "invites");
-
   const directPanel = $("message-subpanel-direct");
   const groupsPanel = $("message-subpanel-groups");
   const invitesPanel = $("message-subpanel-invites");
 
+  if (directTab) directTab.classList.toggle("active", currentMessagesSubtab === "direct");
+  if (groupsTab) groupsTab.classList.toggle("active", currentMessagesSubtab === "groups");
+  if (invitesTab) invitesTab.classList.toggle("active", currentMessagesSubtab === "invites");
   if (directPanel) directPanel.classList.toggle("active", currentMessagesSubtab === "direct");
   if (groupsPanel) groupsPanel.classList.toggle("active", currentMessagesSubtab === "groups");
   if (invitesPanel) invitesPanel.classList.toggle("active", currentMessagesSubtab === "invites");
 
-  const summary = $("messages-summary");
   if (summary) {
     summary.textContent = `Unread messages: ${state?.unreadCount || 0}`;
   }
 
   renderDirectMessagesSection(state);
   renderGroupsSection(state);
-  renderGroupInvitesSection(state);
-}
-
-function renderGroupInvitesSection(state) {
-  const list = $("group-invites-list");
-  if (!list) return;
-
-  const invites = state?.groupInvites || [];
-  list.innerHTML = invites.length
-    ? invites.map(invite => `
-      <div class="social-item">
-        <div class="social-icon">🎫</div>
-        <div class="social-main">
-          <div class="social-title">${escapeHtml(invite.chatName || "Group invite")}</div>
-          <div class="social-sub">${escapeHtml(invite.fromName || invite.fromUid)}</div>
-        </div>
-        <div class="social-actions">
-          <button data-action="group-invite-accept" data-id="${escapeHtml(invite.id)}">Accept</button>
-          <button data-action="group-invite-decline" data-id="${escapeHtml(invite.id)}">Decline</button>
-          <button data-action="group-invite-view" data-id="${escapeHtml(invite.chatId)}">View group</button>
-        </div>
-      </div>
-    `).join("")
-    : `<div class="empty-state">No group invites.</div>`;
 }
 
 function bindTabs() {
@@ -814,25 +857,11 @@ function bindTabs() {
     usernameInput.addEventListener("input", () => {
       profileUsernameDirty = true;
     });
-    usernameInput.addEventListener("focus", () => {
-      profileUsernameDirty = true;
-    });
-    usernameInput.addEventListener("blur", () => {
-      if (usernameInput.value.trim() === profileUsernameLastRendered.trim()) {
-        profileUsernameDirty = false;
-      }
-    });
   }
 
-  const directSearch = $("direct-message-friend-search");
-  if (directSearch) {
-    directSearch.addEventListener("input", () => renderDirectMessagesSection(currentState));
-  }
-
-  const groupSearch = $("group-search-input");
-  if (groupSearch) {
-    groupSearch.addEventListener("input", () => renderGroupsSection(currentState));
-  }
+  $("friend-search-input")?.addEventListener("input", () => renderFriendsSection(currentState));
+  $("direct-message-friend-search")?.addEventListener("input", () => renderDirectMessagesSection(currentState));
+  $("group-search-input")?.addEventListener("input", () => renderGroupsSection(currentState));
 
   $("message-filter-all")?.addEventListener("click", () => {
     currentDirectFilter = "all";
@@ -846,10 +875,6 @@ function bindTabs() {
     currentDirectFilter = "friends";
     renderDirectMessagesSection(currentState);
   });
-}
-
-function copyText(value) {
-  return navigator.clipboard.writeText(String(value || ""));
 }
 
 function bindButtons() {
@@ -957,7 +982,6 @@ function bindButtons() {
 
   $("delete-account-btn")?.addEventListener("click", async () => {
     const password = $("delete-password")?.value || "";
-
     if (!confirm("Delete your account permanently?")) return;
 
     try {
@@ -1037,44 +1061,6 @@ function bindButtons() {
       alert(error?.message || "Redo failed.");
     }
   });
-
-  $("create-group-chat-btn")?.addEventListener("click", async () => {
-    try {
-      const name = $("group-chat-name")?.value || "";
-      const raw = $("group-chat-members")?.value || "";
-      const members = raw.split(",").map(s => s.trim()).filter(Boolean);
-      const chatId = await createGroupChat(name, members);
-      setSelectedGroupChatId(chatId);
-      showMessagesSubsection("groups");
-      alert("Group chat created.");
-    } catch (error) {
-      alert(error?.message || "Could not create group chat.");
-    }
-  });
-
-  $("invite-to-group-btn")?.addEventListener("click", async (e) => {
-    try {
-      const chatId = e.currentTarget.dataset.groupId || currentState?.selectedGroupChatId || "";
-      const target = $("group-invite-uid")?.value || "";
-      await inviteToGroupChat(chatId, target);
-      $("group-invite-uid").value = "";
-      alert("Invite sent.");
-    } catch (error) {
-      alert(error?.message || "Could not send invite.");
-    }
-  });
-
-  $("send-group-message-btn")?.addEventListener("click", async (e) => {
-    try {
-      const chatId = e.currentTarget.dataset.groupId || currentState?.selectedGroupChatId || "";
-      const text = $("group-message-text")?.value || "";
-      await sendGroupMessage(chatId, text);
-      $("group-message-text").value = "";
-      alert("Group message sent.");
-    } catch (error) {
-      alert(error?.message || "Could not send group message.");
-    }
-  });
 }
 
 function bindDelegatedClicks() {
@@ -1093,8 +1079,6 @@ function bindDelegatedClicks() {
       }
 
       if (action === "friend-message") {
-        const input = $("direct-message-friend-search");
-        if (input) input.value = "";
         setSelectedConversation(uid);
         showSection("messages");
         showMessagesSubsection("direct");
@@ -1193,9 +1177,11 @@ function bindDelegatedClicks() {
 
       if (action === "direct-pick-friend") {
         setSelectedConversation(uid);
-        const input = $("direct-message-friend-search");
-        if (input) input.value = "";
         showMessagesSubsection("direct");
+      }
+
+      if (action === "message-card-open") {
+        window.openAccountArea("messages", btn.dataset.section || "direct", uid);
       }
     } catch (err) {
       alert(err.message || "Action failed.");
@@ -1206,6 +1192,8 @@ function bindDelegatedClicks() {
 function renderSocial(state) {
   currentState = state;
   renderUser(state);
+  renderProgressSection(state);
+  renderAchievementsSection(state);
   renderFriendsSection(state);
   renderMessagesSection(state);
 }

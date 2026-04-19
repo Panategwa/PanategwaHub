@@ -136,12 +136,19 @@ async function ensureUserProfile(user) {
       secretsFound: data.stats?.secretsFound || 0
     },
     updatedAt: serverTimestamp(),
-    lastLoginAt: serverTimestamp(),
     createdAt: data.createdAt || serverTimestamp()
   };
 
   await setDoc(ref, merged, { merge: true });
   return { ...data, ...merged };
+}
+
+async function touchLastLoginOnce(user) {
+  const key = `ptg_last_login_${user.uid}`;
+  const today = new Date().toISOString().slice(0, 10);
+  if (sessionStorage.getItem(key) === today) return;
+  sessionStorage.setItem(key, today);
+  await setDoc(userRef(user.uid), { lastLoginAt: serverTimestamp() }, { merge: true });
 }
 
 async function createAccount(email, password, username) {
@@ -175,12 +182,14 @@ async function login(email, password) {
 
   const cred = await signInWithEmailAndPassword(auth, cleanMail, cleanPass);
   await ensureUserProfile(cred.user);
+  await touchLastLoginOnce(cred.user);
   return cred.user;
 }
 
 async function loginWithGoogle() {
   const cred = await signInWithPopup(auth, googleProvider);
   await ensureUserProfile(cred.user);
+  await touchLastLoginOnce(cred.user);
   return cred.user;
 }
 
@@ -207,7 +216,6 @@ async function saveUsername(username) {
 async function resendVerificationEmail() {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-
   if (user.emailVerified) return false;
 
   await sendEmailVerification(user);
@@ -217,7 +225,6 @@ async function resendVerificationEmail() {
 async function requestPasswordReset(email) {
   const cleanMail = cleanEmail(email);
   if (!cleanMail) throw new Error("Email is required.");
-
   await sendPasswordResetEmail(auth, cleanMail);
 }
 
@@ -249,6 +256,7 @@ function watchAuth(callback) {
 
     try {
       const profile = await ensureUserProfile(user);
+      await touchLastLoginOnce(user);
       callback(user, profile);
     } catch (err) {
       console.error("Auth watch error:", err);

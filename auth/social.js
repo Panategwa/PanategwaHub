@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const listeners = new Set();
+
 const state = {
   user: null,
   profile: null,
@@ -98,6 +99,10 @@ function subscribeSocial(callback) {
   return () => listeners.delete(callback);
 }
 
+function cleanUid(value) {
+  return String(value || "").trim();
+}
+
 function toMs(value) {
   if (!value) return 0;
   if (typeof value === "number") return value;
@@ -108,10 +113,6 @@ function toMs(value) {
 
 function sortNewestFirst(list) {
   return [...list].sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
-}
-
-function cleanUid(value) {
-  return String(value || "").trim();
 }
 
 function unique(list) {
@@ -207,7 +208,6 @@ async function loadUserProfileById(uid) {
 
 async function hydrateFriendProfiles(ids) {
   const friendIds = unique(ids);
-
   const results = await Promise.all(friendIds.map(async (uid) => {
     const snap = await getDoc(userRef(uid));
     return [uid, snap.exists() ? snap.data() : null];
@@ -375,7 +375,6 @@ async function undoLastAction() {
 
   if (action.type === "bulk-message-read-state") {
     const batch = writeBatch(db);
-
     for (const item of action.previous || []) {
       const ref = doc(db, "messages", item.id);
       batch.update(ref, {
@@ -383,7 +382,6 @@ async function undoLastAction() {
         readAt: item.readBy.includes(auth.currentUser.uid) ? serverTimestamp() : null
       });
     }
-
     await batch.commit();
   }
 
@@ -490,7 +488,6 @@ function notifyCard({ title, body, buttons = [], onOpen = null }) {
   }
 
   stack.appendChild(card);
-
   setTimeout(() => {
     if (card.isConnected) card.remove();
   }, 5000);
@@ -502,27 +499,11 @@ function notifyRequest(request) {
     body: `${request.fromName || request.fromUid} sent you a friend request.`,
     onOpen: () => openAccountArea("friends", "requests", request.fromUid),
     buttons: [
-      {
-        label: "Accept",
-        variant: "primary",
-        onClick: async () => respondToFriendRequest(request.id, "accept")
-      },
-      {
-        label: "Ignore",
-        onClick: async () => {}
-      },
-      {
-        label: "Decline",
-        onClick: async () => respondToFriendRequest(request.id, "decline")
-      },
-      {
-        label: "Block",
-        onClick: async () => respondToFriendRequest(request.id, "block")
-      },
-      {
-        label: "View in messages",
-        onClick: async () => openAccountArea("messages", "direct", request.fromUid)
-      }
+      { label: "Accept", variant: "primary", onClick: async () => respondToFriendRequest(request.id, "accept") },
+      { label: "Ignore", onClick: async () => {} },
+      { label: "Decline", onClick: async () => respondToFriendRequest(request.id, "decline") },
+      { label: "Block", onClick: async () => respondToFriendRequest(request.id, "block") },
+      { label: "View in messages", onClick: async () => openAccountArea("messages", "direct", request.fromUid) }
     ]
   });
 }
@@ -533,15 +514,8 @@ function notifyMessage(message) {
     body: message.body || "You have a new message.",
     onOpen: () => openAccountArea(message.targetSection || "messages", message.targetSubSection || "direct", message.conversationUid || message.fromUid || null),
     buttons: [
-      {
-        label: "Open",
-        variant: "primary",
-        onClick: async () => openAccountArea(message.targetSection || "messages", message.targetSubSection || "direct", message.conversationUid || message.fromUid || null)
-      },
-      {
-        label: "View in messages",
-        onClick: async () => openAccountArea("messages", "direct", message.conversationUid || message.fromUid || null)
-      }
+      { label: "Open", variant: "primary", onClick: async () => openAccountArea(message.targetSection || "messages", message.targetSubSection || "direct", message.conversationUid || message.fromUid || null) },
+      { label: "View in messages", onClick: async () => openAccountArea("messages", "direct", message.conversationUid || message.fromUid || null) }
     ]
   });
 }
@@ -552,15 +526,8 @@ function notifySummary(text, section = "messages", sub = "direct") {
     body: text,
     onOpen: () => openAccountArea(section, sub),
     buttons: [
-      {
-        label: "Open",
-        variant: "primary",
-        onClick: async () => openAccountArea(section, sub)
-      },
-      {
-        label: "View in messages",
-        onClick: async () => openAccountArea("messages", "direct")
-      }
+      { label: "Open", variant: "primary", onClick: async () => openAccountArea(section, sub) },
+      { label: "View in messages", onClick: async () => openAccountArea("messages", "direct") }
     ]
   });
 }
@@ -571,19 +538,9 @@ function notifyGroupInvite(invite) {
     body: `${invite.fromName || invite.fromUid} invited you to a group chat.`,
     onOpen: () => openAccountArea("messages", "invites"),
     buttons: [
-      {
-        label: "Accept",
-        variant: "primary",
-        onClick: async () => respondToGroupInvite(invite.id, "accept")
-      },
-      {
-        label: "Decline",
-        onClick: async () => respondToGroupInvite(invite.id, "decline")
-      },
-      {
-        label: "View in messages",
-        onClick: async () => openAccountArea("messages", "invites")
-      }
+      { label: "Accept", variant: "primary", onClick: async () => respondToGroupInvite(invite.id, "accept") },
+      { label: "Decline", onClick: async () => respondToGroupInvite(invite.id, "decline") },
+      { label: "View in messages", onClick: async () => openAccountArea("messages", "invites") }
     ]
   });
 }
@@ -663,45 +620,31 @@ async function respondToFriendRequest(requestId, action) {
     if (!requestSnap.exists()) throw new Error("Request not found.");
 
     if (action === "accept") {
-      tx.update(ref, {
-        status: "accepted",
-        updatedAt: serverTimestamp()
-      });
-
+      tx.update(ref, { status: "accepted", updatedAt: serverTimestamp() });
       tx.set(senderRef, {
         friends: arrayUnion(user.uid),
         blocked: arrayRemove(user.uid),
         updatedAt: serverTimestamp()
       }, { merge: true });
-
       tx.set(receiverRef, {
         friends: arrayUnion(req.fromUid),
         updatedAt: serverTimestamp()
       }, { merge: true });
-
       return;
     }
 
     if (action === "decline") {
-      tx.update(ref, {
-        status: "declined",
-        updatedAt: serverTimestamp()
-      });
+      tx.update(ref, { status: "declined", updatedAt: serverTimestamp() });
       return;
     }
 
     if (action === "block") {
-      tx.update(ref, {
-        status: "blocked",
-        updatedAt: serverTimestamp()
-      });
-
+      tx.update(ref, { status: "blocked", updatedAt: serverTimestamp() });
       tx.set(receiverRef, {
         blocked: arrayUnion(req.fromUid),
         friends: arrayRemove(req.fromUid),
         updatedAt: serverTimestamp()
       }, { merge: true });
-
       tx.set(senderRef, {
         friends: arrayRemove(user.uid),
         updatedAt: serverTimestamp()
@@ -796,7 +739,6 @@ async function removeFriend(friendUid) {
   await runTransaction(db, async (tx) => {
     const mySnap = await tx.get(myRef);
     const otherSnap = await tx.get(otherRef);
-
     if (!mySnap.exists() || !otherSnap.exists()) throw new Error("User not found.");
 
     tx.set(myRef, {
@@ -862,7 +804,6 @@ async function blockUser(targetUid) {
 async function toggleRequestsEnabled(enabled) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-
   await updateDoc(userRef(user.uid), {
     "socialSettings.requestsEnabled": !!enabled,
     updatedAt: serverTimestamp()
@@ -872,7 +813,6 @@ async function toggleRequestsEnabled(enabled) {
 async function toggleChatEnabled(enabled) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-
   await updateDoc(userRef(user.uid), {
     "socialSettings.chatEnabled": !!enabled,
     updatedAt: serverTimestamp()
@@ -882,7 +822,6 @@ async function toggleChatEnabled(enabled) {
 async function toggleGroupChatsEnabled(enabled) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-
   await updateDoc(userRef(user.uid), {
     "socialSettings.groupChatsEnabled": !!enabled,
     updatedAt: serverTimestamp()
@@ -892,7 +831,6 @@ async function toggleGroupChatsEnabled(enabled) {
 async function toggleShowNonFriendGroupMessages(enabled) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-
   await updateDoc(userRef(user.uid), {
     "socialSettings.showNonFriendGroupMessages": !!enabled,
     updatedAt: serverTimestamp()
@@ -902,7 +840,6 @@ async function toggleShowNonFriendGroupMessages(enabled) {
 async function toggleProfileHidden(hidden) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-
   await updateDoc(userRef(user.uid), {
     "socialSettings.profileHidden": !!hidden,
     updatedAt: serverTimestamp()
@@ -1028,10 +965,7 @@ async function inviteToGroupChat(chatId, targetUid) {
   if (!unique(chat.members).includes(user.uid)) throw new Error("You are not in that group.");
   if (unique(chat.members).includes(id)) throw new Error("That user is already in the group.");
 
-  const target = await loadUserProfileById(id);
-  if (!target) throw new Error("User not found.");
-
-  const invite = await addDoc(collection(db, "groupChatInvites"), {
+  await addDoc(collection(db, "groupChatInvites"), {
     chatId,
     chatName: chat.name || "Group chat",
     fromUid: user.uid,
@@ -1050,8 +984,6 @@ async function inviteToGroupChat(chatId, targetUid) {
     targetSection: "messages",
     targetSubSection: "invites"
   });
-
-  return invite.id;
 }
 
 async function respondToGroupInvite(inviteId, action) {
@@ -1068,10 +1000,7 @@ async function respondToGroupInvite(inviteId, action) {
   const chatRef = doc(db, "groupChats", invite.chatId);
 
   if (action === "accept") {
-    await updateDoc(ref, {
-      status: "accepted",
-      updatedAt: serverTimestamp()
-    });
+    await updateDoc(ref, { status: "accepted", updatedAt: serverTimestamp() });
     await updateDoc(chatRef, {
       members: arrayUnion(user.uid),
       updatedAt: serverTimestamp()
@@ -1080,11 +1009,7 @@ async function respondToGroupInvite(inviteId, action) {
   }
 
   if (action === "decline") {
-    await updateDoc(ref, {
-      status: "declined",
-      updatedAt: serverTimestamp()
-    });
-    return;
+    await updateDoc(ref, { status: "declined", updatedAt: serverTimestamp() });
   }
 }
 
@@ -1130,6 +1055,66 @@ async function leaveGroupChat(chatId) {
   });
 }
 
+async function markMessageRead(messageId, read = true) {
+  await applyMessageReadState(messageId, read);
+}
+
+async function markAllMessagesRead() {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const qs = await getDocs(query(collection(db, "messages"), where("toUid", "==", user.uid)));
+  const batch = writeBatch(db);
+
+  qs.forEach(d => {
+    const data = d.data();
+    const readBy = unique(data.readBy || []);
+    if (!readBy.includes(user.uid)) {
+      batch.update(d.ref, {
+        readBy: arrayUnion(user.uid),
+        readAt: serverTimestamp()
+      });
+    }
+  });
+
+  await batch.commit();
+}
+
+async function markAllMessagesUnread() {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const qs = await getDocs(query(collection(db, "messages"), where("toUid", "==", user.uid)));
+  const batch = writeBatch(db);
+
+  qs.forEach(d => {
+    const data = d.data();
+    const readBy = unique(data.readBy || []);
+    if (readBy.includes(user.uid)) {
+      batch.update(d.ref, {
+        readBy: arrayRemove(user.uid),
+        readAt: null
+      });
+    }
+  });
+
+  await batch.commit();
+}
+
+async function viewProfileById(uid) {
+  const id = cleanUid(uid);
+  if (!id) return null;
+
+  const profile = await loadUserProfileById(id);
+  const viewerUid = auth.currentUser?.uid || null;
+  const visible = publicProfileForViewer(profile, viewerUid);
+
+  state.selectedProfileId = id;
+  state.selectedProfile = visible;
+  emit();
+  return visible;
+}
+
 function setSelectedConversation(uid) {
   state.selectedConversationId = cleanUid(uid) || null;
   emit();
@@ -1158,14 +1143,14 @@ function getConversationMessages(uid) {
   ));
 }
 
+function getGroupChatMessages(chatId) {
+  return state.groupMessagesByChat?.[cleanUid(chatId)] || [];
+}
+
 function getUnreadIncomingCount() {
   const uid = state.user?.uid;
   if (!uid) return 0;
   return state.messages.filter(m => m.toUid === uid && !unique(m.readBy).includes(uid)).length;
-}
-
-function getGroupChatMessages(chatId) {
-  return state.groupMessagesByChat?.[cleanUid(chatId)] || [];
 }
 
 function resetHistoryStacks() {
@@ -1251,11 +1236,8 @@ function startSnapshots() {
 
         if (firstIncomingLoaded) {
           const newOnes = incoming.filter(r => !seenIncomingRequestIds.has(r.id));
-          if (newOnes.length > 1) {
-            notifySummary(`You have ${newOnes.length} new friend requests.`, "friends", "requests");
-          } else if (newOnes.length === 1) {
-            notifyRequest(newOnes[0]);
-          }
+          if (newOnes.length > 1) notifySummary(`You have ${newOnes.length} new friend requests.`, "friends", "requests");
+          else if (newOnes.length === 1) notifyRequest(newOnes[0]);
         } else {
           firstIncomingLoaded = true;
         }
@@ -1288,11 +1270,8 @@ function startSnapshots() {
 
         if (firstMessagesLoaded) {
           const newOnes = sorted.filter(m => !seenMessageIds.has(m.id) && m.toUid === user.uid);
-          if (newOnes.length > 1) {
-            notifySummary(`You have ${newOnes.length} new messages.`, "messages", "direct");
-          } else if (newOnes.length === 1) {
-            notifyMessage(newOnes[0]);
-          }
+          if (newOnes.length > 1) notifySummary(`You have ${newOnes.length} new messages.`, "messages", "direct");
+          else if (newOnes.length === 1) notifyMessage(newOnes[0]);
         } else {
           firstMessagesLoaded = true;
         }
@@ -1307,16 +1286,15 @@ function startSnapshots() {
       (snap) => {
         const chats = [];
         snap.forEach(d => chats.push({ id: d.id, ...d.data() }));
-        const sortedChats = sortNewestFirst(chats);
+        state.groupChats = sortNewestFirst(chats);
 
-        state.groupChats = sortedChats;
-        if (!state.selectedGroupChatId && sortedChats[0]) {
-          state.selectedGroupChatId = sortedChats[0].id;
-        } else if (state.selectedGroupChatId && !sortedChats.some(c => c.id === state.selectedGroupChatId)) {
-          state.selectedGroupChatId = sortedChats[0]?.id || null;
+        if (!state.selectedGroupChatId && state.groupChats[0]) {
+          state.selectedGroupChatId = state.groupChats[0].id;
+        } else if (state.selectedGroupChatId && !state.groupChats.some(c => c.id === state.selectedGroupChatId)) {
+          state.selectedGroupChatId = state.groupChats[0]?.id || null;
         }
 
-        const existingIds = new Set(sortedChats.map(c => c.id));
+        const existingIds = new Set(state.groupChats.map(c => c.id));
         for (const [chatId, unsub] of groupMessageUnsubs.entries()) {
           if (!existingIds.has(chatId)) {
             try { unsub(); } catch {}
@@ -1325,7 +1303,7 @@ function startSnapshots() {
           }
         }
 
-        for (const chat of sortedChats) {
+        for (const chat of state.groupChats) {
           if (groupMessageUnsubs.has(chat.id)) continue;
 
           const unsub = onSnapshot(
@@ -1334,8 +1312,7 @@ function startSnapshots() {
               const messages = [];
               msgSnap.forEach(m => messages.push({ id: m.id, ...m.data() }));
               state.groupMessagesByChat[chat.id] = sortNewestFirst(messages);
-
-              if (state.selectedGroupChatId === chat.id) emit();
+              emit();
             }
           );
 
@@ -1357,11 +1334,8 @@ function startSnapshots() {
 
         if (firstGroupInvitesLoaded) {
           const newOnes = pending.filter(i => !seenGroupInviteIds.has(i.id));
-          if (newOnes.length > 1) {
-            notifySummary(`You have ${newOnes.length} new group invites.`, "messages", "invites");
-          } else if (newOnes.length === 1) {
-            notifyGroupInvite(newOnes[0]);
-          }
+          if (newOnes.length > 1) notifySummary(`You have ${newOnes.length} new group invites.`, "messages", "invites");
+          else if (newOnes.length === 1) notifyGroupInvite(newOnes[0]);
         } else {
           firstGroupInvitesLoaded = true;
         }

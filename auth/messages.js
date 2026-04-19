@@ -39,10 +39,6 @@ function friendName(uid) {
 function resolveMessageTarget(msg) {
   if (!msg) return { section: "messages", sub: "direct", targetId: null };
 
-  if (msg.kind === "achievement") {
-    return { section: "progress", sub: "progress", targetId: msg.targetId || msg.achievementId || null };
-  }
-
   if (msg.kind === "friend-request") {
     return { section: "friends", sub: "requests", targetId: msg.fromUid || null };
   }
@@ -53,6 +49,10 @@ function resolveMessageTarget(msg) {
 
   if (msg.kind === "group-invite") {
     return { section: "messages", sub: "invites", targetId: msg.groupChatId || msg.targetId || null };
+  }
+
+  if (msg.kind === "achievement") {
+    return { section: "progress", sub: "progress", targetId: msg.targetId || msg.achievementId || null };
   }
 
   return {
@@ -79,10 +79,10 @@ function showTarget(msg) {
 
 function messageCard(msg) {
   const unread = msg.toUid === socialState.user?.uid && !(msg.readBy || []).includes(socialState.user?.uid);
-  const t = resolveMessageTarget(msg);
+  const target = resolveMessageTarget(msg);
 
   return `
-    <div class="msg-card ${unread ? "unread" : "read"}" data-msg-id="${escapeHtml(msg.id)}" data-kind="${escapeHtml(msg.kind || "system")}" data-target-id="${escapeHtml(t.targetId || "")}" data-target-section="${escapeHtml(t.section)}" data-target-sub="${escapeHtml(t.sub)}">
+    <div class="msg-card ${unread ? "unread" : "read"}" data-msg-id="${escapeHtml(msg.id)}" data-kind="${escapeHtml(msg.kind || "system")}" data-target-id="${escapeHtml(target.targetId || "")}" data-target-section="${escapeHtml(target.section)}" data-target-sub="${escapeHtml(target.sub)}">
       <div class="msg-avatar">${unread ? "✉️" : (msg.kind === "chat" ? "💬" : "📭")}</div>
       <div class="msg-body">
         <div class="msg-top">
@@ -124,6 +124,7 @@ function renderDirect(state) {
   }
 
   if (targetLabel) targetLabel.textContent = selectedUid ? `Chatting with ${friendName(selectedUid)}` : "Pick a friend to start chatting";
+
   if (conversation) {
     const msgs = selectedUid ? getConversationMessages(selectedUid) : [];
     conversation.innerHTML = msgs.length ? msgs.map(messageCard).join("") : `<div class="msg-empty">No messages yet.</div>`;
@@ -212,9 +213,6 @@ function renderGroups(state) {
       `).join("")
       : `<div class="msg-empty">No group invites.</div>`;
   }
-
-  const createEmoji = $("new-group-emoji");
-  if (createEmoji && !createEmoji.value) createEmoji.value = "👥";
 }
 
 function renderSystem(state) {
@@ -222,7 +220,7 @@ function renderSystem(state) {
   if (!list) return;
 
   const messages = (state.messages || []).filter(m => {
-    if (directFilter === "system") return ["system", "achievement", "friend-request", "group-invite"].includes(m.kind);
+    if (directFilter === "system") return ["system", "friend-request", "friend-accepted", "friend-declined", "friend-blocked", "group-invite"].includes(m.kind);
     if (directFilter === "friends") return m.kind === "chat" || m.kind === "friend-accepted" || m.kind === "friend-declined" || m.kind === "friend-blocked";
     return true;
   });
@@ -319,7 +317,7 @@ function render(state) {
 
 function bind(root) {
   root.addEventListener("click", async (e) => {
-    const btn = e.target.closest("button,[data-action]");
+    const btn = e.target.closest("[data-action]");
     if (!btn) return;
 
     const action = btn.dataset.action;
@@ -413,33 +411,6 @@ function bind(root) {
         await deleteGroupChat(id);
         return;
       }
-
-      if (action === "create-group") {
-        const name = $("new-group-name")?.value || "";
-        const emoji = $("new-group-emoji")?.value || "👥";
-        const members = String($("new-group-members")?.value || "").split(",").map(s => s.trim()).filter(Boolean);
-        const chatId = await createGroupChat(name, emoji, members);
-        setSelectedGroupChatId(chatId);
-        activeTab = "groups";
-        render(socialState);
-        return;
-      }
-
-      if (action === "invite-member") {
-        const chatId = btn.dataset.groupId || socialState.selectedGroupChatId;
-        const target = $("group-add-member-input")?.value || "";
-        await addMembersToGroupChat(chatId, [target]);
-        $("group-add-member-input").value = "";
-        return;
-      }
-
-      if (action === "save-group-info") {
-        const chatId = btn.dataset.groupId || socialState.selectedGroupChatId;
-        const name = $("group-rename-input")?.value || "";
-        const emoji = $("group-emoji-input")?.value || "👥";
-        await updateGroupChatInfo(chatId, { name, emoji });
-        return;
-      }
     } catch (err) {
       alert(err.message || "Action failed.");
     }
@@ -510,7 +481,7 @@ function bind(root) {
       }
     }
 
-    if (e.target?.id === "group-message-input" && e.key === "Enter" && !e.shiftShiftKey) {
+    if (e.target?.id === "group-message-input" && e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       const chatId = socialState.selectedGroupChatId;
       if (chatId && e.target.value.trim()) {

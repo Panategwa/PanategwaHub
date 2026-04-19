@@ -1,10 +1,6 @@
 import {
   login,
   loginWithGoogle,
-  loginWithGitHub,
-  loginWithFacebook,
-  loginWithTwitter,
-  loginWithDiscord,
   createAccount,
   logout,
   saveUsername,
@@ -35,7 +31,6 @@ const $ = (id) => document.getElementById(id);
 
 let currentState = null;
 let profileUsernameDirty = false;
-let profileUsernameLastRendered = "";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -58,19 +53,38 @@ function getRank(xp) {
   return "Veteran";
 }
 
+function getRankInfo(xp) {
+  if (xp < 5) return { current: "Explorer", next: "Adventurer", start: 0, end: 5 };
+  if (xp < 20) return { current: "Adventurer", next: "Veteran", start: 5, end: 20 };
+  return { current: "Veteran", next: "Max rank", start: 20, end: 20 };
+}
+
+function progressPercent(xp) {
+  const info = getRankInfo(xp);
+  if (xp >= 20) return 100;
+  const span = Math.max(1, info.end - info.start);
+  return Math.max(0, Math.min(100, ((xp - info.start) / span) * 100));
+}
+
 function showSection(sectionName) {
   document.querySelectorAll(".account-section").forEach(section => {
     section.classList.toggle("active", section.dataset.section === sectionName);
   });
+
   document.querySelectorAll(".tab-button").forEach(button => {
     button.classList.toggle("active", button.dataset.target === sectionName);
   });
+
+  if (sectionName === "messages" && typeof window.PanategwaMessagesRender === "function") {
+    window.PanategwaMessagesRender();
+  }
 }
 
 function showFriendsSubsection(name) {
   document.querySelectorAll("[data-friends-subpanel]").forEach(panel => {
     panel.classList.toggle("active", panel.dataset.friendsSubpanel === name);
   });
+
   document.querySelectorAll("[data-friends-subtab]").forEach(button => {
     button.classList.toggle("active", button.dataset.friendsSubtab === name);
   });
@@ -78,12 +92,21 @@ function showFriendsSubsection(name) {
 
 window.openAccountArea = function openAccountArea(section = "messages", sub = "direct", targetId = null) {
   showSection(section);
-  if (section === "friends") showFriendsSubsection(sub || "friends");
-  if (section === "messages" && typeof window.PanategwaMessagesRender === "function") {
-    window.PanategwaMessagesRender();
+
+  if (section === "friends") {
+    showFriendsSubsection(sub || "friends");
+    if (targetId && sub === "profile") {
+      viewProfileById(targetId);
+    }
   }
+
   if (section === "progress" && targetId) {
-    setTimeout(() => document.getElementById(`achievement-card-${targetId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+    setTimeout(() => {
+      document.getElementById(`achievement-card-${targetId}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    }, 150);
   }
 };
 
@@ -101,8 +124,17 @@ function syncUsernameInput(force = false) {
   const username = currentState?.profile?.username || currentState?.user?.displayName || "Player";
   if (force || (!profileUsernameDirty && document.activeElement !== input)) {
     input.value = username;
-    profileUsernameLastRendered = username;
-    profileUsernameDirty = false;
+  }
+}
+
+function updateSidebarAvatar(user, profile) {
+  const emoji = profile?.avatarEmoji || "👤";
+  const photoURL = user?.photoURL || profile?.photoURL || "";
+  localStorage.setItem("panategwa_sidebar_avatar_emoji", emoji);
+  localStorage.setItem("panategwa_sidebar_avatar_url", photoURL || "");
+
+  if (typeof window.PanategwaUpdateSidebarAvatar === "function") {
+    window.PanategwaUpdateSidebarAvatar(emoji, photoURL);
   }
 }
 
@@ -127,6 +159,7 @@ function renderAuth(state) {
       <p><b>Created:</b> —</p>
       <p><b>Last login:</b> —</p>
     `;
+    updateSidebarAvatar(null, null);
     return;
   }
 
@@ -139,10 +172,15 @@ function renderAuth(state) {
   const email = user.email || profile.email || "—";
   const verified = user.emailVerified ? "Yes" : "No";
   const xp = typeof profile.xp === "number" ? profile.xp : 0;
+  const rank = getRank(xp);
 
   info.innerHTML = `
     <div class="account-header">
-      <div class="account-avatar-placeholder">${escapeHtml(profile.avatarEmoji || "👤")}</div>
+      ${
+        user.photoURL
+          ? `<img src="${escapeHtml(user.photoURL)}" alt="Avatar" class="account-avatar">`
+          : `<div class="account-avatar-placeholder">${escapeHtml(profile.avatarEmoji || "👤")}</div>`
+      }
       <div>
         <p style="margin:0;"><b>${escapeHtml(username)}</b></p>
         <p style="margin:0; opacity:0.8;">${escapeHtml(email)}</p>
@@ -158,11 +196,75 @@ function renderAuth(state) {
       <div class="info-row"><span>Created</span><strong>${escapeHtml(formatDate(profile.createdAt))}</strong></div>
       <div class="info-row"><span>Last login</span><strong>${escapeHtml(formatDate(profile.lastLoginAt))}</strong></div>
       <div class="info-row"><span>XP</span><strong>${xp}</strong></div>
-      <div class="info-row"><span>Rank</span><strong>${escapeHtml(getRank(xp))}</strong></div>
+      <div class="info-row"><span>Rank</span><strong>${escapeHtml(rank)}</strong></div>
     </div>
   `;
 
   syncUsernameInput(false);
+  updateSidebarAvatar(user, profile);
+}
+
+function renderProgress(state) {
+  const xp = typeof state.profile?.xp === "number" ? state.profile.xp : 0;
+  const info = getRankInfo(xp);
+
+  const left = $("xp-left-rank");
+  const right = $("xp-right-rank");
+  const fill = $("xp-bar-fill");
+  const total = $("xp-total");
+  const need = $("xp-need");
+  const count = $("xp-count");
+  const achCount = $("achievement-count");
+
+  if (left) left.textContent = info.current;
+  if (right) right.textContent = info.next;
+  if (fill) fill.style.width = `${progressPercent(xp)}%`;
+  if (total) total.textContent = String(xp);
+  if (count) count.textContent = String(xp);
+  if (achCount) achCount.textContent = String((state.profile?.achievements || []).length);
+  if (need) need.textContent = xp >= 20 ? "Max rank reached" : `${info.end - xp} XP to next rank`;
+}
+
+function renderAchievements(state) {
+  const list = $("achievements-list");
+  if (!list) return;
+
+  const unlocked = new Set(state.profile?.achievements || []);
+  const achievements = [
+    { id: "achievement_collector", name: "Achievement Collector", description: "Unlock 10 achievements.", secret: false },
+    { id: "all_planets", name: "Astronaut", description: "Visit all celestial bodies of the Panategwa system.", secret: false },
+    { id: "big_reader", name: "Need some glasses?", description: "Set text size to Large.", secret: true },
+    { id: "dark_mode", name: "Dark Night", description: "Use Dark Mode.", secret: false },
+    { id: "first_login", name: "First Contact", description: "Log in for the first time.", secret: false },
+    { id: "light_mode", name: "Sunshine", description: "Use Light Mode.", secret: false },
+    { id: "morning_person", name: "Morning Person", description: "Visit between 3am and 10am.", secret: true },
+    { id: "nocturnal", name: "Nocturnal", description: "Visit between 9pm and 3am.", secret: true },
+    { id: "ocean_mode", name: "Wavefinder", description: "Use the Ocean theme.", secret: false },
+    { id: "profile_name", name: "True Name", description: "Set your username.", secret: false },
+    { id: "space_mode", name: "Stargazer", description: "Use the Space theme.", secret: false },
+    { id: "theme_shifter", name: "Aesthetic Control", description: "Change your theme.", secret: false },
+    { id: "tiny_text", name: "Microscopic Text", description: "Set text size to Small.", secret: true },
+    { id: "verified_email", name: "Verified Signal", description: "Verify your email address.", secret: false },
+    { id: "veteran", name: "Veteran", description: "Reach 20 XP.", secret: false }
+  ].sort((a, b) => a.name.localeCompare(b.name));
+
+  const ordered = [
+    ...achievements.filter(a => unlocked.has(a.id)).sort((a, b) => a.name.localeCompare(b.name)),
+    ...achievements.filter(a => !unlocked.has(a.id)).sort((a, b) => a.name.localeCompare(b.name))
+  ];
+
+  list.innerHTML = ordered.map(a => {
+    const isUnlocked = unlocked.has(a.id);
+    return `
+      <div class="achievement-card ${isUnlocked ? "unlocked" : "locked"}" id="achievement-card-${escapeHtml(a.id)}" data-achievement-id="${escapeHtml(a.id)}">
+        <div class="achievement-icon">${isUnlocked ? "🏆" : "🔒"}</div>
+        <div>
+          <div class="achievement-name">${escapeHtml(a.secret && !isUnlocked ? "Secret" : a.name)}</div>
+          <div class="achievement-desc">${escapeHtml(a.secret && !isUnlocked ? "Hidden achievement" : a.description)}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
 function renderFriends(state) {
@@ -331,6 +433,7 @@ function renderFriends(state) {
 
 function bind() {
   $("tab-info")?.addEventListener("click", () => showSection("info"));
+  $("tab-profile")?.addEventListener("click", () => showSection("profile"));
   $("tab-progress")?.addEventListener("click", () => showSection("progress"));
   $("tab-friends")?.addEventListener("click", () => showSection("friends"));
   $("tab-messages")?.addEventListener("click", () => showSection("messages"));
@@ -338,19 +441,6 @@ function bind() {
   document.querySelectorAll("[data-friends-subtab]").forEach(btn => {
     btn.addEventListener("click", () => showFriendsSubsection(btn.dataset.friendsSubtab));
   });
-
-  $("login-tab-btn")?.addEventListener("click", () => {
-    $("login-panel").style.display = "block";
-    $("signup-panel").style.display = "none";
-  });
-
-  $("signup-tab-btn")?.addEventListener("click", () => {
-    $("login-panel").style.display = "none";
-    $("signup-panel").style.display = "block";
-  });
-
-  $("profile-username")?.addEventListener("input", () => { profileUsernameDirty = true; });
-  $("friend-search-input")?.addEventListener("input", () => renderFriends(currentState));
 
   $("login-btn")?.addEventListener("click", async () => {
     try {
@@ -376,54 +466,6 @@ function bind() {
     }
   });
 
-  $("github-btn")?.addEventListener("click", async () => {
-    try {
-      setStatus("Signing in with GitHub...", "info");
-      await loginWithGitHub();
-      setStatus("Logged in.", "success");
-    } catch (error) {
-      console.error(error);
-      setStatus(error?.message || "GitHub login failed.", "error");
-      alert(error?.message || "GitHub login failed.");
-    }
-  });
-
-  $("facebook-btn")?.addEventListener("click", async () => {
-    try {
-      setStatus("Signing in with Facebook...", "info");
-      await loginWithFacebook();
-      setStatus("Logged in.", "success");
-    } catch (error) {
-      console.error(error);
-      setStatus(error?.message || "Facebook login failed.", "error");
-      alert(error?.message || "Facebook login failed.");
-    }
-  });
-
-  $("twitter-btn")?.addEventListener("click", async () => {
-    try {
-      setStatus("Signing in with Twitter/X...", "info");
-      await loginWithTwitter();
-      setStatus("Logged in.", "success");
-    } catch (error) {
-      console.error(error);
-      setStatus(error?.message || "Twitter login failed.", "error");
-      alert(error?.message || "Twitter login failed.");
-    }
-  });
-
-  $("discord-btn")?.addEventListener("click", async () => {
-    try {
-      setStatus("Signing in with Discord...", "info");
-      await loginWithDiscord();
-      setStatus("Logged in.", "success");
-    } catch (error) {
-      console.error(error);
-      setStatus(error?.message || "Discord login failed.", "error");
-      alert(error?.message || "Discord login failed.");
-    }
-  });
-
   $("signup-btn")?.addEventListener("click", async () => {
     try {
       setStatus("Creating account...", "info");
@@ -446,28 +488,42 @@ function bind() {
       const nextName = $("profile-username")?.value || "";
       await saveUsername(nextName);
       profileUsernameDirty = false;
-      profileUsernameLastRendered = nextName;
       syncUsernameInput(true);
+      setStatus("Name saved.", "success");
       alert("Name saved.");
     } catch (error) {
+      console.error(error);
+      setStatus(error?.message || "Could not save name.", "error");
       alert(error?.message || "Could not save name.");
     }
   });
 
   $("save-avatar-btn")?.addEventListener("click", async () => {
     try {
-      await saveProfileEmoji($("profile-emoji")?.value || "👤");
-      alert("Profile emoji saved.");
+      const emoji = $("profile-emoji")?.value || "👤";
+      await saveProfileEmoji(emoji);
+      const user = currentState?.user || null;
+      const profile = currentState?.profile || {};
+      profile.avatarEmoji = emoji;
+      updateSidebarAvatar(user, profile);
+      setStatus("Profile picture saved.", "success");
+      alert("Profile picture saved.");
     } catch (error) {
-      alert(error?.message || "Could not save emoji.");
+      console.error(error);
+      setStatus(error?.message || "Could not save profile picture.", "error");
+      alert(error?.message || "Could not save profile picture.");
     }
   });
 
   $("reset-password-btn")?.addEventListener("click", async () => {
     try {
+      setStatus("Sending reset email...", "info");
       await requestPasswordReset($("login-email")?.value || $("signup-email")?.value || "");
+      setStatus("Password reset email sent.", "success");
       alert("Password reset email sent.");
     } catch (error) {
+      console.error(error);
+      setStatus(error?.message || "Could not send reset email.", "error");
       alert(error?.message || "Could not send reset email.");
     }
   });
@@ -476,11 +532,15 @@ function bind() {
     try {
       const sent = await resendVerificationEmail();
       if (sent === false) {
+        setStatus("Your email is already verified.", "info");
         alert("Your email is already verified.");
-      } else {
-        alert("Verification email sent.");
+        return;
       }
+      setStatus("Verification email sent.", "success");
+      alert("Verification email sent.");
     } catch (error) {
+      console.error(error);
+      setStatus(error?.message || "Could not resend verification email.", "error");
       alert(error?.message || "Could not resend verification email.");
     }
   });
@@ -488,17 +548,27 @@ function bind() {
   $("logout-btn")?.addEventListener("click", async () => {
     try {
       await logout();
+      setStatus("Logged out.", "info");
     } catch (error) {
+      console.error(error);
+      setStatus(error?.message || "Logout failed.", "error");
       alert(error?.message || "Logout failed.");
     }
   });
 
   $("delete-account-btn")?.addEventListener("click", async () => {
+    const password = $("delete-password")?.value || "";
     if (!confirm("Delete your account permanently?")) return;
+
     try {
-      await deleteAccount($("delete-password")?.value || "");
+      setStatus("Deleting account...", "info");
+      await deleteAccount(password);
+      setStatus("Account deleted.", "success");
+      alert("Account deleted.");
       window.location.reload();
     } catch (error) {
+      console.error(error);
+      setStatus(error?.message || "Delete failed.", "error");
       alert(error?.message || "Delete failed.");
     }
   });
@@ -568,13 +638,9 @@ function bind() {
 function render(state) {
   currentState = state;
   renderAuth(state);
+  renderProgress(state);
+  renderAchievements(state);
   renderFriends(state);
-
-  const xpCount = $("xp-count");
-  const rankEl = $("xp-rank");
-  const xp = typeof state.profile?.xp === "number" ? state.profile.xp : 0;
-  if (xpCount) xpCount.textContent = String(xp);
-  if (rankEl) rankEl.textContent = getRank(xp);
 }
 
 function start() {

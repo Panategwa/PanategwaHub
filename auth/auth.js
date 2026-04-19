@@ -1,11 +1,4 @@
-import {
-  auth,
-  db,
-  googleProvider,
-  githubProvider,
-  facebookProvider,
-  twitterProvider
-} from "./firebase-config.js";
+import { auth, db, googleProvider } from "./firebase-config.js";
 
 import {
   createUserWithEmailAndPassword,
@@ -59,6 +52,7 @@ function baseProfile(user) {
     emailLower: cleanEmail(user.email),
     username: user.displayName || defaultUsername(user),
     avatarEmoji: "👤",
+    photoURL: user.photoURL || "",
     verified: !!user.emailVerified,
     xp: 0,
     achievements: [],
@@ -132,6 +126,7 @@ async function ensureUserProfile(user) {
     emailLower: cleanEmail(user.email || data.email || ""),
     username: data.username || user.displayName || defaultUsername(user),
     avatarEmoji: data.avatarEmoji || "👤",
+    photoURL: user.photoURL || data.photoURL || "",
     verified: !!user.emailVerified,
     xp: typeof data.xp === "number" ? data.xp : achievements.length,
     achievements,
@@ -197,27 +192,11 @@ async function login(email, password) {
   return cred.user;
 }
 
-async function loginWithPopupProvider(provider) {
-  const cred = await signInWithPopup(auth, provider);
+async function loginWithGoogle() {
+  const cred = await signInWithPopup(auth, googleProvider);
   await ensureUserProfile(cred.user);
   await touchLastLoginOnce(cred.user);
   return cred.user;
-}
-
-async function loginWithGoogle() {
-  return loginWithPopupProvider(googleProvider);
-}
-
-async function loginWithGitHub() {
-  return loginWithPopupProvider(githubProvider);
-}
-
-async function loginWithFacebook() {
-  return loginWithPopupProvider(facebookProvider);
-}
-
-async function loginWithTwitter() {
-  return loginWithPopupProvider(twitterProvider);
 }
 
 async function loginWithDiscord() {
@@ -295,12 +274,6 @@ async function deleteAccount(password) {
 
   if (providerIds.has("google.com") && !providerIds.has("password")) {
     await reauthenticateWithPopup(user, googleProvider);
-  } else if (providerIds.has("github.com")) {
-    await reauthenticateWithPopup(user, githubProvider);
-  } else if (providerIds.has("facebook.com")) {
-    await reauthenticateWithPopup(user, facebookProvider);
-  } else if (providerIds.has("twitter.com")) {
-    await reauthenticateWithPopup(user, twitterProvider);
   } else {
     if (!cleanPass) throw new Error("Password is required to delete your account.");
     const credential = EmailAuthProvider.credential(user.email, cleanPass);
@@ -337,9 +310,6 @@ export {
   createAccount,
   login,
   loginWithGoogle,
-  loginWithGitHub,
-  loginWithFacebook,
-  loginWithTwitter,
   loginWithDiscord,
   logout,
   saveUsername,

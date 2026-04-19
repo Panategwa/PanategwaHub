@@ -22,13 +22,36 @@ document.addEventListener("DOMContentLoaded", function () {
     return url;
   }
 
+  function getSidebarAvatar() {
+    const emoji = localStorage.getItem("panategwa_sidebar_avatar_emoji") || "👤";
+    const url = localStorage.getItem("panategwa_sidebar_avatar_url") || "";
+    return { emoji, url };
+  }
+
+  function renderSidebarAvatar() {
+    const btn = document.getElementById("menu-account-button");
+    if (!btn) return;
+
+    const { emoji, url } = getSidebarAvatar();
+
+    if (url) {
+      btn.innerHTML = `<img src="${url}" alt="Account" style="width:20px;height:20px;border-radius:50%;object-fit:cover;display:block;" />`;
+    } else {
+      btn.innerHTML = `<span style="font-size:18px;line-height:1;">${emoji || "👤"}</span>`;
+    }
+  }
+
+  window.PanategwaUpdateSidebarAvatar = function (emoji, url) {
+    localStorage.setItem("panategwa_sidebar_avatar_emoji", emoji || "👤");
+    localStorage.setItem("panategwa_sidebar_avatar_url", url || "");
+    renderSidebarAvatar();
+  };
+
   const isSettings = current === "settings-page.html";
+  const isAccount = current === "account-page.html";
 
   let menuHTML = `<div class="menu-inner">`;
 
-  // =========================
-  // TITLE
-  // =========================
   menuHTML += `
     <div class="line">
       <div class="menu-main-title">The Panategwa Hub</div>
@@ -36,43 +59,27 @@ document.addEventListener("DOMContentLoaded", function () {
     </div>
   `;
 
-// =========================
-// ICON ROW
-// =========================
-menuHTML += `
-  <div class="line icons">
+  menuHTML += `
+    <div class="line icons">
+      <button class="menu-icon-button ${isSettings ? "active-icon" : ""}"
+        ${isSettings ? "disabled" : ""}
+        onclick="window.location.href='${buildUrl("settings-page.html")}'">
+        ⚙️
+      </button>
 
-    <!-- SETTINGS -->
-    <button class="menu-icon-button ${isSettings ? "active-icon" : ""}"
-      ${isSettings ? "disabled" : ""}
-      onclick="window.location.href='${buildUrl("settings-page.html")}'">
-      ⚙️
-    </button>
+      <button id="menu-account-button"
+        class="menu-icon-button ${isAccount ? "active-icon" : ""}"
+        ${isAccount ? "disabled" : ""}
+        onclick="window.location.href='${buildUrl("account-page.html")}'">
+      </button>
 
-<!-- ACCOUNT -->
-<button class="menu-icon-button"
-  onclick="window.location.href='${buildUrl("account-page.html")}'"
-  aria-label="Account">
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M20 21a8 8 0 0 0-16 0"></path>
-    <circle cx="12" cy="7" r="4"></circle>
-  </svg>
-</button>
+      <button class="menu-icon-button"
+        onclick="window.scrollTo({top:0, behavior:'smooth'})">
+        ⬆️
+      </button>
+    </div>
+  `;
 
-<!-- SCROLL TO TOP -->
-<button class="menu-icon-button"
-  onclick="window.scrollTo({top:0, behavior:'smooth'})">
-  ⬆️
-    </button>
-
-  </div>
-`;
-
-  // =========================
-  // PAGE BUTTONS
-  // =========================
   pages.forEach(page => {
     const isActive = page.url === current;
     const url = buildUrl(page.url);
@@ -90,10 +97,8 @@ menuHTML += `
   menuHTML += `</div>`;
 
   menuContainer.innerHTML = menuHTML;
+  renderSidebarAvatar();
 
-  // =========================
-  // WRAP PAGE CONTENT
-  // =========================
   const wrapper = document.createElement("div");
   wrapper.id = "page-content";
 
@@ -104,9 +109,6 @@ menuHTML += `
 
   document.body.appendChild(wrapper);
 
-  // =========================
-  // RESIZE LOGIC
-  // =========================
   const handle = document.getElementById("resize-handle");
 
   let isResizing = false;
@@ -118,7 +120,7 @@ menuHTML += `
   let savedWidth = localStorage.getItem("menuWidth");
 
   if (savedWidth) {
-    savedWidth = parseInt(savedWidth);
+    savedWidth = parseInt(savedWidth, 10);
     menuContainer.style.width = savedWidth + "px";
     wrapper.style.paddingLeft = savedWidth + "px";
   } else {
@@ -134,7 +136,6 @@ menuHTML += `
     if (!isResizing) return;
 
     let newWidth = e.clientX;
-
     if (newWidth < MIN_WIDTH) newWidth = MIN_WIDTH;
     if (newWidth > MAX_WIDTH) newWidth = MAX_WIDTH;
 
@@ -147,7 +148,6 @@ menuHTML += `
 
     isResizing = false;
     document.body.style.userSelect = "auto";
-
     const finalWidth = menuContainer.offsetWidth;
     localStorage.setItem("menuWidth", finalWidth);
   });
@@ -155,7 +155,6 @@ menuHTML += `
   handle.addEventListener("dblclick", () => {
     menuContainer.style.width = DEFAULT_WIDTH + "px";
     wrapper.style.paddingLeft = DEFAULT_WIDTH + "px";
-
     localStorage.setItem("menuWidth", DEFAULT_WIDTH);
   });
 });

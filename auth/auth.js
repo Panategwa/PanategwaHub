@@ -60,6 +60,8 @@ function baseProfile(user) {
       systemEnabled: true,
       requestsEnabled: true,
       chatEnabled: true,
+      groupChatsEnabled: true,
+      showNonFriendGroupMessages: true,
       profileHidden: false
     },
     socialBackup: {
@@ -82,6 +84,8 @@ function normalizeSocialSettings(settings = {}) {
     systemEnabled: settings.systemEnabled !== false,
     requestsEnabled: settings.requestsEnabled !== false,
     chatEnabled: settings.chatEnabled !== false,
+    groupChatsEnabled: settings.groupChatsEnabled !== false,
+    showNonFriendGroupMessages: settings.showNonFriendGroupMessages !== false,
     profileHidden: !!settings.profileHidden
   };
 }
@@ -203,6 +207,7 @@ async function saveUsername(username) {
 async function resendVerificationEmail() {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
+
   if (user.emailVerified) return false;
 
   await sendEmailVerification(user);

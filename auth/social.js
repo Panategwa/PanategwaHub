@@ -23,6 +23,8 @@ const DEFAULT_SETTINGS = {
   systemEnabled: true,
   requestsEnabled: true,
   chatEnabled: true,
+  groupChatsEnabled: true,
+  showNonFriendGroupMessages: true,
   profileHidden: false
 };
 
@@ -41,6 +43,10 @@ const state = {
   selectedProfile: null,
   selectedProfileId: null,
   selectedConversationId: null,
+  selectedGroupChatId: null,
+  groupChats: [],
+  groupMessagesByChat: {},
+  groupInvites: [],
   canUndo: false,
   canRedo: false
 };
@@ -49,11 +55,16 @@ let unsubProfile = null;
 let unsubIncoming = null;
 let unsubOutgoing = null;
 let unsubMessages = null;
+let unsubGroupChats = null;
+let unsubGroupInvites = null;
+const groupMessageUnsubs = new Map();
 
 let seenIncomingRequestIds = new Set();
 let seenMessageIds = new Set();
+let seenGroupInviteIds = new Set();
 let firstIncomingLoaded = false;
 let firstMessagesLoaded = false;
+let firstGroupInvitesLoaded = false;
 
 const history = [];
 const redoStack = [];
@@ -66,6 +77,11 @@ function cloneState() {
     incomingRequests: [...state.incomingRequests],
     outgoingRequests: [...state.outgoingRequests],
     messages: [...state.messages],
+    groupChats: [...state.groupChats],
+    groupInvites: [...state.groupInvites],
+    groupMessagesByChat: Object.fromEntries(
+      Object.entries(state.groupMessagesByChat).map(([k, v]) => [k, [...v]])
+    ),
     friendProfiles: { ...state.friendProfiles }
   };
 }
@@ -128,6 +144,14 @@ function requestsEnabled() {
 
 function chatEnabled() {
   return state.settings.chatEnabled !== false;
+}
+
+function groupChatsEnabled() {
+  return state.settings.groupChatsEnabled !== false;
+}
+
+function showNonFriendGroupMessages() {
+  return state.settings.showNonFriendGroupMessages !== false;
 }
 
 function getCurrentUsername(profile) {
@@ -221,8 +245,8 @@ async function createSocialMessage({
   kind,
   title,
   body,
-  targetSection = "friends",
-  targetSubSection = "messages",
+  targetSection = "messages",
+  targetSubSection = "direct",
   requestId = null,
   conversationUid = null
 }) {
@@ -383,6 +407,12 @@ async function redoLastAction() {
   emit();
 }
 
+function openAccountArea(section = "messages", sub = "direct", targetUid = null) {
+  if (typeof window.openAccountArea === "function") {
+    window.openAccountArea(section, sub, targetUid);
+  }
+}
+
 function notifyCard({ title, body, buttons = [], onOpen = null }) {
   let stack = document.getElementById("social-toast-stack");
   if (!stack) {
@@ -401,13 +431,13 @@ function notifyCard({ title, body, buttons = [], onOpen = null }) {
 
   const card = document.createElement("div");
   card.style.pointerEvents = "auto";
-  card.style.borderRadius = "14px";
+  card.style.borderRadius = "16px";
   card.style.padding = "14px 16px";
-  card.style.background = "rgba(20, 20, 30, 0.94)";
+  card.style.background = "rgba(20, 20, 30, 0.96)";
   card.style.color = "#fff";
   card.style.border = "1px solid rgba(255,255,255,0.14)";
-  card.style.boxShadow = "0 12px 30px rgba(0,0,0,0.35)";
-  card.style.backdropFilter = "blur(8px)";
+  card.style.boxShadow = "0 18px 36px rgba(0,0,0,0.35)";
+  card.style.backdropFilter = "blur(10px)";
   card.style.display = "grid";
   card.style.gap = "8px";
   card.style.userSelect = "none";
@@ -466,12 +496,6 @@ function notifyCard({ title, body, buttons = [], onOpen = null }) {
   }, 5000);
 }
 
-function openAccountArea(section = "friends", sub = "friends", targetUid = null) {
-  if (typeof window.openAccountArea === "function") {
-    window.openAccountArea(section, sub, targetUid);
-  }
-}
-
 function notifyRequest(request) {
   notifyCard({
     title: "Friend request",
@@ -497,7 +521,7 @@ function notifyRequest(request) {
       },
       {
         label: "View in messages",
-        onClick: async () => openAccountArea("messages", "messages", request.fromUid)
+        onClick: async () => openAccountArea("messages", "direct", request.fromUid)
       }
     ]
   });
@@ -507,22 +531,22 @@ function notifyMessage(message) {
   notifyCard({
     title: message.title || "New message",
     body: message.body || "You have a new message.",
-    onOpen: () => openAccountArea(message.targetSection || "messages", message.targetSubSection || "messages", message.conversationUid || message.fromUid || null),
+    onOpen: () => openAccountArea(message.targetSection || "messages", message.targetSubSection || "direct", message.conversationUid || message.fromUid || null),
     buttons: [
       {
         label: "Open",
         variant: "primary",
-        onClick: async () => openAccountArea(message.targetSection || "messages", message.targetSubSection || "messages", message.conversationUid || message.fromUid || null)
+        onClick: async () => openAccountArea(message.targetSection || "messages", message.targetSubSection || "direct", message.conversationUid || message.fromUid || null)
       },
       {
         label: "View in messages",
-        onClick: async () => openAccountArea("messages", "messages", message.conversationUid || message.fromUid || null)
+        onClick: async () => openAccountArea("messages", "direct", message.conversationUid || message.fromUid || null)
       }
     ]
   });
 }
 
-function notifySummary(text, section = "messages", sub = "messages") {
+function notifySummary(text, section = "messages", sub = "direct") {
   notifyCard({
     title: "New messages",
     body: text,
@@ -535,7 +559,30 @@ function notifySummary(text, section = "messages", sub = "messages") {
       },
       {
         label: "View in messages",
-        onClick: async () => openAccountArea("messages", "messages")
+        onClick: async () => openAccountArea("messages", "direct")
+      }
+    ]
+  });
+}
+
+function notifyGroupInvite(invite) {
+  notifyCard({
+    title: "Group invite",
+    body: `${invite.fromName || invite.fromUid} invited you to a group chat.`,
+    onOpen: () => openAccountArea("messages", "invites"),
+    buttons: [
+      {
+        label: "Accept",
+        variant: "primary",
+        onClick: async () => respondToGroupInvite(invite.id, "accept")
+      },
+      {
+        label: "Decline",
+        onClick: async () => respondToGroupInvite(invite.id, "decline")
+      },
+      {
+        label: "View in messages",
+        onClick: async () => openAccountArea("messages", "invites")
       }
     ]
   });
@@ -696,7 +743,7 @@ async function respondToFriendRequest(requestId, action) {
       title: "You were blocked",
       body: `${myName} blocked you.`,
       targetSection: "friends",
-      targetSubSection: "messages"
+      targetSubSection: "direct"
     });
   }
 }
@@ -707,7 +754,7 @@ async function sendChatMessage(friendUid, text) {
   const body = String(text || "").trim();
 
   if (!user) throw new Error("Not logged in.");
-  if (!id) throw new Error("Enter a friend ID.");
+  if (!id) throw new Error("Pick a friend first.");
   if (!body) throw new Error("Type a message first.");
   if (!systemEnabled() || !chatEnabled()) throw new Error("Chat is turned off.");
   if (!isFriend(id)) throw new Error("That user is not in your friends list.");
@@ -732,7 +779,7 @@ async function sendChatMessage(friendUid, text) {
     title: `Message from ${getCurrentUsername(state.profile)}`,
     body,
     targetSection: "messages",
-    targetSubSection: "messages",
+    targetSubSection: "direct",
     conversationUid: id
   });
 }
@@ -808,7 +855,7 @@ async function blockUser(targetUid) {
     title: "Blocked",
     body: `${getCurrentUsername(state.profile)} blocked you.`,
     targetSection: "friends",
-    targetSubSection: "messages"
+    targetSubSection: "direct"
   });
 }
 
@@ -816,39 +863,50 @@ async function toggleRequestsEnabled(enabled) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
-  await setDoc(userRef(user.uid), {
-    socialSettings: {
-      ...(state.settings || DEFAULT_SETTINGS),
-      requestsEnabled: !!enabled
-    },
+  await updateDoc(userRef(user.uid), {
+    "socialSettings.requestsEnabled": !!enabled,
     updatedAt: serverTimestamp()
-  }, { merge: true });
+  });
 }
 
 async function toggleChatEnabled(enabled) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
-  await setDoc(userRef(user.uid), {
-    socialSettings: {
-      ...(state.settings || DEFAULT_SETTINGS),
-      chatEnabled: !!enabled
-    },
+  await updateDoc(userRef(user.uid), {
+    "socialSettings.chatEnabled": !!enabled,
     updatedAt: serverTimestamp()
-  }, { merge: true });
+  });
+}
+
+async function toggleGroupChatsEnabled(enabled) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  await updateDoc(userRef(user.uid), {
+    "socialSettings.groupChatsEnabled": !!enabled,
+    updatedAt: serverTimestamp()
+  });
+}
+
+async function toggleShowNonFriendGroupMessages(enabled) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  await updateDoc(userRef(user.uid), {
+    "socialSettings.showNonFriendGroupMessages": !!enabled,
+    updatedAt: serverTimestamp()
+  });
 }
 
 async function toggleProfileHidden(hidden) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
-  await setDoc(userRef(user.uid), {
-    socialSettings: {
-      ...(state.settings || DEFAULT_SETTINGS),
-      profileHidden: !!hidden
-    },
+  await updateDoc(userRef(user.uid), {
+    "socialSettings.profileHidden": !!hidden,
     updatedAt: serverTimestamp()
-  }, { merge: true });
+  });
 }
 
 async function disableSocialSystem(mode = "keep") {
@@ -870,7 +928,8 @@ async function disableSocialSystem(mode = "keep") {
       ...(data.socialSettings || DEFAULT_SETTINGS),
       systemEnabled: false,
       requestsEnabled: false,
-      chatEnabled: false
+      chatEnabled: false,
+      groupChatsEnabled: false
     },
     updatedAt: serverTimestamp()
   };
@@ -911,36 +970,164 @@ async function enableSocialSystem(mode = "restore") {
       ...(data.socialSettings || DEFAULT_SETTINGS),
       systemEnabled: true,
       requestsEnabled: true,
-      chatEnabled: true
+      chatEnabled: true,
+      groupChatsEnabled: true
     },
     updatedAt: serverTimestamp()
   }, { merge: true });
 }
 
-async function markMessageRead(messageId, read = true) {
-  await applyMessageReadState(messageId, read);
+async function createGroupChat(name, memberIds = []) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+  if (!groupChatsEnabled()) throw new Error("Group chats are turned off.");
+
+  const cleanName = String(name || "").trim();
+  const members = unique([user.uid, ...memberIds.map(cleanUid)]);
+
+  if (!cleanName) throw new Error("Group chat name is required.");
+  if (members.length < 2) throw new Error("Add at least one other person.");
+
+  const ref = await addDoc(collection(db, "groupChats"), {
+    name: cleanName,
+    ownerUid: user.uid,
+    members,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    lastMessage: ""
+  });
+
+  for (const uid of members) {
+    if (uid === user.uid) continue;
+    await addDoc(collection(db, "groupChatInvites"), {
+      chatId: ref.id,
+      chatName: cleanName,
+      fromUid: user.uid,
+      toUid: uid,
+      status: "pending",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  }
+
+  return ref.id;
 }
 
-async function markAllMessagesRead() {
-  await applyBulkMessageReadState(true);
+async function inviteToGroupChat(chatId, targetUid) {
+  const user = auth.currentUser;
+  const id = cleanUid(targetUid);
+  if (!user) throw new Error("Not logged in.");
+  if (!groupChatsEnabled()) throw new Error("Group chats are turned off.");
+  if (!chatId) throw new Error("Pick a group chat first.");
+  if (!id) throw new Error("Enter a user ID.");
+
+  const chatSnap = await getDoc(doc(db, "groupChats", chatId));
+  if (!chatSnap.exists()) throw new Error("Group chat not found.");
+
+  const chat = chatSnap.data();
+  if (!unique(chat.members).includes(user.uid)) throw new Error("You are not in that group.");
+  if (unique(chat.members).includes(id)) throw new Error("That user is already in the group.");
+
+  const target = await loadUserProfileById(id);
+  if (!target) throw new Error("User not found.");
+
+  const invite = await addDoc(collection(db, "groupChatInvites"), {
+    chatId,
+    chatName: chat.name || "Group chat",
+    fromUid: user.uid,
+    toUid: id,
+    status: "pending",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+
+  await createSocialMessage({
+    fromUid: user.uid,
+    toUid: id,
+    kind: "system",
+    title: "Group invite",
+    body: `${getCurrentUsername(state.profile)} invited you to "${chat.name || "Group chat"}".`,
+    targetSection: "messages",
+    targetSubSection: "invites"
+  });
+
+  return invite.id;
 }
 
-async function markAllMessagesUnread() {
-  await applyBulkMessageReadState(false);
+async function respondToGroupInvite(inviteId, action) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const ref = doc(db, "groupChatInvites", inviteId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error("Invite not found.");
+
+  const invite = snap.data();
+  if (invite.toUid !== user.uid) throw new Error("You cannot edit this invite.");
+
+  const chatRef = doc(db, "groupChats", invite.chatId);
+
+  if (action === "accept") {
+    await updateDoc(ref, {
+      status: "accepted",
+      updatedAt: serverTimestamp()
+    });
+    await updateDoc(chatRef, {
+      members: arrayUnion(user.uid),
+      updatedAt: serverTimestamp()
+    });
+    return;
+  }
+
+  if (action === "decline") {
+    await updateDoc(ref, {
+      status: "declined",
+      updatedAt: serverTimestamp()
+    });
+    return;
+  }
 }
 
-async function viewProfileById(uid) {
-  const id = cleanUid(uid);
-  if (!id) return null;
+async function sendGroupMessage(chatId, text) {
+  const user = auth.currentUser;
+  const body = String(text || "").trim();
 
-  const profile = await loadUserProfileById(id);
-  const viewerUid = auth.currentUser?.uid || null;
-  const visible = publicProfileForViewer(profile, viewerUid);
+  if (!user) throw new Error("Not logged in.");
+  if (!groupChatsEnabled()) throw new Error("Group chats are turned off.");
+  if (!chatId) throw new Error("Pick a group chat first.");
+  if (!body) throw new Error("Type a message first.");
 
-  state.selectedProfileId = id;
-  state.selectedProfile = visible;
-  emit();
-  return visible;
+  const chatRef = doc(db, "groupChats", chatId);
+  const chatSnap = await getDoc(chatRef);
+  if (!chatSnap.exists()) throw new Error("Group chat not found.");
+
+  const chat = chatSnap.data();
+  if (!unique(chat.members).includes(user.uid)) throw new Error("You are not in that group.");
+
+  await addDoc(collection(db, "groupChats", chatId, "messages"), {
+    chatId,
+    fromUid: user.uid,
+    fromName: getCurrentUsername(state.profile),
+    body,
+    createdAt: serverTimestamp(),
+    readBy: [user.uid]
+  });
+
+  await updateDoc(chatRef, {
+    lastMessage: body,
+    updatedAt: serverTimestamp()
+  });
+}
+
+async function leaveGroupChat(chatId) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+  if (!chatId) throw new Error("Pick a group chat first.");
+
+  await updateDoc(doc(db, "groupChats", chatId), {
+    members: arrayRemove(user.uid),
+    updatedAt: serverTimestamp()
+  });
 }
 
 function setSelectedConversation(uid) {
@@ -950,6 +1137,11 @@ function setSelectedConversation(uid) {
 
 function setSelectedProfile(uid) {
   state.selectedProfileId = cleanUid(uid) || null;
+  emit();
+}
+
+function setSelectedGroupChatId(chatId) {
+  state.selectedGroupChatId = cleanUid(chatId) || null;
   emit();
 }
 
@@ -972,6 +1164,10 @@ function getUnreadIncomingCount() {
   return state.messages.filter(m => m.toUid === uid && !unique(m.readBy).includes(uid)).length;
 }
 
+function getGroupChatMessages(chatId) {
+  return state.groupMessagesByChat?.[cleanUid(chatId)] || [];
+}
+
 function resetHistoryStacks() {
   history.length = 0;
   redoStack.length = 0;
@@ -980,17 +1176,37 @@ function resetHistoryStacks() {
   emit();
 }
 
+function teardownGroupListeners() {
+  for (const unsub of groupMessageUnsubs.values()) {
+    try { unsub(); } catch {}
+  }
+  groupMessageUnsubs.clear();
+
+  if (unsubGroupChats) {
+    try { unsubGroupChats(); } catch {}
+    unsubGroupChats = null;
+  }
+
+  if (unsubGroupInvites) {
+    try { unsubGroupInvites(); } catch {}
+    unsubGroupInvites = null;
+  }
+}
+
 function startSnapshots() {
-  watchAuth(async (user, profile) => {
-    if (unsubProfile) { unsubProfile(); unsubProfile = null; }
-    if (unsubIncoming) { unsubIncoming(); unsubIncoming = null; }
-    if (unsubOutgoing) { unsubOutgoing(); unsubOutgoing = null; }
-    if (unsubMessages) { unsubMessages(); unsubMessages = null; }
+  watchAuth(async (user) => {
+    if (unsubProfile) { try { unsubProfile(); } catch {} unsubProfile = null; }
+    if (unsubIncoming) { try { unsubIncoming(); } catch {} unsubIncoming = null; }
+    if (unsubOutgoing) { try { unsubOutgoing(); } catch {} unsubOutgoing = null; }
+    if (unsubMessages) { try { unsubMessages(); } catch {} unsubMessages = null; }
+    teardownGroupListeners();
 
     firstIncomingLoaded = false;
     firstMessagesLoaded = false;
+    firstGroupInvitesLoaded = false;
     seenIncomingRequestIds = new Set();
     seenMessageIds = new Set();
+    seenGroupInviteIds = new Set();
     resetHistoryStacks();
 
     if (!user) {
@@ -1007,6 +1223,10 @@ function startSnapshots() {
       state.selectedProfile = null;
       state.selectedProfileId = null;
       state.selectedConversationId = null;
+      state.selectedGroupChatId = null;
+      state.groupChats = [];
+      state.groupMessagesByChat = {};
+      state.groupInvites = [];
       emit();
       return;
     }
@@ -1069,7 +1289,7 @@ function startSnapshots() {
         if (firstMessagesLoaded) {
           const newOnes = sorted.filter(m => !seenMessageIds.has(m.id) && m.toUid === user.uid);
           if (newOnes.length > 1) {
-            notifySummary(`You have ${newOnes.length} new messages.`, "messages", "messages");
+            notifySummary(`You have ${newOnes.length} new messages.`, "messages", "direct");
           } else if (newOnes.length === 1) {
             notifyMessage(newOnes[0]);
           }
@@ -1078,6 +1298,76 @@ function startSnapshots() {
         }
 
         seenMessageIds = new Set(sorted.map(m => m.id));
+        emit();
+      }
+    );
+
+    unsubGroupChats = onSnapshot(
+      query(collection(db, "groupChats"), where("members", "array-contains", user.uid)),
+      (snap) => {
+        const chats = [];
+        snap.forEach(d => chats.push({ id: d.id, ...d.data() }));
+        const sortedChats = sortNewestFirst(chats);
+
+        state.groupChats = sortedChats;
+        if (!state.selectedGroupChatId && sortedChats[0]) {
+          state.selectedGroupChatId = sortedChats[0].id;
+        } else if (state.selectedGroupChatId && !sortedChats.some(c => c.id === state.selectedGroupChatId)) {
+          state.selectedGroupChatId = sortedChats[0]?.id || null;
+        }
+
+        const existingIds = new Set(sortedChats.map(c => c.id));
+        for (const [chatId, unsub] of groupMessageUnsubs.entries()) {
+          if (!existingIds.has(chatId)) {
+            try { unsub(); } catch {}
+            groupMessageUnsubs.delete(chatId);
+            delete state.groupMessagesByChat[chatId];
+          }
+        }
+
+        for (const chat of sortedChats) {
+          if (groupMessageUnsubs.has(chat.id)) continue;
+
+          const unsub = onSnapshot(
+            collection(db, "groupChats", chat.id, "messages"),
+            (msgSnap) => {
+              const messages = [];
+              msgSnap.forEach(m => messages.push({ id: m.id, ...m.data() }));
+              state.groupMessagesByChat[chat.id] = sortNewestFirst(messages);
+
+              if (state.selectedGroupChatId === chat.id) emit();
+            }
+          );
+
+          groupMessageUnsubs.set(chat.id, unsub);
+        }
+
+        emit();
+      }
+    );
+
+    unsubGroupInvites = onSnapshot(
+      query(collection(db, "groupChatInvites"), where("toUid", "==", user.uid)),
+      (snap) => {
+        const invites = [];
+        snap.forEach(d => invites.push({ id: d.id, ...d.data() }));
+
+        const pending = invites.filter(i => i.status === "pending");
+        const currentIds = new Set(pending.map(i => i.id));
+
+        if (firstGroupInvitesLoaded) {
+          const newOnes = pending.filter(i => !seenGroupInviteIds.has(i.id));
+          if (newOnes.length > 1) {
+            notifySummary(`You have ${newOnes.length} new group invites.`, "messages", "invites");
+          } else if (newOnes.length === 1) {
+            notifyGroupInvite(newOnes[0]);
+          }
+        } else {
+          firstGroupInvitesLoaded = true;
+        }
+
+        seenGroupInviteIds = currentIds;
+        state.groupInvites = sortNewestFirst(pending);
         emit();
       }
     );
@@ -1103,6 +1393,10 @@ watchAuth(async (user, profile) => {
     state.selectedProfile = null;
     state.selectedProfileId = null;
     state.selectedConversationId = null;
+    state.selectedGroupChatId = null;
+    state.groupChats = [];
+    state.groupMessagesByChat = {};
+    state.groupInvites = [];
     resetHistoryStacks();
     emit();
     return;
@@ -1132,6 +1426,8 @@ export {
   blockUser,
   toggleRequestsEnabled,
   toggleChatEnabled,
+  toggleGroupChatsEnabled,
+  toggleShowNonFriendGroupMessages,
   toggleProfileHidden,
   disableSocialSystem,
   enableSocialSystem,
@@ -1143,8 +1439,15 @@ export {
   viewProfileById,
   setSelectedConversation,
   setSelectedProfile,
+  setSelectedGroupChatId,
   getConversationMessages,
+  getGroupChatMessages,
   getUnreadIncomingCount,
   openAccountArea,
+  createGroupChat,
+  inviteToGroupChat,
+  respondToGroupInvite,
+  sendGroupMessage,
+  leaveGroupChat,
   state as socialState
 };

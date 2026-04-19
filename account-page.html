@@ -21,9 +21,8 @@
       --panel-bg: rgba(255, 255, 255, 0.08);
       --panel-border: rgba(255, 255, 255, 0.14);
       --panel-soft: rgba(255, 255, 255, 0.05);
-      --panel-strong: rgba(255, 255, 255, 0.1);
       --accent: rgba(175, 200, 75, 0.28);
-      --text-soft: rgba(255, 255, 255, 0.8);
+      --soft-shadow: 0 18px 40px rgba(0,0,0,0.18);
     }
 
     .account-wrap {
@@ -40,7 +39,6 @@
 
     .page-head h1 {
       margin: 0;
-      letter-spacing: 0.2px;
     }
 
     .page-subtitle {
@@ -88,12 +86,14 @@
       animation: fadeUp 180ms ease-out;
     }
 
-    .friends-subpanel {
+    .friends-subpanel,
+    .message-subpanel {
       display: none;
       margin-top: 14px;
     }
 
-    .friends-subpanel.active {
+    .friends-subpanel.active,
+    .message-subpanel.active {
       display: block;
       animation: fadeUp 180ms ease-out;
     }
@@ -104,7 +104,7 @@
       border-radius: 20px;
       padding: 18px;
       backdrop-filter: blur(10px);
-      box-shadow: 0 18px 40px rgba(0,0,0,0.18);
+      box-shadow: var(--soft-shadow);
     }
 
     .card h2, .card h3 {
@@ -267,8 +267,7 @@
       height: 100%;
       border-radius: 999px;
       background: linear-gradient(90deg, rgba(175,200,75,0.95), rgba(80,180,255,0.95));
-      transition: width 1.1s cubic-bezier(.22,1,.36,1);
-      will-change: width;
+      transition: none;
     }
 
     .xp-foot {
@@ -527,6 +526,38 @@
       border-radius: 999px;
     }
 
+    .messages-shell {
+      display: grid;
+      gap: 14px;
+    }
+
+    .message-filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .message-filter-chip {
+      margin: 0;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+    }
+
+    .message-filter-chip.active {
+      background: var(--accent);
+    }
+
+    .copy-inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tiny-note {
+      font-size: 0.92rem;
+      opacity: 0.8;
+    }
+
     @media (max-width: 959px) {
       .settings-grid,
       .profile-meta,
@@ -549,14 +580,6 @@
       .social-item,
       .social-message {
         grid-template-columns: 1fr;
-      }
-
-      .social-icon {
-        width: 44px;
-      }
-
-      .social-actions {
-        grid-column: auto;
       }
     }
 
@@ -624,7 +647,7 @@
             <button id="signup-btn" type="button">Create account</button>
           </div>
 
-          <p style="margin-top: 12px; opacity: 0.8;">
+          <p class="tiny-note" style="margin-top: 12px;">
             Your email is the login ID. Your username is your editable profile name.
           </p>
         </div>
@@ -667,8 +690,8 @@
 
         <div class="xp-panel">
           <div class="xp-panel-topline">
-            <div>Rank: <span id="xp-rank">Explorer</span></div>
-            <div id="xp-need">5 XP to Adventurer</div>
+            <div id="xp-left-rank">Explorer</div>
+            <div id="xp-right-rank">Adventurer</div>
           </div>
 
           <div class="xp-track" aria-label="XP progress bar">
@@ -676,7 +699,7 @@
           </div>
 
           <div class="xp-foot">
-            <span id="xp-total">0</span> XP total • <span id="xp-label">5 XP to Adventurer</span>
+            <span id="xp-total">0</span> XP total • <span id="xp-need">5 XP to next rank</span>
           </div>
         </div>
 
@@ -696,13 +719,22 @@
 
         <div class="field-row">
           <input id="friend-id-input" type="text" placeholder="Type a user ID" />
-          <input id="friend-note-input" type="text" placeholder="Optional note" />
+          <input id="friend-note-input" type="text" placeholder="Optional message" />
         </div>
 
         <div class="button-row">
           <button id="friend-request-send-btn" type="button">Send request</button>
           <button id="block-user-btn" type="button">Block user</button>
         </div>
+
+        <div class="field-row" style="margin-top: 14px;">
+          <input id="friend-search-input" type="text" placeholder="Search your friends" />
+        </div>
+
+        <div class="subsection-head">
+          <h3>Your friends</h3>
+        </div>
+        <div id="friend-search-results" class="achievement-list"></div>
 
         <div class="tab-bar" style="margin-top: 14px;">
           <button type="button" class="tab-button active" data-friends-subtab="friends">Friends</button>
@@ -734,33 +766,79 @@
         <h2>Messages</h2>
         <p id="messages-summary">Unread messages: 0</p>
 
-        <div class="button-row" style="margin-bottom: 12px;">
+        <div class="tab-bar" style="margin-top: 10px;">
+          <button type="button" class="tab-button active" id="message-subtab-direct" data-message-subtab="direct">Direct</button>
+          <button type="button" class="tab-button" id="message-subtab-groups" data-message-subtab="groups">Groups</button>
+          <button type="button" class="tab-button" id="message-subtab-invites" data-message-subtab="invites">Invites</button>
+        </div>
+
+        <div class="message-subpanel active" data-message-subpanel="direct">
+          <div class="message-filters">
+            <button id="message-filter-all" class="tab-button message-filter-chip active" type="button">All</button>
+            <button id="message-filter-system" class="tab-button message-filter-chip" type="button">System</button>
+            <button id="message-filter-friends" class="tab-button message-filter-chip" type="button">Friend messages</button>
+          </div>
+
+          <div class="card" style="margin-bottom:14px;">
+            <div class="subsection-head">
+              <h3>Pick a friend to message</h3>
+            </div>
+            <div class="field-row">
+              <input id="direct-message-friend-search" type="text" placeholder="Search your friends" />
+            </div>
+            <div id="selected-direct-friend" style="margin-bottom:12px;"></div>
+            <div id="direct-message-friend-results"></div>
+          </div>
+
+          <div class="card">
+            <div class="subsection-head">
+              <h3>Direct messages</h3>
+              <div id="direct-filter-label" class="tiny-note">All messages</div>
+            </div>
+
+            <div class="field-row">
+              <textarea id="direct-message-text" placeholder="Type a message..."></textarea>
+            </div>
+
+            <div class="button-row">
+              <button id="send-direct-message-btn" type="button">Send message</button>
+            </div>
+
+            <div id="direct-messages-list" class="achievement-list" style="margin-top:14px;"></div>
+          </div>
+        </div>
+
+        <div class="message-subpanel" data-message-subpanel="groups">
+          <div class="messages-shell">
+            <div class="card">
+              <div class="subsection-head">
+                <h3>Your group chats</h3>
+                <input id="group-search-input" type="text" placeholder="Search group chats" />
+              </div>
+              <div id="group-chat-list"></div>
+            </div>
+
+            <div class="card">
+              <h3>Group chat</h3>
+              <div id="group-compose-box"></div>
+              <div id="group-chat-view"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="message-subpanel" data-message-subpanel="invites">
+          <div class="card">
+            <h3>Group invites</h3>
+            <div id="group-invites-list"></div>
+          </div>
+        </div>
+
+        <div class="button-row" style="margin-top: 14px;">
           <button id="read-all-btn" type="button">Read all</button>
           <button id="unread-all-btn" type="button">Unread all</button>
           <button id="undo-btn" type="button">Undo</button>
           <button id="redo-btn" type="button">Redo</button>
         </div>
-
-        <div class="field-row">
-          <select id="message-filter-select">
-            <option value="all">All messages</option>
-            <option value="chat">Chats</option>
-            <option value="friend-request">Friend requests</option>
-            <option value="friend-accepted">Accepted</option>
-            <option value="friend-declined">Declined</option>
-            <option value="friend-blocked">Blocked</option>
-            <option value="system">System</option>
-          </select>
-
-          <input id="message-to-id" type="text" placeholder="Friend ID to message" />
-          <textarea id="message-text" placeholder="Type a message..."></textarea>
-        </div>
-
-        <div class="button-row">
-          <button id="send-message-btn" type="button">Send message</button>
-        </div>
-
-        <div id="messages-list" class="achievement-list" style="margin-top: 14px;"></div>
       </div>
     </section>
   </div>

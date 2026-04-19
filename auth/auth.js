@@ -1,9 +1,17 @@
-import { auth, db, googleProvider } from "./firebase-config.js";
+import {
+  auth,
+  db,
+  googleProvider,
+  githubProvider,
+  facebookProvider,
+  twitterProvider
+} from "./firebase-config.js";
 
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithCustomToken,
   signOut,
   onAuthStateChanged,
   sendEmailVerification,
@@ -50,6 +58,7 @@ function baseProfile(user) {
     email: user.email || "",
     emailLower: cleanEmail(user.email),
     username: user.displayName || defaultUsername(user),
+    avatarEmoji: "👤",
     verified: !!user.emailVerified,
     xp: 0,
     achievements: [],
@@ -122,6 +131,7 @@ async function ensureUserProfile(user) {
     email: user.email || data.email || "",
     emailLower: cleanEmail(user.email || data.email || ""),
     username: data.username || user.displayName || defaultUsername(user),
+    avatarEmoji: data.avatarEmoji || "👤",
     verified: !!user.emailVerified,
     xp: typeof data.xp === "number" ? data.xp : achievements.length,
     achievements,
@@ -135,12 +145,13 @@ async function ensureUserProfile(user) {
       planetsFound: data.stats?.planetsFound || 0,
       secretsFound: data.stats?.secretsFound || 0
     },
+    createdAt: data.createdAt || serverTimestamp(),
     updatedAt: serverTimestamp(),
-    createdAt: data.createdAt || serverTimestamp()
+    lastLoginAt: serverTimestamp()
   };
 
   await setDoc(ref, merged, { merge: true });
-  return { ...data, ...merged };
+  return merged;
 }
 
 async function touchLastLoginOnce(user) {
@@ -186,15 +197,49 @@ async function login(email, password) {
   return cred.user;
 }
 
+async function loginWithPopupProvider(provider) {
+  const cred = await signInWithPopup(auth, provider);
+  await ensureUserProfile(cred.user);
+  await touchLastLoginOnce(cred.user);
+  return cred.user;
+}
+
 async function loginWithGoogle() {
-  const cred = await signInWithPopup(auth, googleProvider);
+  return loginWithPopupProvider(googleProvider);
+}
+
+async function loginWithGitHub() {
+  return loginWithPopupProvider(githubProvider);
+}
+
+async function loginWithFacebook() {
+  return loginWithPopupProvider(facebookProvider);
+}
+
+async function loginWithTwitter() {
+  return loginWithPopupProvider(twitterProvider);
+}
+
+async function loginWithDiscord() {
+  const url = window.PANATEGWA_DISCORD_TOKEN_URL || "";
+  if (!url) {
+    throw new Error("Discord login needs a backend endpoint that returns a Firebase custom token.");
+  }
+
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) throw new Error("Discord login endpoint failed.");
+
+  const data = await response.json();
+  if (!data?.token) throw new Error("Discord login did not return a Firebase token.");
+
+  const cred = await signInWithCustomToken(auth, data.token);
   await ensureUserProfile(cred.user);
   await touchLastLoginOnce(cred.user);
   return cred.user;
 }
 
 async function logout() {
-  return await signOut(auth);
+  return signOut(auth);
 }
 
 async function saveUsername(username) {
@@ -211,6 +256,19 @@ async function saveUsername(username) {
   }, { merge: true });
 
   return cleanName;
+}
+
+async function saveProfileEmoji(emoji) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const value = String(emoji || "").trim().slice(0, 4) || "👤";
+  await setDoc(userRef(user.uid), {
+    avatarEmoji: value,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+
+  return value;
 }
 
 async function resendVerificationEmail() {
@@ -237,6 +295,12 @@ async function deleteAccount(password) {
 
   if (providerIds.has("google.com") && !providerIds.has("password")) {
     await reauthenticateWithPopup(user, googleProvider);
+  } else if (providerIds.has("github.com")) {
+    await reauthenticateWithPopup(user, githubProvider);
+  } else if (providerIds.has("facebook.com")) {
+    await reauthenticateWithPopup(user, facebookProvider);
+  } else if (providerIds.has("twitter.com")) {
+    await reauthenticateWithPopup(user, twitterProvider);
   } else {
     if (!cleanPass) throw new Error("Password is required to delete your account.");
     const credential = EmailAuthProvider.credential(user.email, cleanPass);
@@ -273,8 +337,13 @@ export {
   createAccount,
   login,
   loginWithGoogle,
+  loginWithGitHub,
+  loginWithFacebook,
+  loginWithTwitter,
+  loginWithDiscord,
   logout,
   saveUsername,
+  saveProfileEmoji,
   resendVerificationEmail,
   requestPasswordReset,
   deleteAccount,

@@ -3,7 +3,10 @@ import {
   getAuth,
   setPersistence,
   browserLocalPersistence,
-  GoogleAuthProvider
+  GoogleAuthProvider,
+  GithubAuthProvider,
+  FacebookAuthProvider,
+  TwitterAuthProvider
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
@@ -20,9 +23,21 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
 const googleProvider = new GoogleAuthProvider();
+const githubProvider = new GithubAuthProvider();
+const facebookProvider = new FacebookAuthProvider();
+const twitterProvider = new TwitterAuthProvider();
 
 auth.useDeviceLanguage();
 setPersistence(auth, browserLocalPersistence).catch(console.error);
 
-export { app, auth, db, googleProvider };
+export {
+  app,
+  auth,
+  db,
+  googleProvider,
+  githubProvider,
+  facebookProvider,
+  twitterProvider
+};

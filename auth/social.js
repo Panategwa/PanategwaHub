@@ -9,11 +9,10 @@ import {
   setDoc,
   updateDoc,
   addDoc,
+  deleteDoc,
   onSnapshot,
   query,
   where,
-  runTransaction,
-  writeBatch,
   serverTimestamp,
   arrayUnion,
   arrayRemove
@@ -29,7 +28,6 @@ const DEFAULT_SETTINGS = {
 };
 
 const listeners = new Set();
-
 const state = {
   user: null,
   profile: null,
@@ -47,9 +45,7 @@ const state = {
   selectedGroupChatId: null,
   groupChats: [],
   groupMessagesByChat: {},
-  groupInvites: [],
-  canUndo: false,
-  canRedo: false
+  groupInvites: []
 };
 
 let unsubProfile = null;
@@ -60,15 +56,12 @@ let unsubGroupChats = null;
 let unsubGroupInvites = null;
 const groupMessageUnsubs = new Map();
 
-let seenIncomingRequestIds = new Set();
-let seenMessageIds = new Set();
-let seenGroupInviteIds = new Set();
 let firstIncomingLoaded = false;
 let firstMessagesLoaded = false;
 let firstGroupInvitesLoaded = false;
-
-const history = [];
-const redoStack = [];
+let seenIncoming = new Set();
+let seenMessages = new Set();
+let seenInvites = new Set();
 
 function cloneState() {
   return {
@@ -88,8 +81,6 @@ function cloneState() {
 }
 
 function emit() {
-  state.canUndo = history.length > 0;
-  state.canRedo = redoStack.length > 0;
   listeners.forEach(fn => fn(cloneState()));
 }
 
@@ -101,6 +92,10 @@ function subscribeSocial(callback) {
 
 function cleanUid(value) {
   return String(value || "").trim();
+}
+
+function unique(list) {
+  return [...new Set((Array.isArray(list) ? list : []).map(cleanUid).filter(Boolean))];
 }
 
 function toMs(value) {
@@ -115,131 +110,85 @@ function sortNewestFirst(list) {
   return [...list].sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
 }
 
-function unique(list) {
-  return [...new Set((Array.isArray(list) ? list : []).map(cleanUid).filter(Boolean))];
-}
-
 function userRef(uid) {
   return doc(db, "users", uid);
 }
 
-function requestDocId(fromUid, toUid) {
-  return `request_${fromUid}_${toUid}`;
+function requestRef(fromUid, toUid) {
+  return doc(db, "friendRequests", `request_${fromUid}_${toUid}`);
 }
 
-function isFriend(uid) {
-  return state.friends.includes(uid);
+function usernameOf(profile) {
+  return profile?.username || profile?.displayName || profile?.email?.split("@")?.[0] || "Player";
 }
 
-function isBlocked(uid) {
-  return state.blocked.includes(uid);
-}
-
-function systemEnabled() {
-  return state.settings.systemEnabled !== false;
-}
-
-function requestsEnabled() {
-  return state.settings.requestsEnabled !== false;
-}
-
-function chatEnabled() {
-  return state.settings.chatEnabled !== false;
-}
-
-function groupChatsEnabled() {
-  return state.settings.groupChatsEnabled !== false;
-}
-
-function showNonFriendGroupMessages() {
-  return state.settings.showNonFriendGroupMessages !== false;
-}
-
-function getCurrentUsername(profile) {
-  return profile?.username || state.user?.displayName || state.user?.email?.split("@")?.[0] || "Player";
-}
-
-function publicProfileForViewer(profile, viewerUid) {
+function publicProfile(profile, viewerUid) {
   if (!profile) return null;
-
-  const isSelf = profile.uid === viewerUid;
   const hidden = !!profile.socialSettings?.profileHidden;
+  const self = profile.uid === viewerUid;
 
-  if (isSelf || !hidden) {
+  if (self || !hidden) {
     return {
       uid: profile.uid,
       username: profile.username || "Player",
+      avatarEmoji: profile.avatarEmoji || "👤",
       email: profile.email || "",
       xp: profile.xp || 0,
-      friends: unique(profile.friends),
-      blocked: unique(profile.blocked),
-      socialSettings: {
-        ...(profile.socialSettings || DEFAULT_SETTINGS)
-      },
-      stats: profile.stats || {},
+      verified: !!profile.verified,
       createdAt: profile.createdAt || null,
       lastLoginAt: profile.lastLoginAt || null,
-      verified: !!profile.verified
+      friends: unique(profile.friends),
+      blocked: unique(profile.blocked),
+      socialSettings: { ...(profile.socialSettings || DEFAULT_SETTINGS) },
+      stats: profile.stats || {}
     };
   }
 
   return {
     uid: profile.uid,
     username: profile.username || "Player",
+    avatarEmoji: profile.avatarEmoji || "👤",
     email: "",
     xp: 0,
+    verified: !!profile.verified,
+    createdAt: profile.createdAt || null,
+    lastLoginAt: profile.lastLoginAt || null,
     friends: [],
     blocked: [],
-    socialSettings: {
-      ...DEFAULT_SETTINGS,
-      profileHidden: true
-    },
+    socialSettings: { ...DEFAULT_SETTINGS, profileHidden: true },
     stats: {}
   };
 }
 
-async function loadUserProfileById(uid) {
+async function loadUser(uid) {
   const id = cleanUid(uid);
   if (!id) return null;
   const snap = await getDoc(userRef(id));
-  if (!snap.exists()) return null;
-  return snap.data();
+  return snap.exists() ? snap.data() : null;
 }
 
-async function hydrateFriendProfiles(ids) {
-  const friendIds = unique(ids);
-  const results = await Promise.all(friendIds.map(async (uid) => {
-    const snap = await getDoc(userRef(uid));
-    return [uid, snap.exists() ? snap.data() : null];
+async function loadFriendProfiles(ids) {
+  const idsUnique = unique(ids);
+  const pairs = await Promise.all(idsUnique.map(async (uid) => {
+    const data = await loadUser(uid);
+    return [uid, data];
   }));
 
   const map = {};
-  for (const [uid, data] of results) {
-    if (data) map[uid] = publicProfileForViewer(data, state.user?.uid);
+  for (const [uid, data] of pairs) {
+    if (data) map[uid] = publicProfile(data, state.user?.uid);
   }
-
   state.friendProfiles = map;
   emit();
 }
 
-function updateDerivedState(profile) {
-  state.profile = profile || null;
-  state.settings = {
-    ...DEFAULT_SETTINGS,
-    ...(profile?.socialSettings || {})
-  };
-  state.friends = unique(profile?.friends);
-  state.blocked = unique(profile?.blocked);
-  state.selectedProfile = state.selectedProfileId
-    ? (state.selectedProfileId === state.user?.uid
-        ? publicProfileForViewer(profile, state.user?.uid)
-        : state.friendProfiles[state.selectedProfileId] || state.selectedProfile || null)
-    : publicProfileForViewer(profile, state.user?.uid);
-
-  emit();
+async function updateMyProfile(partial) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+  await setDoc(userRef(user.uid), partial, { merge: true });
 }
 
-async function createSocialMessage({
+async function createMessage({
   fromUid,
   toUid,
   kind,
@@ -247,171 +196,41 @@ async function createSocialMessage({
   body,
   targetSection = "messages",
   targetSubSection = "direct",
+  targetId = null,
+  conversationUid = null,
   requestId = null,
-  conversationUid = null
+  groupChatId = null
 }) {
-  if (!fromUid || !toUid) return;
-
-  const fromProfile = await loadUserProfileById(fromUid);
-  const toProfile = await loadUserProfileById(toUid);
+  const from = await loadUser(fromUid);
+  const to = await loadUser(toUid);
 
   await addDoc(collection(db, "messages"), {
     fromUid,
     toUid,
-    participants: [fromUid, toUid],
-    fromName: getCurrentUsername(fromProfile),
-    toName: getCurrentUsername(toProfile),
+    fromName: usernameOf(from),
+    toName: usernameOf(to),
     kind,
     title,
     body,
     targetSection,
     targetSubSection,
-    requestId,
+    targetId,
     conversationUid,
+    requestId,
+    groupChatId,
     readBy: [fromUid],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
 }
 
-function pushHistory(entry) {
-  history.push(entry);
-  redoStack.length = 0;
-  state.canUndo = history.length > 0;
-  state.canRedo = false;
-  emit();
-}
-
-async function applyMessageReadState(id, read, silentHistory = false) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-
-  const ref = doc(db, "messages", id);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return;
-
-  const data = snap.data();
-  if (data.toUid !== user.uid) return;
-
-  const readBy = unique(data.readBy || []);
-
-  if (read) {
-    if (readBy.includes(user.uid)) return;
-    await updateDoc(ref, {
-      readBy: arrayUnion(user.uid),
-      readAt: serverTimestamp()
-    });
-  } else {
-    if (!readBy.includes(user.uid)) return;
-    await updateDoc(ref, {
-      readBy: arrayRemove(user.uid),
-      readAt: null
-    });
-  }
-
-  if (!silentHistory) {
-    pushHistory({
-      type: "message-read-state",
-      ids: [id],
-      next: read
-    });
-  }
-}
-
-async function applyBulkMessageReadState(read, silentHistory = false) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-
-  const qs = await getDocs(query(collection(db, "messages"), where("participants", "array-contains", user.uid)));
-  const targets = [];
-  const previous = [];
-
-  qs.forEach(docSnap => {
-    const data = docSnap.data();
-    const readBy = unique(data.readBy || []);
-    if (data.toUid !== user.uid) return;
-    if (read && readBy.includes(user.uid)) return;
-    if (!read && !readBy.includes(user.uid)) return;
-
-    targets.push(docSnap.ref);
-    previous.push({
-      id: docSnap.id,
-      readBy: [...readBy]
-    });
-  });
-
-  if (!targets.length) return;
-
-  const batch = writeBatch(db);
-
-  targets.forEach(ref => {
-    batch.update(ref, read
-      ? { readBy: arrayUnion(user.uid), readAt: serverTimestamp() }
-      : { readBy: arrayRemove(user.uid), readAt: null }
-    );
-  });
-
-  await batch.commit();
-
-  if (!silentHistory) {
-    pushHistory({
-      type: "bulk-message-read-state",
-      ids: previous.map(x => x.id),
-      next: read,
-      previous
-    });
-  }
-}
-
-async function undoLastAction() {
-  const action = history.pop();
-  if (!action) return;
-
-  redoStack.push(action);
-
-  if (action.type === "message-read-state") {
-    await applyMessageReadState(action.ids[0], !action.next, true);
-  }
-
-  if (action.type === "bulk-message-read-state") {
-    const batch = writeBatch(db);
-    for (const item of action.previous || []) {
-      const ref = doc(db, "messages", item.id);
-      batch.update(ref, {
-        readBy: item.readBy,
-        readAt: item.readBy.includes(auth.currentUser.uid) ? serverTimestamp() : null
-      });
-    }
-    await batch.commit();
-  }
-
-  emit();
-}
-
-async function redoLastAction() {
-  const action = redoStack.pop();
-  if (!action) return;
-
-  history.push(action);
-
-  if (action.type === "message-read-state") {
-    await applyMessageReadState(action.ids[0], action.next, true);
-  }
-
-  if (action.type === "bulk-message-read-state") {
-    await applyBulkMessageReadState(action.next, true);
-  }
-
-  emit();
-}
-
-function openAccountArea(section = "messages", sub = "direct", targetUid = null) {
+function openAccountArea(section = "messages", sub = "direct", targetId = null) {
   if (typeof window.openAccountArea === "function") {
-    window.openAccountArea(section, sub, targetUid);
+    window.openAccountArea(section, sub, targetId);
   }
 }
 
-function notifyCard({ title, body, buttons = [], onOpen = null }) {
+function toast(title, body, buttons = [], onOpen = null) {
   let stack = document.getElementById("social-toast-stack");
   if (!stack) {
     stack = document.createElement("div");
@@ -419,7 +238,7 @@ function notifyCard({ title, body, buttons = [], onOpen = null }) {
     stack.style.position = "fixed";
     stack.style.right = "16px";
     stack.style.bottom = "16px";
-    stack.style.zIndex = "99998";
+    stack.style.zIndex = "99999";
     stack.style.display = "grid";
     stack.style.gap = "10px";
     stack.style.width = "min(380px, calc(100vw - 32px))";
@@ -438,23 +257,22 @@ function notifyCard({ title, body, buttons = [], onOpen = null }) {
   card.style.backdropFilter = "blur(10px)";
   card.style.display = "grid";
   card.style.gap = "8px";
-  card.style.userSelect = "none";
 
-  const titleEl = document.createElement("div");
-  titleEl.style.fontWeight = "700";
-  titleEl.textContent = title || "Notification";
+  const t = document.createElement("div");
+  t.style.fontWeight = "700";
+  t.textContent = title;
 
-  const bodyEl = document.createElement("div");
-  bodyEl.style.opacity = "0.88";
-  bodyEl.style.lineHeight = "1.35";
-  bodyEl.textContent = body || "";
+  const b = document.createElement("div");
+  b.style.opacity = "0.88";
+  b.style.lineHeight = "1.35";
+  b.textContent = body;
 
-  const btnRow = document.createElement("div");
-  btnRow.style.display = "flex";
-  btnRow.style.flexWrap = "wrap";
-  btnRow.style.gap = "8px";
+  const row = document.createElement("div");
+  row.style.display = "flex";
+  row.style.flexWrap = "wrap";
+  row.style.gap = "8px";
 
-  for (const btn of buttons) {
+  buttons.forEach(btn => {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = btn.label;
@@ -466,19 +284,17 @@ function notifyCard({ title, body, buttons = [], onOpen = null }) {
     button.style.fontWeight = "700";
     button.style.background = btn.variant === "primary" ? "rgba(175, 200, 75, 0.32)" : "rgba(255,255,255,0.12)";
     button.style.color = "#fff";
-
     button.addEventListener("click", async (e) => {
       e.stopPropagation();
       await btn.onClick?.();
       card.remove();
     });
+    row.appendChild(button);
+  });
 
-    btnRow.appendChild(button);
-  }
-
-  card.appendChild(titleEl);
-  card.appendChild(bodyEl);
-  if (buttons.length) card.appendChild(btnRow);
+  card.appendChild(t);
+  card.appendChild(b);
+  if (buttons.length) card.appendChild(row);
 
   if (onOpen) {
     card.addEventListener("click", async () => {
@@ -488,116 +304,94 @@ function notifyCard({ title, body, buttons = [], onOpen = null }) {
   }
 
   stack.appendChild(card);
-  setTimeout(() => {
-    if (card.isConnected) card.remove();
-  }, 5000);
+  setTimeout(() => { if (card.isConnected) card.remove(); }, 5000);
 }
 
-function notifyRequest(request) {
-  notifyCard({
-    title: "Friend request",
-    body: `${request.fromName || request.fromUid} sent you a friend request.`,
-    onOpen: () => openAccountArea("friends", "requests", request.fromUid),
-    buttons: [
-      { label: "Accept", variant: "primary", onClick: async () => respondToFriendRequest(request.id, "accept") },
-      { label: "Ignore", onClick: async () => {} },
-      { label: "Decline", onClick: async () => respondToFriendRequest(request.id, "decline") },
-      { label: "Block", onClick: async () => respondToFriendRequest(request.id, "block") },
-      { label: "View in messages", onClick: async () => openAccountArea("messages", "direct", request.fromUid) }
-    ]
-  });
+function notifyMessage(msg) {
+  const targetSection = msg.targetSection || "messages";
+  const targetSub = msg.targetSubSection || "direct";
+  const targetId = msg.targetId || msg.conversationUid || msg.fromUid || null;
+
+  toast(
+    msg.title || "New message",
+    msg.body || "You have a new message.",
+    [
+      { label: "Open", variant: "primary", onClick: async () => openAccountArea(targetSection, targetSub, targetId) },
+      { label: "Show in Messages", onClick: async () => openAccountArea("messages", targetSection === "progress" ? "system" : "direct", targetId) }
+    ],
+    async () => openAccountArea(targetSection, targetSub, targetId)
+  );
 }
 
-function notifyMessage(message) {
-  notifyCard({
-    title: message.title || "New message",
-    body: message.body || "You have a new message.",
-    onOpen: () => openAccountArea(message.targetSection || "messages", message.targetSubSection || "direct", message.conversationUid || message.fromUid || null),
-    buttons: [
-      { label: "Open", variant: "primary", onClick: async () => openAccountArea(message.targetSection || "messages", message.targetSubSection || "direct", message.conversationUid || message.fromUid || null) },
-      { label: "View in messages", onClick: async () => openAccountArea("messages", "direct", message.conversationUid || message.fromUid || null) }
-    ]
-  });
-}
-
-function notifySummary(text, section = "messages", sub = "direct") {
-  notifyCard({
-    title: "New messages",
-    body: text,
-    onOpen: () => openAccountArea(section, sub),
-    buttons: [
-      { label: "Open", variant: "primary", onClick: async () => openAccountArea(section, sub) },
-      { label: "View in messages", onClick: async () => openAccountArea("messages", "direct") }
-    ]
-  });
+function notifyRequest(req) {
+  toast(
+    "Friend request",
+    `${req.fromName || req.fromUid} sent you a friend request.`,
+    [
+      { label: "Accept", variant: "primary", onClick: async () => respondToFriendRequest(req.id, "accept") },
+      { label: "Decline", onClick: async () => respondToFriendRequest(req.id, "decline") },
+      { label: "Block", onClick: async () => respondToFriendRequest(req.id, "block") },
+      { label: "Show in Messages", onClick: async () => openAccountArea("messages", "direct", req.fromUid) }
+    ],
+    async () => openAccountArea("friends", "requests", req.fromUid)
+  );
 }
 
 function notifyGroupInvite(invite) {
-  notifyCard({
-    title: "Group invite",
-    body: `${invite.fromName || invite.fromUid} invited you to a group chat.`,
-    onOpen: () => openAccountArea("messages", "invites"),
-    buttons: [
+  toast(
+    "Group invite",
+    `${invite.fromName || invite.fromUid} invited you to ${invite.chatName || "a group chat"}.`,
+    [
       { label: "Accept", variant: "primary", onClick: async () => respondToGroupInvite(invite.id, "accept") },
       { label: "Decline", onClick: async () => respondToGroupInvite(invite.id, "decline") },
-      { label: "View in messages", onClick: async () => openAccountArea("messages", "invites") }
-    ]
-  });
+      { label: "Show in Messages", onClick: async () => openAccountArea("messages", "groups", invite.chatId) }
+    ],
+    async () => openAccountArea("messages", "invites", invite.chatId)
+  );
 }
 
 async function sendFriendRequestById(targetUid, note = "") {
   const user = auth.currentUser;
   const id = cleanUid(targetUid);
-
   if (!user) throw new Error("Not logged in.");
   if (!id) throw new Error("Enter a valid user ID.");
   if (id === user.uid) throw new Error("You cannot send a request to yourself.");
-  if (!systemEnabled() || !requestsEnabled()) throw new Error("Friend requests are turned off.");
 
-  const target = await loadUserProfileById(id);
+  const me = await loadUser(user.uid);
+  const target = await loadUser(id);
   if (!target) throw new Error("That user was not found.");
 
-  const targetSettings = {
-    ...DEFAULT_SETTINGS,
-    ...(target.socialSettings || {})
-  };
-
-  if (!targetSettings.systemEnabled || !targetSettings.requestsEnabled) {
-    throw new Error("That user is not accepting friend requests.");
-  }
-
-  if (isBlocked(id) || unique(target.blocked).includes(user.uid)) {
+  if (unique(me?.blocked).includes(id) || unique(target?.blocked).includes(user.uid)) {
     throw new Error("You cannot send a request to this user.");
   }
 
-  if (isFriend(id)) {
-    throw new Error("You are already friends.");
-  }
+  const meSettings = { ...DEFAULT_SETTINGS, ...(me?.socialSettings || {}) };
+  const targetSettings = { ...DEFAULT_SETTINGS, ...(target?.socialSettings || {}) };
+  if (!meSettings.systemEnabled || !meSettings.requestsEnabled) throw new Error("Friend requests are turned off.");
+  if (!targetSettings.systemEnabled || !targetSettings.requestsEnabled) throw new Error("That user is not accepting friend requests.");
 
-  const requestId = requestDocId(user.uid, id);
-  const ref = doc(db, "friendRequests", requestId);
-
+  const ref = requestRef(user.uid, id);
   await setDoc(ref, {
-    id: requestId,
+    id: ref.id,
     fromUid: user.uid,
     toUid: id,
     status: "pending",
-    note: cleanUid(note) || "",
-    fromName: getCurrentUsername(state.profile),
-    toName: getCurrentUsername(target),
+    note: String(note || "").trim(),
+    fromName: usernameOf(me),
+    toName: usernameOf(target),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   }, { merge: true });
 
-  await createSocialMessage({
+  await createMessage({
     fromUid: user.uid,
     toUid: id,
     kind: "friend-request",
-    title: "Friend request received",
-    body: note ? `${getCurrentUsername(state.profile)}: ${note}` : `${getCurrentUsername(state.profile)} sent you a friend request.`,
+    title: "Friend request",
+    body: note ? `${usernameOf(me)}: ${note}` : `${usernameOf(me)} sent you a friend request.`,
     targetSection: "friends",
     targetSubSection: "requests",
-    requestId
+    requestId: ref.id
   });
 }
 
@@ -615,78 +409,52 @@ async function respondToFriendRequest(requestId, action) {
   const senderRef = userRef(req.fromUid);
   const receiverRef = userRef(req.toUid);
 
-  await runTransaction(db, async (tx) => {
-    const requestSnap = await tx.get(ref);
-    if (!requestSnap.exists()) throw new Error("Request not found.");
-
-    if (action === "accept") {
-      tx.update(ref, { status: "accepted", updatedAt: serverTimestamp() });
-      tx.set(senderRef, {
-        friends: arrayUnion(user.uid),
-        blocked: arrayRemove(user.uid),
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-      tx.set(receiverRef, {
-        friends: arrayUnion(req.fromUid),
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-      return;
-    }
-
-    if (action === "decline") {
-      tx.update(ref, { status: "declined", updatedAt: serverTimestamp() });
-      return;
-    }
-
-    if (action === "block") {
-      tx.update(ref, { status: "blocked", updatedAt: serverTimestamp() });
-      tx.set(receiverRef, {
-        blocked: arrayUnion(req.fromUid),
-        friends: arrayRemove(req.fromUid),
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-      tx.set(senderRef, {
-        friends: arrayRemove(user.uid),
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-    }
-  });
-
-  const myName = getCurrentUsername(state.profile);
-
   if (action === "accept") {
-    await createSocialMessage({
+    await setDoc(senderRef, { friends: arrayUnion(user.uid), blocked: arrayRemove(user.uid), updatedAt: serverTimestamp() }, { merge: true });
+    await setDoc(receiverRef, { friends: arrayUnion(req.fromUid), updatedAt: serverTimestamp() }, { merge: true });
+    await updateDoc(ref, { status: "accepted", updatedAt: serverTimestamp() });
+
+    await createMessage({
       fromUid: user.uid,
       toUid: req.fromUid,
       kind: "friend-accepted",
-      title: "Friend request accepted",
-      body: `${myName} accepted your friend request.`,
-      targetSection: "friends",
-      targetSubSection: "friends"
+      title: "Friend accepted",
+      body: `${usernameOf(await loadUser(user.uid))} accepted your friend request.`,
+      targetSection: "messages",
+      targetSubSection: "direct",
+      conversationUid: req.fromUid
     });
+    return;
   }
 
   if (action === "decline") {
-    await createSocialMessage({
+    await updateDoc(ref, { status: "declined", updatedAt: serverTimestamp() });
+    await createMessage({
       fromUid: user.uid,
       toUid: req.fromUid,
       kind: "friend-declined",
-      title: "Friend request declined",
-      body: `${myName} declined your friend request.`,
-      targetSection: "friends",
-      targetSubSection: "requests"
+      title: "Friend declined",
+      body: `${usernameOf(await loadUser(user.uid))} declined your friend request.`,
+      targetSection: "messages",
+      targetSubSection: "direct",
+      conversationUid: req.fromUid
     });
+    return;
   }
 
   if (action === "block") {
-    await createSocialMessage({
+    await setDoc(receiverRef, { blocked: arrayUnion(req.fromUid), friends: arrayRemove(req.fromUid), updatedAt: serverTimestamp() }, { merge: true });
+    await setDoc(senderRef, { friends: arrayRemove(user.uid), updatedAt: serverTimestamp() }, { merge: true });
+    await updateDoc(ref, { status: "blocked", updatedAt: serverTimestamp() });
+    await createMessage({
       fromUid: user.uid,
       toUid: req.fromUid,
       kind: "friend-blocked",
-      title: "You were blocked",
-      body: `${myName} blocked you.`,
-      targetSection: "friends",
-      targetSubSection: "direct"
+      title: "Blocked",
+      body: `${usernameOf(await loadUser(user.uid))} blocked you.`,
+      targetSection: "messages",
+      targetSubSection: "direct",
+      conversationUid: req.fromUid
     });
   }
 }
@@ -695,31 +463,25 @@ async function sendChatMessage(friendUid, text) {
   const user = auth.currentUser;
   const id = cleanUid(friendUid);
   const body = String(text || "").trim();
-
   if (!user) throw new Error("Not logged in.");
   if (!id) throw new Error("Pick a friend first.");
   if (!body) throw new Error("Type a message first.");
-  if (!systemEnabled() || !chatEnabled()) throw new Error("Chat is turned off.");
-  if (!isFriend(id)) throw new Error("That user is not in your friends list.");
-  if (isBlocked(id)) throw new Error("You blocked this user.");
 
-  const target = await loadUserProfileById(id);
+  const me = await loadUser(user.uid);
+  const target = await loadUser(id);
   if (!target) throw new Error("That user was not found.");
+  if (!unique(me?.friends).includes(id)) throw new Error("That user is not in your friends list.");
 
-  const targetSettings = {
-    ...DEFAULT_SETTINGS,
-    ...(target.socialSettings || {})
-  };
+  const meSettings = { ...DEFAULT_SETTINGS, ...(me?.socialSettings || {}) };
+  const targetSettings = { ...DEFAULT_SETTINGS, ...(target?.socialSettings || {}) };
+  if (!meSettings.systemEnabled || !meSettings.chatEnabled) throw new Error("Chat is turned off.");
+  if (!targetSettings.systemEnabled || !targetSettings.chatEnabled) throw new Error("That user is not accepting chats.");
 
-  if (!targetSettings.systemEnabled || !targetSettings.chatEnabled) {
-    throw new Error("That user is not accepting chats.");
-  }
-
-  await createSocialMessage({
+  await createMessage({
     fromUid: user.uid,
     toUid: id,
     kind: "chat",
-    title: `Message from ${getCurrentUsername(state.profile)}`,
+    title: `Message from ${usernameOf(me)}`,
     body,
     targetSection: "messages",
     targetSubSection: "direct",
@@ -733,34 +495,8 @@ async function removeFriend(friendUid) {
   if (!user) throw new Error("Not logged in.");
   if (!id) throw new Error("Enter a friend ID.");
 
-  const myRef = userRef(user.uid);
-  const otherRef = userRef(id);
-
-  await runTransaction(db, async (tx) => {
-    const mySnap = await tx.get(myRef);
-    const otherSnap = await tx.get(otherRef);
-    if (!mySnap.exists() || !otherSnap.exists()) throw new Error("User not found.");
-
-    tx.set(myRef, {
-      friends: arrayRemove(id),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-
-    tx.set(otherRef, {
-      friends: arrayRemove(user.uid),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-  });
-
-  await createSocialMessage({
-    fromUid: user.uid,
-    toUid: id,
-    kind: "system",
-    title: "Friend removed",
-    body: `${getCurrentUsername(state.profile)} removed you from friends.`,
-    targetSection: "friends",
-    targetSubSection: "friends"
-  });
+  await setDoc(userRef(user.uid), { friends: arrayRemove(id), updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(userRef(id), { friends: arrayRemove(user.uid), updatedAt: serverTimestamp() }, { merge: true });
 }
 
 async function blockUser(targetUid) {
@@ -768,88 +504,34 @@ async function blockUser(targetUid) {
   const id = cleanUid(targetUid);
   if (!user) throw new Error("Not logged in.");
   if (!id) throw new Error("Enter a user ID.");
-  if (id === user.uid) throw new Error("You cannot block yourself.");
 
-  const myRef = userRef(user.uid);
-  const otherRef = userRef(id);
-
-  await runTransaction(db, async (tx) => {
-    const mySnap = await tx.get(myRef);
-    const otherSnap = await tx.get(otherRef);
-    if (!mySnap.exists() || !otherSnap.exists()) throw new Error("User not found.");
-
-    tx.set(myRef, {
-      blocked: arrayUnion(id),
-      friends: arrayRemove(id),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-
-    tx.set(otherRef, {
-      friends: arrayRemove(user.uid),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-  });
-
-  await createSocialMessage({
-    fromUid: user.uid,
-    toUid: id,
-    kind: "friend-blocked",
-    title: "Blocked",
-    body: `${getCurrentUsername(state.profile)} blocked you.`,
-    targetSection: "friends",
-    targetSubSection: "direct"
-  });
+  await setDoc(userRef(user.uid), { blocked: arrayUnion(id), friends: arrayRemove(id), updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(userRef(id), { friends: arrayRemove(user.uid), updatedAt: serverTimestamp() }, { merge: true });
 }
 
 async function toggleRequestsEnabled(enabled) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  await updateDoc(userRef(user.uid), {
-    "socialSettings.requestsEnabled": !!enabled,
-    updatedAt: serverTimestamp()
-  });
+  await updateMyProfile({ socialSettings: { ...(state.profile?.socialSettings || DEFAULT_SETTINGS), requestsEnabled: !!enabled }, updatedAt: serverTimestamp() });
 }
 
 async function toggleChatEnabled(enabled) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  await updateDoc(userRef(user.uid), {
-    "socialSettings.chatEnabled": !!enabled,
-    updatedAt: serverTimestamp()
-  });
+  await updateMyProfile({ socialSettings: { ...(state.profile?.socialSettings || DEFAULT_SETTINGS), chatEnabled: !!enabled }, updatedAt: serverTimestamp() });
 }
 
 async function toggleGroupChatsEnabled(enabled) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  await updateDoc(userRef(user.uid), {
-    "socialSettings.groupChatsEnabled": !!enabled,
-    updatedAt: serverTimestamp()
-  });
+  await updateMyProfile({ socialSettings: { ...(state.profile?.socialSettings || DEFAULT_SETTINGS), groupChatsEnabled: !!enabled }, updatedAt: serverTimestamp() });
 }
 
 async function toggleShowNonFriendGroupMessages(enabled) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  await updateDoc(userRef(user.uid), {
-    "socialSettings.showNonFriendGroupMessages": !!enabled,
-    updatedAt: serverTimestamp()
-  });
+  await updateMyProfile({ socialSettings: { ...(state.profile?.socialSettings || DEFAULT_SETTINGS), showNonFriendGroupMessages: !!enabled }, updatedAt: serverTimestamp() });
 }
 
 async function toggleProfileHidden(hidden) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  await updateDoc(userRef(user.uid), {
-    "socialSettings.profileHidden": !!hidden,
-    updatedAt: serverTimestamp()
-  });
+  await updateMyProfile({ socialSettings: { ...(state.profile?.socialSettings || DEFAULT_SETTINGS), profileHidden: !!hidden }, updatedAt: serverTimestamp() });
 }
 
 async function disableSocialSystem(mode = "keep") {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-
   const snap = await getDoc(userRef(user.uid));
   const data = snap.data() || {};
 
@@ -859,7 +541,7 @@ async function disableSocialSystem(mode = "keep") {
     timestamp: Date.now()
   };
 
-  const updates = {
+  const payload = {
     socialBackup: backup,
     socialSettings: {
       ...(data.socialSettings || DEFAULT_SETTINGS),
@@ -872,17 +554,16 @@ async function disableSocialSystem(mode = "keep") {
   };
 
   if (mode === "clear") {
-    updates.friends = [];
-    updates.blocked = [];
+    payload.friends = [];
+    payload.blocked = [];
   }
 
-  await setDoc(userRef(user.uid), updates, { merge: true });
+  await setDoc(userRef(user.uid), payload, { merge: true });
 }
 
 async function enableSocialSystem(mode = "restore") {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-
   const snap = await getDoc(userRef(user.uid));
   const data = snap.data() || {};
   const backup = data.socialBackup || { friends: [], blocked: [] };
@@ -914,21 +595,22 @@ async function enableSocialSystem(mode = "restore") {
   }, { merge: true });
 }
 
-async function createGroupChat(name, memberIds = []) {
+async function createGroupChat(name, emoji = "👥", memberIds = []) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-  if (!groupChatsEnabled()) throw new Error("Group chats are turned off.");
 
   const cleanName = String(name || "").trim();
-  const members = unique([user.uid, ...memberIds.map(cleanUid)]);
-
   if (!cleanName) throw new Error("Group chat name is required.");
+
+  const members = unique([user.uid, ...memberIds.map(cleanUid)]);
   if (members.length < 2) throw new Error("Add at least one other person.");
 
   const ref = await addDoc(collection(db, "groupChats"), {
     name: cleanName,
+    emoji: String(emoji || "👥").trim().slice(0, 4) || "👥",
     ownerUid: user.uid,
     members,
+    deleted: false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     lastMessage: ""
@@ -939,6 +621,7 @@ async function createGroupChat(name, memberIds = []) {
     await addDoc(collection(db, "groupChatInvites"), {
       chatId: ref.id,
       chatName: cleanName,
+      chatEmoji: String(emoji || "👥").trim().slice(0, 4) || "👥",
       fromUid: user.uid,
       toUid: uid,
       status: "pending",
@@ -950,24 +633,82 @@ async function createGroupChat(name, memberIds = []) {
   return ref.id;
 }
 
+async function updateGroupChatInfo(chatId, updates = {}) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+  const ref = doc(db, "groupChats", chatId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error("Group chat not found.");
+
+  const chat = snap.data();
+  if (!unique(chat.members).includes(user.uid)) throw new Error("You are not in that group.");
+
+  const payload = { updatedAt: serverTimestamp() };
+
+  if (typeof updates.name === "string") payload.name = updates.name.trim() || chat.name || "Group chat";
+  if (typeof updates.emoji === "string") payload.emoji = updates.emoji.trim().slice(0, 4) || chat.emoji || "👥";
+
+  await updateDoc(ref, payload);
+}
+
+async function addMembersToGroupChat(chatId, memberIds = []) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const ref = doc(db, "groupChats", chatId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error("Group chat not found.");
+
+  const chat = snap.data();
+  if (!unique(chat.members).includes(user.uid)) throw new Error("You are not in that group.");
+
+  const members = unique(memberIds.map(cleanUid)).filter(uid => uid && uid !== user.uid && !unique(chat.members).includes(uid));
+  for (const uid of members) {
+    await addDoc(collection(db, "groupChatInvites"), {
+      chatId,
+      chatName: chat.name || "Group chat",
+      chatEmoji: chat.emoji || "👥",
+      fromUid: user.uid,
+      toUid: uid,
+      status: "pending",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  }
+}
+
+async function deleteGroupChat(chatId) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const ref = doc(db, "groupChats", chatId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error("Group chat not found.");
+
+  const chat = snap.data();
+  if (chat.ownerUid !== user.uid) throw new Error("Only the owner can delete the group chat.");
+
+  await deleteDoc(ref);
+}
+
 async function inviteToGroupChat(chatId, targetUid) {
   const user = auth.currentUser;
   const id = cleanUid(targetUid);
   if (!user) throw new Error("Not logged in.");
-  if (!groupChatsEnabled()) throw new Error("Group chats are turned off.");
-  if (!chatId) throw new Error("Pick a group chat first.");
   if (!id) throw new Error("Enter a user ID.");
 
-  const chatSnap = await getDoc(doc(db, "groupChats", chatId));
-  if (!chatSnap.exists()) throw new Error("Group chat not found.");
+  const ref = doc(db, "groupChats", chatId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error("Group chat not found.");
 
-  const chat = chatSnap.data();
+  const chat = snap.data();
   if (!unique(chat.members).includes(user.uid)) throw new Error("You are not in that group.");
   if (unique(chat.members).includes(id)) throw new Error("That user is already in the group.");
 
   await addDoc(collection(db, "groupChatInvites"), {
     chatId,
     chatName: chat.name || "Group chat",
+    chatEmoji: chat.emoji || "👥",
     fromUid: user.uid,
     toUid: id,
     status: "pending",
@@ -975,14 +716,16 @@ async function inviteToGroupChat(chatId, targetUid) {
     updatedAt: serverTimestamp()
   });
 
-  await createSocialMessage({
+  await createMessage({
     fromUid: user.uid,
     toUid: id,
-    kind: "system",
+    kind: "group-invite",
     title: "Group invite",
-    body: `${getCurrentUsername(state.profile)} invited you to "${chat.name || "Group chat"}".`,
+    body: `${usernameOf(await loadUser(user.uid))} invited you to "${chat.name || "Group chat"}".`,
     targetSection: "messages",
-    targetSubSection: "invites"
+    targetSubSection: "invites",
+    targetId: chatId,
+    groupChatId: chatId
   });
 }
 
@@ -1001,11 +744,7 @@ async function respondToGroupInvite(inviteId, action) {
 
   if (action === "accept") {
     await updateDoc(ref, { status: "accepted", updatedAt: serverTimestamp() });
-    await updateDoc(chatRef, {
-      members: arrayUnion(user.uid),
-      updatedAt: serverTimestamp()
-    });
-    return;
+    await updateDoc(chatRef, { members: arrayUnion(user.uid), updatedAt: serverTimestamp() });
   }
 
   if (action === "decline") {
@@ -1018,27 +757,25 @@ async function sendGroupMessage(chatId, text) {
   const body = String(text || "").trim();
 
   if (!user) throw new Error("Not logged in.");
-  if (!groupChatsEnabled()) throw new Error("Group chats are turned off.");
-  if (!chatId) throw new Error("Pick a group chat first.");
   if (!body) throw new Error("Type a message first.");
 
-  const chatRef = doc(db, "groupChats", chatId);
-  const chatSnap = await getDoc(chatRef);
-  if (!chatSnap.exists()) throw new Error("Group chat not found.");
+  const ref = doc(db, "groupChats", chatId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error("Group chat not found.");
 
-  const chat = chatSnap.data();
+  const chat = snap.data();
   if (!unique(chat.members).includes(user.uid)) throw new Error("You are not in that group.");
 
   await addDoc(collection(db, "groupChats", chatId, "messages"), {
     chatId,
     fromUid: user.uid,
-    fromName: getCurrentUsername(state.profile),
+    fromName: usernameOf(await loadUser(user.uid)),
     body,
     createdAt: serverTimestamp(),
     readBy: [user.uid]
   });
 
-  await updateDoc(chatRef, {
+  await updateDoc(ref, {
     lastMessage: body,
     updatedAt: serverTimestamp()
   });
@@ -1047,8 +784,6 @@ async function sendGroupMessage(chatId, text) {
 async function leaveGroupChat(chatId) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-  if (!chatId) throw new Error("Pick a group chat first.");
-
   await updateDoc(doc(db, "groupChats", chatId), {
     members: arrayRemove(user.uid),
     updatedAt: serverTimestamp()
@@ -1056,72 +791,55 @@ async function leaveGroupChat(chatId) {
 }
 
 async function markMessageRead(messageId, read = true) {
-  await applyMessageReadState(messageId, read);
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+  const ref = doc(db, "messages", messageId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  if (data.toUid !== user.uid) return;
+
+  if (read) {
+    await updateDoc(ref, { readBy: arrayUnion(user.uid), readAt: serverTimestamp() });
+  } else {
+    await updateDoc(ref, { readBy: arrayRemove(user.uid), readAt: null });
+  }
 }
 
 async function markAllMessagesRead() {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-
   const qs = await getDocs(query(collection(db, "messages"), where("toUid", "==", user.uid)));
-  const batch = writeBatch(db);
-
-  qs.forEach(d => {
-    const data = d.data();
-    const readBy = unique(data.readBy || []);
-    if (!readBy.includes(user.uid)) {
-      batch.update(d.ref, {
-        readBy: arrayUnion(user.uid),
-        readAt: serverTimestamp()
-      });
+  for (const snap of qs.docs) {
+    const data = snap.data();
+    if (!unique(data.readBy).includes(user.uid)) {
+      await updateDoc(snap.ref, { readBy: arrayUnion(user.uid), readAt: serverTimestamp() });
     }
-  });
-
-  await batch.commit();
+  }
 }
 
 async function markAllMessagesUnread() {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-
   const qs = await getDocs(query(collection(db, "messages"), where("toUid", "==", user.uid)));
-  const batch = writeBatch(db);
-
-  qs.forEach(d => {
-    const data = d.data();
-    const readBy = unique(data.readBy || []);
-    if (readBy.includes(user.uid)) {
-      batch.update(d.ref, {
-        readBy: arrayRemove(user.uid),
-        readAt: null
-      });
+  for (const snap of qs.docs) {
+    const data = snap.data();
+    if (unique(data.readBy).includes(user.uid)) {
+      await updateDoc(snap.ref, { readBy: arrayRemove(user.uid), readAt: null });
     }
-  });
-
-  await batch.commit();
+  }
 }
 
 async function viewProfileById(uid) {
-  const id = cleanUid(uid);
-  if (!id) return null;
-
-  const profile = await loadUserProfileById(id);
-  const viewerUid = auth.currentUser?.uid || null;
-  const visible = publicProfileForViewer(profile, viewerUid);
-
-  state.selectedProfileId = id;
-  state.selectedProfile = visible;
+  const data = await loadUser(uid);
+  state.selectedProfileId = cleanUid(uid) || null;
+  state.selectedProfile = publicProfile(data, state.user?.uid);
   emit();
-  return visible;
+  return state.selectedProfile;
 }
 
 function setSelectedConversation(uid) {
   state.selectedConversationId = cleanUid(uid) || null;
-  emit();
-}
-
-function setSelectedProfile(uid) {
-  state.selectedProfileId = cleanUid(uid) || null;
   emit();
 }
 
@@ -1132,15 +850,11 @@ function setSelectedGroupChatId(chatId) {
 
 function getConversationMessages(uid) {
   const id = cleanUid(uid);
-  if (!id) return state.messages;
-
-  return state.messages.filter(m => (
+  if (!id) return [];
+  return (state.messages || []).filter(m =>
     m.kind === "chat" &&
-    (
-      (m.fromUid === state.user?.uid && m.toUid === id) ||
-      (m.fromUid === id && m.toUid === state.user?.uid)
-    )
-  ));
+    ((m.fromUid === state.user?.uid && m.toUid === id) || (m.fromUid === id && m.toUid === state.user?.uid))
+  );
 }
 
 function getGroupChatMessages(chatId) {
@@ -1150,15 +864,7 @@ function getGroupChatMessages(chatId) {
 function getUnreadIncomingCount() {
   const uid = state.user?.uid;
   if (!uid) return 0;
-  return state.messages.filter(m => m.toUid === uid && !unique(m.readBy).includes(uid)).length;
-}
-
-function resetHistoryStacks() {
-  history.length = 0;
-  redoStack.length = 0;
-  state.canUndo = false;
-  state.canRedo = false;
-  emit();
+  return (state.messages || []).filter(m => m.toUid === uid && !unique(m.readBy).includes(uid)).length;
 }
 
 function teardownGroupListeners() {
@@ -1178,7 +884,7 @@ function teardownGroupListeners() {
   }
 }
 
-function startSnapshots() {
+function startRealtime() {
   watchAuth(async (user) => {
     if (unsubProfile) { try { unsubProfile(); } catch {} unsubProfile = null; }
     if (unsubIncoming) { try { unsubIncoming(); } catch {} unsubIncoming = null; }
@@ -1189,10 +895,9 @@ function startSnapshots() {
     firstIncomingLoaded = false;
     firstMessagesLoaded = false;
     firstGroupInvitesLoaded = false;
-    seenIncomingRequestIds = new Set();
-    seenMessageIds = new Set();
-    seenGroupInviteIds = new Set();
-    resetHistoryStacks();
+    seenIncoming = new Set();
+    seenMessages = new Set();
+    seenInvites = new Set();
 
     if (!user) {
       state.user = null;
@@ -1217,179 +922,143 @@ function startSnapshots() {
     }
 
     state.user = user;
-    await ensureUserProfile(user);
+    state.profile = await ensureUserProfile(user);
+    state.settings = { ...DEFAULT_SETTINGS, ...(state.profile?.socialSettings || {}) };
+    state.friends = unique(state.profile?.friends);
+    state.blocked = unique(state.profile?.blocked);
+    state.selectedProfile = publicProfile(state.profile, user.uid);
+    state.selectedProfileId = user.uid;
+    await loadFriendProfiles(state.friends);
+    emit();
 
     unsubProfile = onSnapshot(userRef(user.uid), async (snap) => {
       const fresh = snap.exists() ? snap.data() : null;
-      updateDerivedState(fresh);
-      await hydrateFriendProfiles(fresh?.friends || []);
+      state.profile = fresh;
+      state.settings = { ...DEFAULT_SETTINGS, ...(fresh?.socialSettings || {}) };
+      state.friends = unique(fresh?.friends);
+      state.blocked = unique(fresh?.blocked);
+      state.selectedProfile = state.selectedProfileId
+        ? (state.selectedProfileId === user.uid ? publicProfile(fresh, user.uid) : state.friendProfiles[state.selectedProfileId] || state.selectedProfile)
+        : publicProfile(fresh, user.uid);
+      await loadFriendProfiles(state.friends);
+      emit();
     });
 
-    unsubIncoming = onSnapshot(
-      query(collection(db, "friendRequests"), where("toUid", "==", user.uid)),
-      (snap) => {
-        const all = [];
-        snap.forEach(d => all.push({ id: d.id, ...d.data() }));
-
-        const incoming = all.filter(r => r.status === "pending");
-        const currentIds = new Set(incoming.map(r => r.id));
-
-        if (firstIncomingLoaded) {
-          const newOnes = incoming.filter(r => !seenIncomingRequestIds.has(r.id));
-          if (newOnes.length > 1) notifySummary(`You have ${newOnes.length} new friend requests.`, "friends", "requests");
-          else if (newOnes.length === 1) notifyRequest(newOnes[0]);
-        } else {
-          firstIncomingLoaded = true;
+    unsubIncoming = onSnapshot(query(collection(db, "friendRequests"), where("toUid", "==", user.uid)), (snap) => {
+      const all = [];
+      snap.forEach(d => all.push({ id: d.id, ...d.data() }));
+      const incoming = all.filter(r => r.status === "pending");
+      if (firstIncomingLoaded) {
+        const fresh = incoming.filter(r => !seenIncoming.has(r.id));
+        if (fresh.length === 1) notifyRequest(fresh[0]);
+        if (fresh.length > 1) {
+          toast("New friend requests", `You have ${fresh.length} new friend requests.`, [
+            { label: "Open", variant: "primary", onClick: async () => openAccountArea("friends", "requests") },
+            { label: "Show in Messages", onClick: async () => openAccountArea("messages", "direct") }
+          ], async () => openAccountArea("friends", "requests"));
         }
-
-        seenIncomingRequestIds = currentIds;
-        state.incomingRequests = sortNewestFirst(incoming);
-        emit();
+      } else {
+        firstIncomingLoaded = true;
       }
-    );
+      seenIncoming = new Set(incoming.map(r => r.id));
+      state.incomingRequests = sortNewestFirst(incoming);
+      emit();
+    });
 
-    unsubOutgoing = onSnapshot(
-      query(collection(db, "friendRequests"), where("fromUid", "==", user.uid)),
-      (snap) => {
-        const all = [];
-        snap.forEach(d => all.push({ id: d.id, ...d.data() }));
-        state.outgoingRequests = sortNewestFirst(all.filter(r => r.status === "pending"));
-        emit();
+    unsubOutgoing = onSnapshot(query(collection(db, "friendRequests"), where("fromUid", "==", user.uid)), (snap) => {
+      const all = [];
+      snap.forEach(d => all.push({ id: d.id, ...d.data() }));
+      state.outgoingRequests = sortNewestFirst(all.filter(r => r.status === "pending"));
+      emit();
+    });
+
+    unsubMessages = onSnapshot(query(collection(db, "messages"), where("participants", "array-contains", user.uid)), (snap) => {
+      const all = [];
+      snap.forEach(d => all.push({ id: d.id, ...d.data() }));
+      const sorted = sortNewestFirst(all);
+
+      state.messages = sorted;
+      state.unreadCount = sorted.filter(m => m.toUid === user.uid && !unique(m.readBy).includes(user.uid)).length;
+
+      if (firstMessagesLoaded) {
+        const fresh = sorted.filter(m => !seenMessages.has(m.id) && m.toUid === user.uid);
+        if (fresh.length === 1) notifyMessage(fresh[0]);
+        if (fresh.length > 1) {
+          toast("New messages", `You have ${fresh.length} new messages.`, [
+            { label: "Open", variant: "primary", onClick: async () => openAccountArea("messages", "direct") },
+            { label: "Show in Messages", onClick: async () => openAccountArea("messages", "direct") }
+          ], async () => openAccountArea("messages", "direct"));
+        }
+      } else {
+        firstMessagesLoaded = true;
       }
-    );
 
-    unsubMessages = onSnapshot(
-      query(collection(db, "messages"), where("participants", "array-contains", user.uid)),
-      (snap) => {
-        const all = [];
-        snap.forEach(d => all.push({ id: d.id, ...d.data() }));
-        const sorted = sortNewestFirst(all);
+      seenMessages = new Set(sorted.map(m => m.id));
+      emit();
+    });
 
-        state.unreadCount = sorted.filter(m => m.toUid === user.uid && !unique(m.readBy).includes(user.uid)).length;
-        state.messages = sorted;
+    unsubGroupChats = onSnapshot(query(collection(db, "groupChats"), where("members", "array-contains", user.uid)), (snap) => {
+      const chats = [];
+      snap.forEach(d => chats.push({ id: d.id, ...d.data() }));
+      state.groupChats = sortNewestFirst(chats.filter(c => !c.deleted));
 
-        if (firstMessagesLoaded) {
-          const newOnes = sorted.filter(m => !seenMessageIds.has(m.id) && m.toUid === user.uid);
-          if (newOnes.length > 1) notifySummary(`You have ${newOnes.length} new messages.`, "messages", "direct");
-          else if (newOnes.length === 1) notifyMessage(newOnes[0]);
-        } else {
-          firstMessagesLoaded = true;
-        }
-
-        seenMessageIds = new Set(sorted.map(m => m.id));
-        emit();
+      if (!state.selectedGroupChatId && state.groupChats[0]) state.selectedGroupChatId = state.groupChats[0].id;
+      if (state.selectedGroupChatId && !state.groupChats.some(c => c.id === state.selectedGroupChatId)) {
+        state.selectedGroupChatId = state.groupChats[0]?.id || null;
       }
-    );
 
-    unsubGroupChats = onSnapshot(
-      query(collection(db, "groupChats"), where("members", "array-contains", user.uid)),
-      (snap) => {
-        const chats = [];
-        snap.forEach(d => chats.push({ id: d.id, ...d.data() }));
-        state.groupChats = sortNewestFirst(chats);
+      const activeIds = new Set(state.groupChats.map(c => c.id));
 
-        if (!state.selectedGroupChatId && state.groupChats[0]) {
-          state.selectedGroupChatId = state.groupChats[0].id;
-        } else if (state.selectedGroupChatId && !state.groupChats.some(c => c.id === state.selectedGroupChatId)) {
-          state.selectedGroupChatId = state.groupChats[0]?.id || null;
+      for (const [chatId, unsub] of groupMessageUnsubs.entries()) {
+        if (!activeIds.has(chatId)) {
+          try { unsub(); } catch {}
+          groupMessageUnsubs.delete(chatId);
+          delete state.groupMessagesByChat[chatId];
         }
-
-        const existingIds = new Set(state.groupChats.map(c => c.id));
-        for (const [chatId, unsub] of groupMessageUnsubs.entries()) {
-          if (!existingIds.has(chatId)) {
-            try { unsub(); } catch {}
-            groupMessageUnsubs.delete(chatId);
-            delete state.groupMessagesByChat[chatId];
-          }
-        }
-
-        for (const chat of state.groupChats) {
-          if (groupMessageUnsubs.has(chat.id)) continue;
-
-          const unsub = onSnapshot(
-            collection(db, "groupChats", chat.id, "messages"),
-            (msgSnap) => {
-              const messages = [];
-              msgSnap.forEach(m => messages.push({ id: m.id, ...m.data() }));
-              state.groupMessagesByChat[chat.id] = sortNewestFirst(messages);
-              emit();
-            }
-          );
-
-          groupMessageUnsubs.set(chat.id, unsub);
-        }
-
-        emit();
       }
-    );
 
-    unsubGroupInvites = onSnapshot(
-      query(collection(db, "groupChatInvites"), where("toUid", "==", user.uid)),
-      (snap) => {
-        const invites = [];
-        snap.forEach(d => invites.push({ id: d.id, ...d.data() }));
-
-        const pending = invites.filter(i => i.status === "pending");
-        const currentIds = new Set(pending.map(i => i.id));
-
-        if (firstGroupInvitesLoaded) {
-          const newOnes = pending.filter(i => !seenGroupInviteIds.has(i.id));
-          if (newOnes.length > 1) notifySummary(`You have ${newOnes.length} new group invites.`, "messages", "invites");
-          else if (newOnes.length === 1) notifyGroupInvite(newOnes[0]);
-        } else {
-          firstGroupInvitesLoaded = true;
-        }
-
-        seenGroupInviteIds = currentIds;
-        state.groupInvites = sortNewestFirst(pending);
-        emit();
+      for (const chat of state.groupChats) {
+        if (groupMessageUnsubs.has(chat.id)) continue;
+        const unsub = onSnapshot(collection(db, "groupChats", chat.id, "messages"), (msgSnap) => {
+          const arr = [];
+          msgSnap.forEach(m => arr.push({ id: m.id, ...m.data() }));
+          state.groupMessagesByChat[chat.id] = sortNewestFirst(arr);
+          emit();
+        });
+        groupMessageUnsubs.set(chat.id, unsub);
       }
-    );
+
+      emit();
+    });
+
+    unsubGroupInvites = onSnapshot(query(collection(db, "groupChatInvites"), where("toUid", "==", user.uid)), (snap) => {
+      const invites = [];
+      snap.forEach(d => invites.push({ id: d.id, ...d.data() }));
+      const pending = invites.filter(i => i.status === "pending");
+
+      if (firstGroupInvitesLoaded) {
+        const fresh = pending.filter(i => !seenInvites.has(i.id));
+        if (fresh.length === 1) notifyGroupInvite(fresh[0]);
+        if (fresh.length > 1) {
+          toast("New group invites", `You have ${fresh.length} new group invites.`, [
+            { label: "Open", variant: "primary", onClick: async () => openAccountArea("messages", "invites") },
+            { label: "Show in Messages", onClick: async () => openAccountArea("messages", "invites") }
+          ], async () => openAccountArea("messages", "invites"));
+        }
+      } else {
+        firstGroupInvitesLoaded = true;
+      }
+
+      seenInvites = new Set(pending.map(i => i.id));
+      state.groupInvites = sortNewestFirst(pending);
+      emit();
+    });
   });
 }
 
-async function loadAllData() {
-  startSnapshots();
-}
+watchAuth(async () => {});
 
-watchAuth(async (user, profile) => {
-  if (!user) {
-    state.user = null;
-    state.profile = null;
-    state.settings = { ...DEFAULT_SETTINGS };
-    state.friends = [];
-    state.blocked = [];
-    state.incomingRequests = [];
-    state.outgoingRequests = [];
-    state.messages = [];
-    state.unreadCount = 0;
-    state.friendProfiles = {};
-    state.selectedProfile = null;
-    state.selectedProfileId = null;
-    state.selectedConversationId = null;
-    state.selectedGroupChatId = null;
-    state.groupChats = [];
-    state.groupMessagesByChat = {};
-    state.groupInvites = [];
-    resetHistoryStacks();
-    emit();
-    return;
-  }
-
-  state.user = user;
-  state.profile = profile || await getProfile(user.uid);
-  state.settings = {
-    ...DEFAULT_SETTINGS,
-    ...(state.profile?.socialSettings || {})
-  };
-  state.friends = unique(state.profile?.friends);
-  state.blocked = unique(state.profile?.blocked);
-  state.selectedProfile = publicProfileForViewer(state.profile, user.uid);
-  state.selectedProfileId = user.uid;
-  await hydrateFriendProfiles(state.friends);
-  emit();
-  loadAllData();
-});
+startRealtime();
 
 export {
   subscribeSocial,
@@ -1405,23 +1074,22 @@ export {
   toggleProfileHidden,
   disableSocialSystem,
   enableSocialSystem,
-  markMessageRead,
-  markAllMessagesRead,
-  markAllMessagesUnread,
-  undoLastAction,
-  redoLastAction,
-  viewProfileById,
-  setSelectedConversation,
-  setSelectedProfile,
-  setSelectedGroupChatId,
-  getConversationMessages,
-  getGroupChatMessages,
-  getUnreadIncomingCount,
-  openAccountArea,
   createGroupChat,
+  updateGroupChatInfo,
+  addMembersToGroupChat,
+  deleteGroupChat,
   inviteToGroupChat,
   respondToGroupInvite,
   sendGroupMessage,
   leaveGroupChat,
+  markMessageRead,
+  markAllMessagesRead,
+  markAllMessagesUnread,
+  viewProfileById,
+  setSelectedConversation,
+  setSelectedGroupChatId,
+  getConversationMessages,
+  getGroupChatMessages,
+  getUnreadIncomingCount,
   state as socialState
 };

@@ -40,16 +40,32 @@ function uniqueStrings(value) {
   return [...new Set(arr.map(v => String(v || "").trim()).filter(Boolean))];
 }
 
+function defaultUsername(user) {
+  return user?.displayName || user?.email?.split("@")?.[0] || "Player";
+}
+
 function baseProfile(user) {
   return {
     uid: user.uid,
     email: user.email || "",
     emailLower: cleanEmail(user.email),
-    username: user.displayName || "",
+    username: user.displayName || defaultUsername(user),
     verified: !!user.emailVerified,
     xp: 0,
     achievements: [],
     visitedPages: [],
+    friends: [],
+    blocked: [],
+    socialSettings: {
+      systemEnabled: true,
+      requestsEnabled: true,
+      chatEnabled: true,
+      profileHidden: false
+    },
+    socialBackup: {
+      friends: [],
+      blocked: []
+    },
     stats: {
       pagesVisited: 0,
       planetsFound: 0,
@@ -61,12 +77,19 @@ function baseProfile(user) {
   };
 }
 
+function normalizeSocialSettings(settings = {}) {
+  return {
+    systemEnabled: settings.systemEnabled !== false,
+    requestsEnabled: settings.requestsEnabled !== false,
+    chatEnabled: settings.chatEnabled !== false,
+    profileHidden: !!settings.profileHidden
+  };
+}
+
 async function getProfile(uid = auth.currentUser?.uid) {
   if (!uid) return null;
-
   const snap = await getDoc(userRef(uid));
   if (!snap.exists()) return null;
-
   return snap.data();
 }
 
@@ -83,24 +106,34 @@ async function ensureUserProfile(user) {
   const data = snap.data() || {};
   const achievements = uniqueStrings(data.achievements);
   const visitedPages = uniqueStrings(data.visitedPages);
-  const xp = typeof data.xp === "number" ? data.xp : achievements.length;
+  const friends = uniqueStrings(data.friends);
+  const blocked = uniqueStrings(data.blocked);
+  const socialBackup = {
+    friends: uniqueStrings(data.socialBackup?.friends),
+    blocked: uniqueStrings(data.socialBackup?.blocked)
+  };
 
   const merged = {
     uid: user.uid,
     email: user.email || data.email || "",
     emailLower: cleanEmail(user.email || data.email || ""),
-    username: data.username || user.displayName || "",
+    username: data.username || user.displayName || defaultUsername(user),
     verified: !!user.emailVerified,
-    xp,
+    xp: typeof data.xp === "number" ? data.xp : achievements.length,
     achievements,
     visitedPages,
+    friends,
+    blocked,
+    socialSettings: normalizeSocialSettings(data.socialSettings),
+    socialBackup,
     stats: {
       pagesVisited: visitedPages.length,
       planetsFound: data.stats?.planetsFound || 0,
       secretsFound: data.stats?.secretsFound || 0
     },
     updatedAt: serverTimestamp(),
-    lastLoginAt: serverTimestamp()
+    lastLoginAt: serverTimestamp(),
+    createdAt: data.createdAt || serverTimestamp()
   };
 
   await setDoc(ref, merged, { merge: true });
@@ -170,7 +203,6 @@ async function saveUsername(username) {
 async function resendVerificationEmail() {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-
   if (user.emailVerified) return false;
 
   await sendEmailVerification(user);
@@ -194,10 +226,7 @@ async function deleteAccount(password) {
   if (providerIds.has("google.com") && !providerIds.has("password")) {
     await reauthenticateWithPopup(user, googleProvider);
   } else {
-    if (!cleanPass) {
-      throw new Error("Password is required to delete your account.");
-    }
-
+    if (!cleanPass) throw new Error("Password is required to delete your account.");
     const credential = EmailAuthProvider.credential(user.email, cleanPass);
     await reauthenticateWithCredential(user, credential);
   }

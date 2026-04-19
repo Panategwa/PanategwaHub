@@ -9,10 +9,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 export const ACHIEVEMENTS = [
-  { id: "first_login", name: "First Contact", description: "Log in for the first time.", secret: false },
+  { id: "first_login", name: "Login", description: "Log in for the first time.", secret: false },
   { id: "profile_name", name: "True Name", description: "Set your username.", secret: false },
-  { id: "verified_email", name: "Verified Signal", description: "Verify your email address.", secret: false },
-  { id: "account_viewed", name: "Account Viewer", description: "Open the account page.", secret: false },
+  { id: "verified_email", name: "Verified", description: "Verify your email address.", secret: false },
 
   { id: "panategwa_b", name: "Panategwa B", description: "Visit Panategwa B.", secret: false },
   { id: "panategwa_c", name: "Panategwa C", description: "Visit Panategwa C.", secret: false },
@@ -144,7 +143,6 @@ function computeUnlocks(user, profile, pages) {
   add("first_login", true);
   add("profile_name", !!(profile?.username || user.displayName));
   add("verified_email", !!user.emailVerified);
-  add("account_viewed", isAccountPage());
   add("panategwa_b", page === "panategwa-b-page.html");
   add("panategwa_c", page === "panategwa-c-page.html");
   add("panategwa_d", page === "panategwa-d-page.html");

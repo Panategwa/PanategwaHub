@@ -34,6 +34,8 @@ const $ = (id) => document.getElementById(id);
 
 let currentState = null;
 let currentMessageFilter = "all";
+let profileUsernameDirty = false;
+let profileUsernameLastRendered = "";
 
 function setStatus(text, kind = "info") {
   const el = $("auth-status");
@@ -56,6 +58,14 @@ function formatDate(value) {
   return "—";
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function showSection(sectionName) {
   document.querySelectorAll(".account-section").forEach(section => {
     section.classList.toggle("active", section.dataset.section === sectionName);
@@ -74,6 +84,25 @@ function showFriendsSubsection(name) {
   document.querySelectorAll("[data-friends-subtab]").forEach(button => {
     button.classList.toggle("active", button.dataset.friendsSubtab === name);
   });
+}
+
+function getProfileUsername() {
+  const user = currentState?.user || null;
+  const profile = currentState?.profile || null;
+  return profile?.username || user?.displayName || "Player";
+}
+
+function syncUsernameInput(force = false) {
+  const input = $("profile-username");
+  if (!input) return;
+
+  const currentName = getProfileUsername();
+
+  if (force || (!profileUsernameDirty && document.activeElement !== input)) {
+    input.value = currentName;
+    profileUsernameLastRendered = currentName;
+    profileUsernameDirty = false;
+  }
 }
 
 window.openAccountArea = function openAccountArea(section = "friends", sub = "friends", targetUid = null) {
@@ -142,6 +171,13 @@ function renderUser(state) {
       <p><b>Created:</b> —</p>
       <p><b>Last login:</b> —</p>
     `;
+
+    const input = $("profile-username");
+    if (input) {
+      input.value = "";
+      profileUsernameDirty = false;
+      profileUsernameLastRendered = "";
+    }
     return;
   }
 
@@ -162,28 +198,29 @@ function renderUser(state) {
     <div class="account-header">
       ${
         user.photoURL
-          ? `<img src="${user.photoURL}" alt="Avatar" class="account-avatar">`
+          ? `<img src="${escapeHtml(user.photoURL)}" alt="Avatar" class="account-avatar">`
           : `<div class="account-avatar-placeholder">👤</div>`
       }
       <div>
-        <p style="margin:0;"><b>${username}</b></p>
-        <p style="margin:0; opacity:0.8;">${email}</p>
+        <p style="margin:0;"><b>${escapeHtml(username)}</b></p>
+        <p style="margin:0; opacity:0.8;">${escapeHtml(email)}</p>
       </div>
     </div>
 
-    <p><b>Status:</b> Logged in</p>
-    <p><b>Username:</b> ${username}</p>
-    <p><b>Email:</b> ${email}</p>
-    <p><b>Verified:</b> ${verified}</p>
-    <p><b>XP:</b> ${xp}</p>
-    <p><b>Rank:</b> ${rank}</p>
-    <p><b>Account ID:</b> ${user.uid}</p>
-    <p><b>Created:</b> ${formatDate(profile?.createdAt)}</p>
-    <p><b>Last login:</b> ${formatDate(profile?.lastLoginAt)}</p>
+    <div class="info-grid">
+      <div class="info-row"><span>Status</span><strong>Logged in</strong></div>
+      <div class="info-row"><span>Username</span><strong>${escapeHtml(username)}</strong></div>
+      <div class="info-row"><span>Email</span><strong>${escapeHtml(email)}</strong></div>
+      <div class="info-row"><span>Verified</span><strong>${verified}</strong></div>
+      <div class="info-row"><span>XP</span><strong>${xp}</strong></div>
+      <div class="info-row"><span>Rank</span><strong>${rank}</strong></div>
+      <div class="info-row"><span>Account ID</span><strong>${escapeHtml(user.uid)}</strong></div>
+      <div class="info-row"><span>Created</span><strong>${escapeHtml(formatDate(profile?.createdAt))}</strong></div>
+      <div class="info-row"><span>Last login</span><strong>${escapeHtml(formatDate(profile?.lastLoginAt))}</strong></div>
+    </div>
   `;
 
-  const usernameInput = $("profile-username");
-  if (usernameInput) usernameInput.value = username;
+  syncUsernameInput(false);
 }
 
 function renderFriendsSection(state) {
@@ -205,22 +242,22 @@ function renderFriendsSection(state) {
           const name = friend?.username || uid;
 
           return `
-            <div class="achievement-card" style="align-items:center;">
-              <div class="achievement-icon">👥</div>
-              <div style="flex:1;">
-                <div class="achievement-name">${name}</div>
-                <div class="achievement-desc">${uid}</div>
+            <div class="social-item">
+              <div class="social-icon">👥</div>
+              <div class="social-main">
+                <div class="social-title">${escapeHtml(name)}</div>
+                <div class="social-sub">${escapeHtml(uid)}</div>
               </div>
-              <div class="button-row">
-                <button data-action="friend-view" data-uid="${uid}">View profile</button>
-                <button data-action="friend-message" data-uid="${uid}">Message</button>
-                <button data-action="friend-remove" data-uid="${uid}">Remove</button>
-                <button data-action="friend-block" data-uid="${uid}">Block</button>
+              <div class="social-actions">
+                <button data-action="friend-view" data-uid="${escapeHtml(uid)}">View profile</button>
+                <button data-action="friend-message" data-uid="${escapeHtml(uid)}">Message</button>
+                <button data-action="friend-remove" data-uid="${escapeHtml(uid)}">Remove</button>
+                <button data-action="friend-block" data-uid="${escapeHtml(uid)}">Block</button>
               </div>
             </div>
           `;
         }).join("")
-      : `<div class="achievement-empty">No friends yet.</div>`;
+      : `<div class="empty-state">No friends yet.</div>`;
   }
 
   if (requestList) {
@@ -228,44 +265,48 @@ function renderFriendsSection(state) {
     const outgoing = state?.outgoingRequests || [];
 
     requestList.innerHTML = `
-      <h3>Incoming</h3>
+      <div class="subsection-head">
+        <h3>Incoming</h3>
+      </div>
       ${
         incoming.length
           ? incoming.map(req => `
-            <div class="achievement-card" style="align-items:center;">
-              <div class="achievement-icon">📨</div>
-              <div style="flex:1;">
-                <div class="achievement-name">${req.fromName || req.fromUid}</div>
-                <div class="achievement-desc">${req.note || "Friend request"}</div>
+            <div class="social-item">
+              <div class="social-icon">📨</div>
+              <div class="social-main">
+                <div class="social-title">${escapeHtml(req.fromName || req.fromUid)}</div>
+                <div class="social-sub">${escapeHtml(req.note || "Friend request")}</div>
               </div>
-              <div class="button-row">
-                <button data-action="request-accept" data-id="${req.id}">Accept</button>
-                <button data-action="request-decline" data-id="${req.id}">Decline</button>
-                <button data-action="request-block" data-id="${req.id}">Block</button>
-                <button data-action="request-ignore" data-id="${req.id}">Ignore</button>
-                <button data-action="request-view-messages" data-uid="${req.fromUid}">View in messages</button>
+              <div class="social-actions">
+                <button data-action="request-accept" data-id="${escapeHtml(req.id)}">Accept</button>
+                <button data-action="request-decline" data-id="${escapeHtml(req.id)}">Decline</button>
+                <button data-action="request-block" data-id="${escapeHtml(req.id)}">Block</button>
+                <button data-action="request-ignore" data-id="${escapeHtml(req.id)}">Ignore</button>
+                <button data-action="request-view-messages" data-uid="${escapeHtml(req.fromUid)}">View in messages</button>
               </div>
             </div>
           `).join("")
-          : `<div class="achievement-empty">No incoming requests.</div>`
+          : `<div class="empty-state">No incoming requests.</div>`
       }
 
-      <h3 style="margin-top:16px;">Outgoing</h3>
+      <div class="subsection-head" style="margin-top:16px;">
+        <h3>Outgoing</h3>
+      </div>
       ${
         outgoing.length
           ? outgoing.map(req => `
-            <div class="achievement-card" style="align-items:center;">
-              <div class="achievement-icon">📤</div>
-              <div style="flex:1;">
-                <div class="achievement-name">${req.toName || req.toUid}</div>
-                <div class="achievement-desc">${req.status || "pending"}</div>
+            <div class="social-item">
+              <div class="social-icon">📤</div>
+              <div class="social-main">
+                <div class="social-title">${escapeHtml(req.toName || req.toUid)}</div>
+                <div class="social-sub">${escapeHtml(req.status || "pending")}</div>
               </div>
-              <div class="button-row">
-                <button data-action="request-view-messages" data-uid="${req.toUid}">View in messages</button>
+              <div class="social-actions">
+                <button data-action="request-view-messages" data-uid="${escapeHtml(req.toUid)}">View in messages</button>
               </div>
             </div>
           `).join("")
-          : `<div class="achievement-empty">No outgoing requests.</div>`
+          : `<div class="empty-state">No outgoing requests.</div>`
       }
     `;
   }
@@ -273,38 +314,44 @@ function renderFriendsSection(state) {
   if (settingsList) {
     const s = state?.settings || {};
     settingsList.innerHTML = `
-      <div class="achievement-card" style="flex-direction:column; align-items:stretch;">
-        <div class="achievement-name">Friend system</div>
-        <div class="achievement-desc">Turn the whole social system on or off.</div>
-        <div class="button-row">
-          <button data-action="social-enable-restore">Enable & restore</button>
-          <button data-action="social-enable-fresh">Enable fresh</button>
-          <button data-action="social-disable-keep">Disable & keep backup</button>
-          <button data-action="social-disable-clear">Disable & clear</button>
+      <div class="settings-grid">
+        <div class="setting-card">
+          <div class="setting-top">
+            <div>
+              <div class="setting-title">Friend system</div>
+              <div class="setting-desc">Turn the whole social system on or off.</div>
+            </div>
+          </div>
+          <div class="button-row">
+            <button data-action="social-enable-restore">Enable & restore</button>
+            <button data-action="social-enable-fresh">Enable fresh</button>
+            <button data-action="social-disable-keep">Disable & keep backup</button>
+            <button data-action="social-disable-clear">Disable & clear</button>
+          </div>
         </div>
-      </div>
 
-      <div class="achievement-card" style="flex-direction:column; align-items:stretch;">
-        <div class="achievement-name">Requests</div>
-        <div class="achievement-desc">${s.requestsEnabled ? "On" : "Off"}</div>
-        <div class="button-row">
-          <button data-action="requests-toggle" data-enabled="${(!s.requestsEnabled).toString()}">${s.requestsEnabled ? "Turn requests off" : "Turn requests on"}</button>
+        <div class="setting-card">
+          <div class="setting-title">Requests</div>
+          <div class="setting-desc">${s.requestsEnabled ? "On" : "Off"}</div>
+          <div class="button-row">
+            <button data-action="requests-toggle" data-enabled="${(!s.requestsEnabled).toString()}">${s.requestsEnabled ? "Turn requests off" : "Turn requests on"}</button>
+          </div>
         </div>
-      </div>
 
-      <div class="achievement-card" style="flex-direction:column; align-items:stretch;">
-        <div class="achievement-name">Chatting</div>
-        <div class="achievement-desc">${s.chatEnabled ? "On" : "Off"}</div>
-        <div class="button-row">
-          <button data-action="chat-toggle" data-enabled="${(!s.chatEnabled).toString()}">${s.chatEnabled ? "Turn chat off" : "Turn chat on"}</button>
+        <div class="setting-card">
+          <div class="setting-title">Chatting</div>
+          <div class="setting-desc">${s.chatEnabled ? "On" : "Off"}</div>
+          <div class="button-row">
+            <button data-action="chat-toggle" data-enabled="${(!s.chatEnabled).toString()}">${s.chatEnabled ? "Turn chat off" : "Turn chat on"}</button>
+          </div>
         </div>
-      </div>
 
-      <div class="achievement-card" style="flex-direction:column; align-items:stretch;">
-        <div class="achievement-name">Profile privacy</div>
-        <div class="achievement-desc">${s.profileHidden ? "Others only see your name and ID." : "People can see your full public profile."}</div>
-        <div class="button-row">
-          <button data-action="privacy-toggle" data-enabled="${(!s.profileHidden).toString()}">${s.profileHidden ? "Show full profile" : "Hide profile details"}</button>
+        <div class="setting-card">
+          <div class="setting-title">Profile privacy</div>
+          <div class="setting-desc">${s.profileHidden ? "Others only see your name and ID." : "People can see your full public profile."}</div>
+          <div class="button-row">
+            <button data-action="privacy-toggle" data-enabled="${(!s.profileHidden).toString()}">${s.profileHidden ? "Show full profile" : "Hide profile details"}</button>
+          </div>
         </div>
       </div>
     `;
@@ -313,20 +360,29 @@ function renderFriendsSection(state) {
   if (profileView) {
     const profile = state?.selectedProfile || state?.profile;
     if (!profile) {
-      profileView.innerHTML = `<div class="achievement-empty">No profile selected.</div>`;
+      profileView.innerHTML = `<div class="empty-state">No profile selected.</div>`;
     } else {
       const visibleFull = profile.uid === state?.user?.uid || !profile.socialSettings?.profileHidden;
 
       profileView.innerHTML = `
-        <div class="achievement-card" style="flex-direction:column; align-items:flex-start;">
-          <div class="achievement-name">${profile.username || "Player"}</div>
-          <div class="achievement-desc">ID: ${profile.uid}</div>
-          ${visibleFull ? `<div class="achievement-desc">XP: ${profile.xp || 0}</div>` : `<div class="achievement-desc">Private profile</div>`}
-          ${visibleFull ? `<div class="achievement-desc">Friends: ${(profile.friends || []).length}</div>` : ""}
-          ${visibleFull ? `<div class="achievement-desc">Verified: ${profile.verified ? "Yes" : "No"}</div>` : ""}
+        <div class="profile-card">
+          <div class="profile-card-top">
+            <div>
+              <div class="profile-name">${escapeHtml(profile.username || "Player")}</div>
+              <div class="profile-id">ID: ${escapeHtml(profile.uid)}</div>
+            </div>
+            <div class="profile-badge">${visibleFull ? "Public" : "Private"}</div>
+          </div>
+
+          <div class="profile-meta">
+            ${visibleFull ? `<div><span>XP</span><strong>${profile.xp || 0}</strong></div>` : ""}
+            ${visibleFull ? `<div><span>Friends</span><strong>${(profile.friends || []).length}</strong></div>` : ""}
+            ${visibleFull ? `<div><span>Verified</span><strong>${profile.verified ? "Yes" : "No"}</strong></div>` : ""}
+          </div>
+
           <div class="button-row">
             <button data-action="profile-self">View my profile</button>
-            <button data-action="profile-open-message" data-uid="${profile.uid}">Message</button>
+            <button data-action="profile-open-message" data-uid="${escapeHtml(profile.uid)}">Message</button>
           </div>
         </div>
       `;
@@ -366,21 +422,21 @@ function renderMessagesSection(state) {
             : msg.title || "Message";
 
         return `
-          <div class="achievement-card ${unread ? "unlocked" : "locked"}" style="align-items:center;">
-            <div class="achievement-icon">${unread ? "✉️" : "📭"}</div>
-            <div style="flex:1;">
-              <div class="achievement-name">${label}</div>
-              <div class="achievement-desc">${msg.body || ""}</div>
+          <div class="social-message ${unread ? "unread" : "read"}">
+            <div class="social-icon">${unread ? "✉️" : "📭"}</div>
+            <div class="social-main">
+              <div class="social-title">${escapeHtml(label)}</div>
+              <div class="social-sub">${escapeHtml(msg.body || "")}</div>
             </div>
-            <div class="button-row">
-              <button data-action="message-open" data-id="${msg.id}" data-section="${msg.targetSection || "messages"}" data-sub="${msg.targetSubSection || "messages"}" data-uid="${msg.conversationUid || msg.fromUid || ""}">Open</button>
-              <button data-action="message-view-inbox" data-uid="${msg.conversationUid || msg.fromUid || ""}">View in messages</button>
-              <button data-action="message-read-toggle" data-id="${msg.id}" data-read="${unread ? "true" : "false"}">${unread ? "Read" : "Unread"}</button>
+            <div class="social-actions">
+              <button data-action="message-open" data-id="${escapeHtml(msg.id)}" data-section="${escapeHtml(msg.targetSection || "messages")}" data-sub="${escapeHtml(msg.targetSubSection || "messages")}" data-uid="${escapeHtml(msg.conversationUid || msg.fromUid || "")}">Open</button>
+              <button data-action="message-view-inbox" data-uid="${escapeHtml(msg.conversationUid || msg.fromUid || "")}">View in messages</button>
+              <button data-action="message-read-toggle" data-id="${escapeHtml(msg.id)}" data-read="${unread ? "true" : "false"}">${unread ? "Read" : "Unread"}</button>
             </div>
           </div>
         `;
       }).join("")
-    : `<div class="achievement-empty">No messages yet.</div>`;
+    : `<div class="empty-state">No messages yet.</div>`;
 }
 
 function bindTabs() {
@@ -411,6 +467,23 @@ function bindTabs() {
     currentMessageFilter = e.target.value || "all";
     renderMessagesSection(currentState);
   });
+
+  const usernameInput = $("profile-username");
+  if (usernameInput) {
+    usernameInput.addEventListener("input", () => {
+      profileUsernameDirty = true;
+    });
+
+    usernameInput.addEventListener("focus", () => {
+      profileUsernameDirty = true;
+    });
+
+    usernameInput.addEventListener("blur", () => {
+      if (usernameInput.value.trim() === profileUsernameLastRendered.trim()) {
+        profileUsernameDirty = false;
+      }
+    });
+  }
 }
 
 function bindButtons() {
@@ -458,7 +531,11 @@ function bindButtons() {
   $("save-username-btn")?.addEventListener("click", async () => {
     try {
       setStatus("Saving name...", "info");
-      await saveUsername($("profile-username")?.value || "");
+      const nextName = $("profile-username")?.value || "";
+      await saveUsername(nextName);
+      profileUsernameDirty = false;
+      profileUsernameLastRendered = nextName;
+      syncUsernameInput(true);
       setStatus("Name saved.", "success");
       alert("Name saved.");
     } catch (error) {
@@ -723,6 +800,13 @@ document.addEventListener("DOMContentLoaded", () => {
   showSection("info");
   showFriendsSubsection("friends");
   setStatus("Checking account...", "info");
+
+  const usernameInput = $("profile-username");
+  if (usernameInput) {
+    usernameInput.addEventListener("input", () => {
+      profileUsernameDirty = true;
+    });
+  }
 
   setTimeout(() => {
     const status = $("auth-status");

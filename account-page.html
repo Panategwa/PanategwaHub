@@ -17,21 +17,47 @@
   <script type="module" src="auth/account.js"></script>
 
   <style>
+    :root {
+      --panel-bg: rgba(255, 255, 255, 0.08);
+      --panel-border: rgba(255, 255, 255, 0.14);
+      --panel-soft: rgba(255, 255, 255, 0.05);
+      --panel-strong: rgba(255, 255, 255, 0.1);
+      --accent: rgba(175, 200, 75, 0.28);
+      --text-soft: rgba(255, 255, 255, 0.8);
+    }
+
     .account-wrap {
       max-width: 1180px;
       margin: 0 auto;
+      padding-bottom: 28px;
+    }
+
+    .page-head {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .page-head h1 {
+      margin: 0;
+      letter-spacing: 0.2px;
+    }
+
+    .page-subtitle {
+      margin: 0;
+      opacity: 0.82;
     }
 
     .tab-bar {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
-      margin: 10px 0 16px;
+      margin: 10px 0 18px;
     }
 
     .tab-button {
       margin: 0;
-      padding: 10px 14px;
+      padding: 11px 15px;
       border-radius: 999px;
       border: 1px solid rgba(255,255,255,0.18);
       background: rgba(255,255,255,0.08);
@@ -39,12 +65,17 @@
       font: inherit;
       font-weight: 700;
       cursor: pointer;
-      transition: filter 0.15s ease, background 0.15s ease;
+      transition: transform 0.15s ease, filter 0.15s ease, background 0.15s ease;
+    }
+
+    .tab-button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
     }
 
     .tab-button.active {
-      filter: brightness(0.85);
-      background: rgba(175, 200, 75, 0.28);
+      filter: brightness(0.9);
+      background: var(--accent);
     }
 
     .account-section {
@@ -54,6 +85,7 @@
 
     .account-section.active {
       display: block;
+      animation: fadeUp 180ms ease-out;
     }
 
     .friends-subpanel {
@@ -63,15 +95,16 @@
 
     .friends-subpanel.active {
       display: block;
+      animation: fadeUp 180ms ease-out;
     }
 
     .card {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 18px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
       padding: 18px;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 16px 36px rgba(0,0,0,0.16);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.18);
     }
 
     .card h2, .card h3 {
@@ -101,14 +134,23 @@
       width: 100%;
       box-sizing: border-box;
       padding: 12px 14px;
-      border-radius: 12px;
-      border: 1px solid rgba(0, 0, 0, 0.35);
+      border-radius: 14px;
+      border: 1px solid rgba(0, 0, 0, 0.26);
       font: inherit;
-      background: rgba(255,255,255,0.92);
+      background: rgba(255,255,255,0.94);
+      outline: none;
+      transition: box-shadow 0.15s ease, transform 0.15s ease;
+    }
+
+    .field-row input:focus,
+    .field-row textarea:focus,
+    .field-row select:focus {
+      box-shadow: 0 0 0 3px rgba(175,200,75,0.2);
+      transform: translateY(-1px);
     }
 
     .field-row textarea {
-      min-height: 110px;
+      min-height: 115px;
       resize: vertical;
     }
 
@@ -120,10 +162,11 @@
 
     .button-row button {
       margin: 0;
+      border-radius: 999px;
     }
 
     .danger {
-      background: rgba(180, 40, 40, 0.85);
+      background: rgba(180, 40, 40, 0.9);
       color: white;
     }
 
@@ -131,6 +174,7 @@
       margin: 10px 0 16px;
       font-weight: 700;
       opacity: 0.9;
+      letter-spacing: 0.2px;
     }
 
     .status[data-kind="error"] { color: #ffb3b3; }
@@ -155,6 +199,32 @@
       place-items: center;
       background: rgba(255, 255, 255, 0.12);
       font-size: 28px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 12px;
+    }
+
+    .info-row {
+      padding: 12px;
+      border-radius: 14px;
+      background: var(--panel-soft);
+      border: 1px solid rgba(255,255,255,0.08);
+      display: grid;
+      gap: 4px;
+    }
+
+    .info-row span {
+      font-size: 0.88rem;
+      opacity: 0.78;
+    }
+
+    .info-row strong {
+      font-size: 0.98rem;
+      word-break: break-word;
     }
 
     .progress-row {
@@ -169,8 +239,8 @@
       display: grid;
       gap: 10px;
       padding: 14px;
-      border-radius: 14px;
-      background: rgba(255,255,255,0.06);
+      border-radius: 16px;
+      background: var(--panel-soft);
       border: 1px solid rgba(255,255,255,0.12);
       margin-bottom: 14px;
     }
@@ -219,7 +289,7 @@
       gap: 12px;
       align-items: flex-start;
       padding: 12px;
-      border-radius: 12px;
+      border-radius: 16px;
       border: 1px solid rgba(255, 255, 255, 0.12);
       background: rgba(255, 255, 255, 0.05);
     }
@@ -274,7 +344,7 @@
 
     .achievement-filter-btn.active {
       filter: brightness(0.85);
-      background: rgba(175, 200, 75, 0.28);
+      background: var(--accent);
     }
 
     .achievement-list-inner {
@@ -282,17 +352,222 @@
       gap: 10px;
     }
 
-    .achievement-empty {
+    .empty-state {
       padding: 14px;
-      border-radius: 12px;
-      background: rgba(255,255,255,0.05);
+      border-radius: 16px;
+      background: var(--panel-soft);
       border: 1px dashed rgba(255,255,255,0.16);
-      opacity: 0.85;
+      opacity: 0.88;
+    }
+
+    .social-item,
+    .social-message,
+    .setting-card,
+    .profile-card {
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: var(--panel-soft);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+    }
+
+    .social-item,
+    .social-message {
+      padding: 14px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .social-message.read {
+      opacity: 0.88;
+    }
+
+    .social-message.unread {
+      border-color: rgba(175,200,75,0.28);
+      background: rgba(175,200,75,0.08);
+    }
+
+    .social-icon {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.1);
+      font-size: 20px;
+    }
+
+    .social-main {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .social-title {
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .social-sub {
+      opacity: 0.82;
+      font-size: 0.95rem;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .social-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .social-actions button {
+      margin: 0;
+      border-radius: 999px;
+    }
+
+    .subsection-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .setting-card {
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .setting-title {
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .setting-desc {
+      opacity: 0.82;
+      line-height: 1.4;
+    }
+
+    .profile-card {
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .profile-card-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: start;
+      flex-wrap: wrap;
+    }
+
+    .profile-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .profile-id {
+      opacity: 0.8;
+      font-size: 0.95rem;
+      word-break: break-word;
+    }
+
+    .profile-badge {
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .profile-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .profile-meta > div {
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.05);
+      display: grid;
+      gap: 4px;
+    }
+
+    .profile-meta span {
+      opacity: 0.78;
+      font-size: 0.86rem;
+    }
+
+    .profile-meta strong {
+      font-size: 1rem;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .button-row button {
+      margin: 0;
+      border-radius: 999px;
     }
 
     @media (max-width: 959px) {
-      .account-main {
+      .settings-grid,
+      .profile-meta,
+      .info-grid {
         grid-template-columns: 1fr;
+      }
+
+      .social-item,
+      .social-message {
+        grid-template-columns: auto 1fr;
+      }
+
+      .social-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .social-item,
+      .social-message {
+        grid-template-columns: 1fr;
+      }
+
+      .social-icon {
+        width: 44px;
+      }
+
+      .social-actions {
+        grid-column: auto;
+      }
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
       }
     }
   </style>
@@ -302,7 +577,11 @@
   <div id="menu-container"></div>
 
   <div class="account-wrap">
-    <h1>👤 Account</h1>
+    <div class="page-head">
+      <h1>👤 Account</h1>
+      <p class="page-subtitle">Profile, progress, friends, and messages all in one place.</p>
+    </div>
+
     <p id="auth-status" class="status" data-kind="info">Checking account...</p>
 
     <div class="tab-bar">

@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase-config.js";
-import { watchAuth, ensureUserProfile, getProfile } from "./auth.js";
+import { watchAuth, ensureUserProfile } from "./auth.js";
 
 import {
   collection,
@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS = {
 
 const listeners = new Set();
 
-const state = {
+const socialState = {
   user: null,
   profile: null,
   settings: { ...DEFAULT_SETTINGS },
@@ -59,18 +59,18 @@ const groupMessageUnsubs = new Map();
 
 function cloneState() {
   return {
-    ...state,
-    friends: [...state.friends],
-    blocked: [...state.blocked],
-    incomingRequests: [...state.incomingRequests],
-    outgoingRequests: [...state.outgoingRequests],
-    messages: [...state.messages],
-    groupChats: [...state.groupChats],
-    groupInvites: [...state.groupInvites],
+    ...socialState,
+    friends: [...socialState.friends],
+    blocked: [...socialState.blocked],
+    incomingRequests: [...socialState.incomingRequests],
+    outgoingRequests: [...socialState.outgoingRequests],
+    messages: [...socialState.messages],
+    groupChats: [...socialState.groupChats],
+    groupInvites: [...socialState.groupInvites],
     groupMessagesByChat: Object.fromEntries(
-      Object.entries(state.groupMessagesByChat).map(([k, v]) => [k, [...v]])
+      Object.entries(socialState.groupMessagesByChat).map(([k, v]) => [k, [...v]])
     ),
-    friendProfiles: { ...state.friendProfiles }
+    friendProfiles: { ...socialState.friendProfiles }
   };
 }
 
@@ -125,13 +125,11 @@ function publicProfile(profile, viewerUid) {
     return {
       uid: profile.uid,
       username: profile.username || "Player",
-      avatarEmoji: profile.avatarEmoji || "👤",
       photoURL: profile.photoURL || "",
       email: profile.email || "",
       xp: profile.xp || 0,
       verified: !!profile.verified,
       createdAt: profile.createdAt || null,
-      lastLoginAt: profile.lastLoginAt || null,
       friends: unique(profile.friends),
       blocked: unique(profile.blocked),
       socialSettings: { ...(profile.socialSettings || DEFAULT_SETTINGS) },
@@ -142,13 +140,11 @@ function publicProfile(profile, viewerUid) {
   return {
     uid: profile.uid,
     username: profile.username || "Player",
-    avatarEmoji: profile.avatarEmoji || "👤",
     photoURL: "",
     email: "",
     xp: 0,
     verified: !!profile.verified,
     createdAt: profile.createdAt || null,
-    lastLoginAt: profile.lastLoginAt || null,
     friends: [],
     blocked: [],
     socialSettings: { ...DEFAULT_SETTINGS, profileHidden: true },
@@ -172,9 +168,9 @@ async function loadFriendProfiles(ids) {
 
   const map = {};
   for (const [uid, data] of pairs) {
-    if (data) map[uid] = publicProfile(data, state.user?.uid);
+    if (data) map[uid] = publicProfile(data, socialState.user?.uid);
   }
-  state.friendProfiles = map;
+  socialState.friendProfiles = map;
   emit();
 }
 
@@ -185,7 +181,7 @@ async function createMessage({
   title,
   body,
   targetSection = "messages",
-  targetSubSection = "direct",
+  targetSubSection = "chat",
   targetId = null,
   conversationUid = null,
   requestId = null,
@@ -197,6 +193,7 @@ async function createMessage({
   await addDoc(collection(db, "messages"), {
     fromUid,
     toUid,
+    participants: toUid === fromUid ? [fromUid] : [fromUid, toUid],
     fromName: usernameOf(from),
     toName: usernameOf(to),
     kind,
@@ -212,12 +209,6 @@ async function createMessage({
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
-}
-
-function openAccountArea(section = "messages", sub = "direct", targetId = null) {
-  if (typeof window.openAccountArea === "function") {
-    window.openAccountArea(section, sub, targetId);
-  }
 }
 
 async function sendFriendRequestById(targetUid, note = "") {
@@ -289,7 +280,7 @@ async function respondToFriendRequest(requestId, action) {
       title: "Friend accepted",
       body: `${usernameOf(await loadUser(user.uid))} accepted your friend request.`,
       targetSection: "messages",
-      targetSubSection: "direct",
+      targetSubSection: "chat",
       conversationUid: req.fromUid
     });
     return;
@@ -304,7 +295,7 @@ async function respondToFriendRequest(requestId, action) {
       title: "Friend declined",
       body: `${usernameOf(await loadUser(user.uid))} declined your friend request.`,
       targetSection: "messages",
-      targetSubSection: "direct",
+      targetSubSection: "chat",
       conversationUid: req.fromUid
     });
     return;
@@ -321,7 +312,7 @@ async function respondToFriendRequest(requestId, action) {
       title: "Blocked",
       body: `${usernameOf(await loadUser(user.uid))} blocked you.`,
       targetSection: "messages",
-      targetSubSection: "direct",
+      targetSubSection: "chat",
       conversationUid: req.fromUid
     });
   }
@@ -353,7 +344,7 @@ async function sendChatMessage(friendUid, text) {
     title: `Message from ${usernameOf(me)}`,
     body,
     targetSection: "messages",
-    targetSubSection: "direct",
+    targetSubSection: "chat",
     conversationUid: id
   });
 }
@@ -497,7 +488,7 @@ async function createGroupChat(name, emoji = "👥", memberIds = []) {
   const cleanName = String(name || "").trim();
   if (!cleanName) throw new Error("Group chat name is required.");
 
-  const members = unique([user.uid, ...memberIds.map(cleanUid)]);
+  const members = unique([user.uid, ...memberIds.map(v => String(v || "").trim())]);
   if (members.length < 2) throw new Error("Add at least one other person.");
 
   const ref = await addDoc(collection(db, "groupChats"), {
@@ -528,6 +519,25 @@ async function createGroupChat(name, emoji = "👥", memberIds = []) {
   return ref.id;
 }
 
+async function joinGroupChatById(chatId) {
+  const user = auth.currentUser;
+  const id = cleanUid(chatId);
+  if (!user) throw new Error("Not logged in.");
+  if (!id) throw new Error("Enter a group chat ID.");
+
+  const ref = doc(db, "groupChats", id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error("Group chat not found.");
+
+  const chat = snap.data();
+  if (chat.deleted) throw new Error("That chat was deleted.");
+
+  await updateDoc(ref, {
+    members: arrayUnion(user.uid),
+    updatedAt: serverTimestamp()
+  });
+}
+
 async function updateGroupChatInfo(chatId, updates = {}) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
@@ -556,7 +566,7 @@ async function addMembersToGroupChat(chatId, memberIds = []) {
   const chat = snap.data();
   if (!unique(chat.members).includes(user.uid)) throw new Error("You are not in that group.");
 
-  const members = unique(memberIds.map(cleanUid)).filter(uid => uid && uid !== user.uid && !unique(chat.members).includes(uid));
+  const members = unique(memberIds.map(v => String(v || "").trim())).filter(uid => uid && uid !== user.uid && !unique(chat.members).includes(uid));
   for (const uid of members) {
     await addDoc(collection(db, "groupChatInvites"), {
       chatId,
@@ -621,7 +631,7 @@ async function inviteToGroupChat(chatId, targetUid) {
     title: "Group invite",
     body: `${usernameOf(await loadUser(user.uid))} invited you to "${chat.name || "Group chat"}".`,
     targetSection: "messages",
-    targetSubSection: "invites",
+    targetSubSection: "chat",
     targetId: chatId,
     groupChatId: chatId
   });
@@ -731,39 +741,39 @@ async function markAllMessagesUnread() {
 
 async function viewProfileById(uid) {
   const data = await loadUser(uid);
-  state.selectedProfileId = cleanUid(uid) || null;
-  state.selectedProfile = publicProfile(data, state.user?.uid);
+  socialState.selectedProfileId = cleanUid(uid) || null;
+  socialState.selectedProfile = publicProfile(data, socialState.user?.uid);
   emit();
-  return state.selectedProfile;
+  return socialState.selectedProfile;
 }
 
 function setSelectedConversation(uid) {
-  state.selectedConversationId = cleanUid(uid) || null;
+  socialState.selectedConversationId = cleanUid(uid) || null;
   emit();
 }
 
 function setSelectedGroupChatId(chatId) {
-  state.selectedGroupChatId = cleanUid(chatId) || null;
+  socialState.selectedGroupChatId = cleanUid(chatId) || null;
   emit();
 }
 
 function getConversationMessages(uid) {
   const id = cleanUid(uid);
   if (!id) return [];
-  return (state.messages || []).filter(m =>
+  return (socialState.messages || []).filter(m =>
     m.kind === "chat" &&
-    ((m.fromUid === state.user?.uid && m.toUid === id) || (m.fromUid === id && m.toUid === state.user?.uid))
+    ((m.fromUid === socialState.user?.uid && m.toUid === id) || (m.fromUid === id && m.toUid === socialState.user?.uid))
   );
 }
 
 function getGroupChatMessages(chatId) {
-  return state.groupMessagesByChat?.[cleanUid(chatId)] || [];
+  return socialState.groupMessagesByChat?.[cleanUid(chatId)] || [];
 }
 
 function getUnreadIncomingCount() {
-  const uid = state.user?.uid;
+  const uid = socialState.user?.uid;
   if (!uid) return 0;
-  return (state.messages || []).filter(m => m.toUid === uid && !unique(m.readBy).includes(uid)).length;
+  return (socialState.messages || []).filter(m => m.toUid === uid && !unique(m.readBy).includes(uid)).length;
 }
 
 function teardownGroupListeners() {
@@ -792,61 +802,61 @@ function startRealtime() {
     teardownGroupListeners();
 
     if (!user) {
-      state.user = null;
-      state.profile = null;
-      state.settings = { ...DEFAULT_SETTINGS };
-      state.friends = [];
-      state.blocked = [];
-      state.incomingRequests = [];
-      state.outgoingRequests = [];
-      state.messages = [];
-      state.unreadCount = 0;
-      state.friendProfiles = {};
-      state.selectedProfile = null;
-      state.selectedProfileId = null;
-      state.selectedConversationId = null;
-      state.selectedGroupChatId = null;
-      state.groupChats = [];
-      state.groupMessagesByChat = {};
-      state.groupInvites = [];
+      socialState.user = null;
+      socialState.profile = null;
+      socialState.settings = { ...DEFAULT_SETTINGS };
+      socialState.friends = [];
+      socialState.blocked = [];
+      socialState.incomingRequests = [];
+      socialState.outgoingRequests = [];
+      socialState.messages = [];
+      socialState.unreadCount = 0;
+      socialState.friendProfiles = {};
+      socialState.selectedProfile = null;
+      socialState.selectedProfileId = null;
+      socialState.selectedConversationId = null;
+      socialState.selectedGroupChatId = null;
+      socialState.groupChats = [];
+      socialState.groupMessagesByChat = {};
+      socialState.groupInvites = [];
       emit();
       return;
     }
 
-    state.user = user;
-    state.profile = await ensureUserProfile(user);
-    state.settings = { ...DEFAULT_SETTINGS, ...(state.profile?.socialSettings || {}) };
-    state.friends = unique(state.profile?.friends);
-    state.blocked = unique(state.profile?.blocked);
-    state.selectedProfile = publicProfile(state.profile, user.uid);
-    state.selectedProfileId = user.uid;
-    await loadFriendProfiles(state.friends);
+    socialState.user = user;
+    socialState.profile = await ensureUserProfile(user);
+    socialState.settings = { ...DEFAULT_SETTINGS, ...(socialState.profile?.socialSettings || {}) };
+    socialState.friends = unique(socialState.profile?.friends);
+    socialState.blocked = unique(socialState.profile?.blocked);
+    socialState.selectedProfile = publicProfile(socialState.profile, user.uid);
+    socialState.selectedProfileId = user.uid;
+    await loadFriendProfiles(socialState.friends);
     emit();
 
     unsubProfile = onSnapshot(userRef(user.uid), async (snap) => {
       const fresh = snap.exists() ? snap.data() : null;
-      state.profile = fresh;
-      state.settings = { ...DEFAULT_SETTINGS, ...(fresh?.socialSettings || {}) };
-      state.friends = unique(fresh?.friends);
-      state.blocked = unique(fresh?.blocked);
-      state.selectedProfile = state.selectedProfileId
-        ? (state.selectedProfileId === user.uid ? publicProfile(fresh, user.uid) : state.friendProfiles[state.selectedProfileId] || state.selectedProfile)
+      socialState.profile = fresh;
+      socialState.settings = { ...DEFAULT_SETTINGS, ...(fresh?.socialSettings || {}) };
+      socialState.friends = unique(fresh?.friends);
+      socialState.blocked = unique(fresh?.blocked);
+      socialState.selectedProfile = socialState.selectedProfileId
+        ? (socialState.selectedProfileId === user.uid ? publicProfile(fresh, user.uid) : socialState.friendProfiles[socialState.selectedProfileId] || socialState.selectedProfile)
         : publicProfile(fresh, user.uid);
-      await loadFriendProfiles(state.friends);
+      await loadFriendProfiles(socialState.friends);
       emit();
     });
 
     unsubIncoming = onSnapshot(query(collection(db, "friendRequests"), where("toUid", "==", user.uid)), (snap) => {
       const all = [];
       snap.forEach(d => all.push({ id: d.id, ...d.data() }));
-      state.incomingRequests = sortNewestFirst(all.filter(r => r.status === "pending"));
+      socialState.incomingRequests = sortNewestFirst(all.filter(r => r.status === "pending"));
       emit();
     });
 
     unsubOutgoing = onSnapshot(query(collection(db, "friendRequests"), where("fromUid", "==", user.uid)), (snap) => {
       const all = [];
       snap.forEach(d => all.push({ id: d.id, ...d.data() }));
-      state.outgoingRequests = sortNewestFirst(all.filter(r => r.status === "pending"));
+      socialState.outgoingRequests = sortNewestFirst(all.filter(r => r.status === "pending"));
       emit();
     });
 
@@ -854,36 +864,36 @@ function startRealtime() {
       const all = [];
       snap.forEach(d => all.push({ id: d.id, ...d.data() }));
       const sorted = sortNewestFirst(all);
-      state.messages = sorted;
-      state.unreadCount = sorted.filter(m => m.toUid === user.uid && !unique(m.readBy).includes(user.uid)).length;
+      socialState.messages = sorted;
+      socialState.unreadCount = sorted.filter(m => m.toUid === user.uid && !unique(m.readBy).includes(user.uid)).length;
       emit();
     });
 
     unsubGroupChats = onSnapshot(query(collection(db, "groupChats"), where("members", "array-contains", user.uid)), (snap) => {
       const chats = [];
       snap.forEach(d => chats.push({ id: d.id, ...d.data() }));
-      state.groupChats = sortNewestFirst(chats.filter(c => !c.deleted));
+      socialState.groupChats = sortNewestFirst(chats.filter(c => !c.deleted));
 
-      if (!state.selectedGroupChatId && state.groupChats[0]) state.selectedGroupChatId = state.groupChats[0].id;
-      if (state.selectedGroupChatId && !state.groupChats.some(c => c.id === state.selectedGroupChatId)) {
-        state.selectedGroupChatId = state.groupChats[0]?.id || null;
+      if (!socialState.selectedGroupChatId && socialState.groupChats[0]) socialState.selectedGroupChatId = socialState.groupChats[0].id;
+      if (socialState.selectedGroupChatId && !socialState.groupChats.some(c => c.id === socialState.selectedGroupChatId)) {
+        socialState.selectedGroupChatId = socialState.groupChats[0]?.id || null;
       }
 
-      const activeIds = new Set(state.groupChats.map(c => c.id));
+      const activeIds = new Set(socialState.groupChats.map(c => c.id));
       for (const [chatId, unsub] of groupMessageUnsubs.entries()) {
         if (!activeIds.has(chatId)) {
           try { unsub(); } catch {}
           groupMessageUnsubs.delete(chatId);
-          delete state.groupMessagesByChat[chatId];
+          delete socialState.groupMessagesByChat[chatId];
         }
       }
 
-      for (const chat of state.groupChats) {
+      for (const chat of socialState.groupChats) {
         if (groupMessageUnsubs.has(chat.id)) continue;
         const unsub = onSnapshot(collection(db, "groupChats", chat.id, "messages"), (msgSnap) => {
           const arr = [];
           msgSnap.forEach(m => arr.push({ id: m.id, ...m.data() }));
-          state.groupMessagesByChat[chat.id] = sortNewestFirst(arr);
+          socialState.groupMessagesByChat[chat.id] = sortNewestFirst(arr);
           emit();
         });
         groupMessageUnsubs.set(chat.id, unsub);
@@ -895,13 +905,12 @@ function startRealtime() {
     unsubGroupInvites = onSnapshot(query(collection(db, "groupChatInvites"), where("toUid", "==", user.uid)), (snap) => {
       const invites = [];
       snap.forEach(d => invites.push({ id: d.id, ...d.data() }));
-      state.groupInvites = sortNewestFirst(invites.filter(i => i.status === "pending"));
+      socialState.groupInvites = sortNewestFirst(invites.filter(i => i.status === "pending"));
       emit();
     });
   });
 }
 
-watchAuth(async () => {});
 startRealtime();
 
 export {
@@ -919,6 +928,7 @@ export {
   disableSocialSystem,
   enableSocialSystem,
   createGroupChat,
+  joinGroupChatById,
   updateGroupChatInfo,
   addMembersToGroupChat,
   deleteGroupChat,
@@ -935,6 +945,5 @@ export {
   getConversationMessages,
   getGroupChatMessages,
   getUnreadIncomingCount,
-  openAccountArea,
-  state as socialState
+  socialState
 };

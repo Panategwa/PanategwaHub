@@ -4,7 +4,6 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signInWithCustomToken,
   signOut,
   onAuthStateChanged,
   sendEmailVerification,
@@ -21,11 +20,17 @@ import {
   getDoc,
   setDoc,
   deleteDoc,
+  addDoc,
+  collection,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 function userRef(uid) {
   return doc(db, "users", uid);
+}
+
+function messagesRef() {
+  return collection(db, "messages");
 }
 
 function cleanEmail(email) {
@@ -51,7 +56,6 @@ function baseProfile(user) {
     email: user.email || "",
     emailLower: cleanEmail(user.email),
     username: user.displayName || defaultUsername(user),
-    avatarEmoji: "👤",
     photoURL: user.photoURL || "",
     verified: !!user.emailVerified,
     xp: 0,
@@ -96,8 +100,28 @@ function normalizeSocialSettings(settings = {}) {
 async function getProfile(uid = auth.currentUser?.uid) {
   if (!uid) return null;
   const snap = await getDoc(userRef(uid));
-  if (!snap.exists()) return null;
-  return snap.data();
+  return snap.exists() ? snap.data() : null;
+}
+
+async function createSystemMessage(user, title, body, targetSection = "messages", targetSubSection = "system", targetId = null) {
+  if (!user) return;
+
+  await addDoc(messagesRef(), {
+    fromUid: user.uid,
+    toUid: user.uid,
+    participants: [user.uid],
+    fromName: user.displayName || user.email?.split("@")?.[0] || "System",
+    toName: user.displayName || user.email?.split("@")?.[0] || "System",
+    kind: "system",
+    title,
+    body,
+    targetSection,
+    targetSubSection,
+    targetId,
+    readBy: [user.uid],
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
 }
 
 async function ensureUserProfile(user) {
@@ -125,7 +149,6 @@ async function ensureUserProfile(user) {
     email: user.email || data.email || "",
     emailLower: cleanEmail(user.email || data.email || ""),
     username: data.username || user.displayName || defaultUsername(user),
-    avatarEmoji: data.avatarEmoji || "👤",
     photoURL: user.photoURL || data.photoURL || "",
     verified: !!user.emailVerified,
     xp: typeof data.xp === "number" ? data.xp : achievements.length,
@@ -157,12 +180,29 @@ async function touchLastLoginOnce(user) {
   await setDoc(userRef(user.uid), { lastLoginAt: serverTimestamp() }, { merge: true });
 }
 
+async function maybeCreateLoginMessage(user) {
+  const today = new Date().toISOString().slice(0, 10);
+  const key = `ptg_login_msg_${user.uid}_${today}`;
+  if (sessionStorage.getItem(key)) return;
+  sessionStorage.setItem(key, "1");
+
+  await createSystemMessage(
+    user,
+    "Logged in",
+    `You signed in as ${user.displayName || user.email?.split("@")?.[0] || "Player"}.`,
+    "messages",
+    "system",
+    null
+  );
+}
+
 async function createAccount(email, password, username) {
-  const cleanName = cleanText(username);
+  const cleanName = cleanText(username).slice(0, 20);
   const cleanMail = cleanEmail(email);
   const cleanPass = String(password || "");
 
   if (!cleanName) throw new Error("Username is required.");
+  if (cleanName.length > 20) throw new Error("Username must be 20 characters or less.");
   if (!cleanMail) throw new Error("Email is required.");
   if (!cleanPass) throw new Error("Password is required.");
 
@@ -175,6 +215,15 @@ async function createAccount(email, password, username) {
     username: cleanName,
     verified: false
   });
+
+  await createSystemMessage(
+    cred.user,
+    "Welcome",
+    "Your account was created successfully.",
+    "messages",
+    "system",
+    null
+  );
 
   return cred.user;
 }
@@ -189,6 +238,7 @@ async function login(email, password) {
   const cred = await signInWithEmailAndPassword(auth, cleanMail, cleanPass);
   await ensureUserProfile(cred.user);
   await touchLastLoginOnce(cred.user);
+  await maybeCreateLoginMessage(cred.user);
   return cred.user;
 }
 
@@ -196,24 +246,7 @@ async function loginWithGoogle() {
   const cred = await signInWithPopup(auth, googleProvider);
   await ensureUserProfile(cred.user);
   await touchLastLoginOnce(cred.user);
-  return cred.user;
-}
-
-async function loginWithDiscord() {
-  const url = window.PANATEGWA_DISCORD_TOKEN_URL || "";
-  if (!url) {
-    throw new Error("Discord login needs a backend endpoint that returns a Firebase custom token.");
-  }
-
-  const response = await fetch(url, { credentials: "include" });
-  if (!response.ok) throw new Error("Discord login endpoint failed.");
-
-  const data = await response.json();
-  if (!data?.token) throw new Error("Discord login did not return a Firebase token.");
-
-  const cred = await signInWithCustomToken(auth, data.token);
-  await ensureUserProfile(cred.user);
-  await touchLastLoginOnce(cred.user);
+  await maybeCreateLoginMessage(cred.user);
   return cred.user;
 }
 
@@ -225,8 +258,9 @@ async function saveUsername(username) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
-  const cleanName = cleanText(username);
+  const cleanName = cleanText(username).slice(0, 20);
   if (!cleanName) throw new Error("Username cannot be empty.");
+  if (cleanName.length > 20) throw new Error("Username must be 20 characters or less.");
 
   await updateProfile(user, { displayName: cleanName });
   await setDoc(userRef(user.uid), {
@@ -237,17 +271,43 @@ async function saveUsername(username) {
   return cleanName;
 }
 
-async function saveProfileEmoji(emoji) {
+async function saveProfilePictureFromFile(file) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
+  if (!file) throw new Error("Choose an image first.");
+  if (!String(file.type || "").startsWith("image/")) throw new Error("That file is not an image.");
 
-  const value = String(emoji || "").trim().slice(0, 4) || "👤";
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Could not read the image file."));
+    reader.readAsDataURL(file);
+  });
+
+  if (dataUrl.length > 250000) {
+    throw new Error("Image is too large. Use a smaller image.");
+  }
+
+  await updateProfile(user, { photoURL: dataUrl });
   await setDoc(userRef(user.uid), {
-    avatarEmoji: value,
+    photoURL: dataUrl,
     updatedAt: serverTimestamp()
   }, { merge: true });
 
-  return value;
+  return dataUrl;
+}
+
+async function useDefaultProfilePicture() {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  await updateProfile(user, { photoURL: "" });
+  await setDoc(userRef(user.uid), {
+    photoURL: "",
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+
+  return true;
 }
 
 async function resendVerificationEmail() {
@@ -294,6 +354,7 @@ function watchAuth(callback) {
     try {
       const profile = await ensureUserProfile(user);
       await touchLastLoginOnce(user);
+      await maybeCreateLoginMessage(user);
       callback(user, profile);
     } catch (err) {
       console.error("Auth watch error:", err);
@@ -310,10 +371,10 @@ export {
   createAccount,
   login,
   loginWithGoogle,
-  loginWithDiscord,
   logout,
   saveUsername,
-  saveProfileEmoji,
+  saveProfilePictureFromFile,
+  useDefaultProfilePicture,
   resendVerificationEmail,
   requestPasswordReset,
   deleteAccount,

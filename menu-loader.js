@@ -23,27 +23,28 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function getSidebarAvatar() {
-    const emoji = localStorage.getItem("panategwa_sidebar_avatar_emoji") || "👤";
-    const url = localStorage.getItem("panategwa_sidebar_avatar_url") || "";
-    return { emoji, url };
+    return {
+      url: localStorage.getItem("panategwa_sidebar_avatar_url") || "",
+      label: localStorage.getItem("panategwa_sidebar_avatar_label") || "👤"
+    };
   }
 
   function renderSidebarAvatar() {
     const btn = document.getElementById("menu-account-button");
     if (!btn) return;
 
-    const { emoji, url } = getSidebarAvatar();
+    const { url, label } = getSidebarAvatar();
 
     if (url) {
-      btn.innerHTML = `<img src="${url}" alt="Account" style="width:20px;height:20px;border-radius:50%;object-fit:cover;display:block;" />`;
+      btn.innerHTML = `<img src="${url}" alt="Account" style="width:22px;height:22px;border-radius:50%;object-fit:cover;display:block;" />`;
     } else {
-      btn.innerHTML = `<span style="font-size:18px;line-height:1;">${emoji || "👤"}</span>`;
+      btn.innerHTML = `<span style="font-size:18px;line-height:1;">${label || "👤"}</span>`;
     }
   }
 
-  window.PanategwaUpdateSidebarAvatar = function (emoji, url) {
-    localStorage.setItem("panategwa_sidebar_avatar_emoji", emoji || "👤");
-    localStorage.setItem("panategwa_sidebar_avatar_url", url || "");
+  window.PanategwaUpdateSidebarAvatar = function (avatarUrl, label) {
+    localStorage.setItem("panategwa_sidebar_avatar_url", avatarUrl || "");
+    localStorage.setItem("panategwa_sidebar_avatar_label", label || "👤");
     renderSidebarAvatar();
   };
 
@@ -63,18 +64,28 @@ document.addEventListener("DOMContentLoaded", function () {
     <div class="line icons">
       <button class="menu-icon-button ${isSettings ? "active-icon" : ""}"
         ${isSettings ? "disabled" : ""}
-        onclick="window.location.href='${buildUrl("settings-page.html")}'">
+        onclick="window.location.href='${buildUrl("settings-page.html")}'"
+        title="Site settings">
         ⚙️
       </button>
 
-      <button id="menu-account-button"
-        class="menu-icon-button ${isAccount ? "active-icon" : ""}"
-        ${isAccount ? "disabled" : ""}
-        onclick="window.location.href='${buildUrl("account-page.html")}'">
+      <button class="menu-icon-button"
+        onclick="window.location.href='${buildUrl("account-page.html")}'"
+        title="Account">
+        <span id="menu-account-button"
+          class="${isAccount ? "active-icon" : ""}"
+          style="display:inline-flex; align-items:center; justify-content:center;"></span>
       </button>
 
       <button class="menu-icon-button"
-        onclick="window.scrollTo({top:0, behavior:'smooth'})">
+        onclick="window.location.href='${buildUrl("streak-page.html")}'"
+        title="Streak">
+        🔥
+      </button>
+
+      <button class="menu-icon-button"
+        onclick="window.scrollTo({top:0, behavior:'smooth'})"
+        title="Top">
         ⬆️
       </button>
     </div>
@@ -110,7 +121,6 @@ document.addEventListener("DOMContentLoaded", function () {
   document.body.appendChild(wrapper);
 
   const handle = document.getElementById("resize-handle");
-
   let isResizing = false;
 
   const MIN_WIDTH = 160;
@@ -145,16 +155,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
   document.addEventListener("mouseup", () => {
     if (!isResizing) return;
-
     isResizing = false;
     document.body.style.userSelect = "auto";
-    const finalWidth = menuContainer.offsetWidth;
-    localStorage.setItem("menuWidth", finalWidth);
+    localStorage.setItem("menuWidth", String(menuContainer.offsetWidth));
   });
 
   handle.addEventListener("dblclick", () => {
     menuContainer.style.width = DEFAULT_WIDTH + "px";
     wrapper.style.paddingLeft = DEFAULT_WIDTH + "px";
-    localStorage.setItem("menuWidth", DEFAULT_WIDTH);
+    localStorage.setItem("menuWidth", String(DEFAULT_WIDTH));
   });
 });

@@ -5,37 +5,35 @@ import {
   doc,
   onSnapshot,
   runTransaction,
-  serverTimestamp
+  serverTimestamp,
+  addDoc,
+  collection
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 export const ACHIEVEMENTS = [
-  { id: "first_login", name: "Login", description: "Log in for the first time.", secret: false },
-  { id: "profile_name", name: "True Name", description: "Set your username.", secret: false },
-  { id: "verified_email", name: "Verified", description: "Verify your email address.", secret: false },
-
-  { id: "panategwa_b", name: "Panategwa B", description: "Visit Panategwa B.", secret: false },
-  { id: "panategwa_c", name: "Panategwa C", description: "Visit Panategwa C.", secret: false },
-  { id: "panategwa_d", name: "Panategwa D", description: "Visit Panategwa D.", secret: false },
-  { id: "panategwa_e", name: "Panategwa E", description: "Visit Panategwa E.", secret: false },
-  { id: "panategwa_f", name: "Panategwa F", description: "Visit Panategwa F.", secret: false },
-  { id: "panategwa_g", name: "Panategwa G", description: "Visit Panategwa G.", secret: false },
-
-  { id: "thrinsachelom_history", name: "Historian", description: "View the history of the Thrinsacheloms.", secret: false },
-  { id: "all_planets", name: "Astronaught", description: "Visit all celestial bodies of the Panategwa System.", secret: false },
-
-  { id: "theme_shifter", name: "Aesthetic Control", description: "Change your theme.", secret: false },
-  { id: "dark_mode", name: "Dark Night", description: "Use Dark Mode.", secret: false },
-  { id: "light_mode", name: "Lights On", description: "Use Light Mode.", secret: false },
-  { id: "ocean_mode", name: "Wavefinder", description: "Use the Ocean theme.", secret: false },
-  { id: "space_mode", name: "Stargazer", description: "Use the Space theme.", secret: false },
-
-  { id: "achievement_collector", name: "Achievement Collector", description: "Unlock 10 achievements.", secret: false },
-  { id: "veteran", name: "Veteran", description: "Unlock 20 achievements.", secret: false },
-
-  { id: "big_reader", name: "Need some glasses?", description: "Set text size to Large.", secret: true },
-  { id: "tiny_text", name: "Microscopic Text", description: "Set text size to Small.", secret: true },
-  { id: "nocturnal", name: "Nocturnal", description: "Visit the site late at night.", secret: true },
-  { id: "morning_person", name: "Morning Person", description: "Visit the site early in the morning.", secret: true }
+  { id: "achievement_collector", name: "Achievement Collector", description: "Unlock 10 achievements.", secret: false, reward: 5 },
+  { id: "all_planets", name: "Astronaut", description: "Visit all celestial bodies of the Panategwa system.", secret: false, reward: 5 },
+  { id: "account_viewed", name: "Account Viewer", description: "Open the account page.", secret: false, reward: 1 },
+  { id: "big_reader", name: "Need some glasses?", description: "Set text size to Large.", secret: true, reward: 2 },
+  { id: "dark_mode", name: "Dark Night", description: "Use Dark Mode.", secret: false, reward: 1 },
+  { id: "first_login", name: "First Contact", description: "Log in for the first time.", secret: false, reward: 1 },
+  { id: "light_mode", name: "Sunshine", description: "Use Light Mode.", secret: false, reward: 1 },
+  { id: "morning_person", name: "Morning Person", description: "Visit between 3am and 10am.", secret: true, reward: 2 },
+  { id: "nocturnal", name: "Nocturnal", description: "Visit between 9pm and 3am.", secret: true, reward: 2 },
+  { id: "ocean_mode", name: "Wavefinder", description: "Use the Ocean theme.", secret: false, reward: 1 },
+  { id: "panategwa_b", name: "Panategwa B", description: "Visit Panategwa B.", secret: false, reward: 1 },
+  { id: "panategwa_c", name: "Panategwa C", description: "Visit Panategwa C.", secret: false, reward: 1 },
+  { id: "panategwa_d", name: "Panategwa D", description: "Visit Panategwa D.", secret: false, reward: 1 },
+  { id: "panategwa_e", name: "Panategwa E", description: "Visit Panategwa E.", secret: false, reward: 1 },
+  { id: "panategwa_f", name: "Panategwa F", description: "Visit Panategwa F.", secret: false, reward: 1 },
+  { id: "panategwa_g", name: "Panategwa G", description: "Visit Panategwa G.", secret: false, reward: 1 },
+  { id: "profile_name", name: "True Name", description: "Set your username.", secret: false, reward: 1 },
+  { id: "space_mode", name: "Stargazer", description: "Use the Space theme.", secret: false, reward: 1 },
+  { id: "theme_shifter", name: "Aesthetic Control", description: "Change your theme.", secret: false, reward: 1 },
+  { id: "thrinsachelom_history", name: "Historian", description: "View the history of the Thrinsacheloms.", secret: false, reward: 2 },
+  { id: "tiny_text", name: "Microscopic Text", description: "Set text size to Small.", secret: true, reward: 2 },
+  { id: "verified_email", name: "Verified Signal", description: "Verify your email address.", secret: false, reward: 2 },
+  { id: "veteran", name: "Veteran", description: "Reach 20 XP.", secret: false, reward: 5 }
 ];
 
 const ACHIEVEMENT_MAP = new Map(ACHIEVEMENTS.map(a => [a.id, a]));
@@ -47,8 +45,6 @@ let toastQueue = [];
 let toastActive = false;
 let toastTimer = null;
 let pollTimer = null;
-let lastProfileState = null;
-let activeFilter = localStorage.getItem("achievementFilter") || "both";
 
 function pageId() {
   return (window.location.pathname.split("/").pop() || "index.html").toLowerCase();
@@ -69,7 +65,6 @@ function currentTextSize() {
 function uniqueKnown(list) {
   const seen = new Set();
   const out = [];
-
   for (const raw of Array.isArray(list) ? list : []) {
     const id = String(raw || "").trim();
     if (!KNOWN_IDS.has(id)) continue;
@@ -77,7 +72,6 @@ function uniqueKnown(list) {
     seen.add(id);
     out.push(id);
   }
-
   return out;
 }
 
@@ -90,59 +84,28 @@ function achievementById(id) {
 }
 
 function visitedPages(profile) {
-  return [...new Set(
-    (Array.isArray(profile?.visitedPages) ? profile.visitedPages : [])
-      .map(v => String(v || "").trim())
-      .filter(Boolean)
-  )];
+  return [...new Set((Array.isArray(profile?.visitedPages) ? profile.visitedPages : [])
+    .map(v => String(v || "").trim())
+    .filter(Boolean))];
 }
 
-function getRankInfo(xp) {
-  if (xp < 5) {
-    return {
-      rank: "Explorer",
-      nextRank: "Adventurer",
-      nextXP: 5,
-      progress: xp / 5,
-      remaining: 5 - xp
-    };
-  }
-
-  if (xp < 20) {
-    return {
-      rank: "Adventurer",
-      nextRank: "Veteran",
-      nextXP: 20,
-      progress: (xp - 5) / 15,
-      remaining: 20 - xp
-    };
-  }
-
-  return {
-    rank: "Veteran",
-    nextRank: null,
-    nextXP: null,
-    progress: 1,
-    remaining: 0
-  };
+function rewardForId(id) {
+  return achievementById(id)?.reward || 1;
 }
 
 function computeUnlocks(user, profile, pages) {
   const unlocked = unlockedSet(profile);
   const pending = [];
-
   const add = (id, condition) => {
-    if (condition && !unlocked.has(id) && !pending.includes(id)) {
-      pending.push(id);
-    }
+    if (condition && !unlocked.has(id) && !pending.includes(id)) pending.push(id);
   };
 
   const page = pageId();
-  const xpAfterPending = () => new Set([...Array.from(unlocked), ...pending]).size;
 
   add("first_login", true);
   add("profile_name", !!(profile?.username || user.displayName));
   add("verified_email", !!user.emailVerified);
+  add("account_viewed", isAccountPage());
   add("panategwa_b", page === "panategwa-b-page.html");
   add("panategwa_c", page === "panategwa-c-page.html");
   add("panategwa_d", page === "panategwa-d-page.html");
@@ -153,15 +116,8 @@ function computeUnlocks(user, profile, pages) {
 
   add(
     "all_planets",
-    [
-      "panategwa-page.html",
-      "panategwa-b-page.html",
-      "panategwa-c-page.html",
-      "panategwa-d-page.html",
-      "panategwa-e-page.html",
-      "panategwa-f-page.html",
-      "panategwa-g-page.html"
-    ].every(p => pages.includes(p))
+    ["panategwa-page.html", "panategwa-b-page.html", "panategwa-c-page.html", "panategwa-d-page.html", "panategwa-e-page.html", "panategwa-f-page.html", "panategwa-g-page.html"]
+      .every(p => pages.includes(p))
   );
 
   const theme = currentTheme();
@@ -177,12 +133,31 @@ function computeUnlocks(user, profile, pages) {
 
   const hour = new Date().getHours();
   add("nocturnal", hour >= 21 || hour < 3);
-  add("morning_person", hour >= 3 && hour < 10);
+  add("morning_person", hour >= 3 && hour < 11);
 
-  add("achievement_collector", xpAfterPending() >= 10);
-  add("veteran", xpAfterPending() >= 20);
+  add("achievement_collector", unlocked.size + pending.length >= 10);
+  add("veteran", unlocked.size + pending.length >= 20);
 
   return pending;
+}
+
+async function sendAchievementMessage(user, achievement) {
+  await addDoc(collection(db, "messages"), {
+    fromUid: user.uid,
+    toUid: user.uid,
+    participants: [user.uid],
+    fromName: user.displayName || user.email?.split("@")?.[0] || "System",
+    toName: user.displayName || user.email?.split("@")?.[0] || "System",
+    kind: "achievement",
+    title: `Achievement unlocked: ${achievement.name}`,
+    body: `You unlocked ${achievement.name} and earned +${achievement.reward} XP.`,
+    targetSection: "progress",
+    targetSubSection: "progress",
+    targetId: achievement.id,
+    readBy: [user.uid],
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
 }
 
 async function syncAchievementProgress(user, profile) {
@@ -195,7 +170,6 @@ async function syncAchievementProgress(user, profile) {
 
     const currentAchievements = uniqueKnown(data.achievements || profile?.achievements || []);
     const currentVisited = visitedPages(data);
-
     const page = pageId();
     const nextVisited = [...new Set([...currentVisited, page])];
 
@@ -217,7 +191,9 @@ async function syncAchievementProgress(user, profile) {
 
     const pending = computeUnlocks(user, mergedProfile, nextVisited);
     const mergedAchievements = uniqueKnown([...currentAchievements, ...pending]);
-    const xp = mergedAchievements.length;
+
+    const addedReward = pending.reduce((sum, id) => sum + rewardForId(id), 0);
+    const xp = (typeof data.xp === "number" ? data.xp : currentAchievements.length) + addedReward;
 
     const nextDoc = {
       uid: user.uid,
@@ -281,10 +257,6 @@ function ensureToastStyle() {
       user-select: none;
     }
 
-    .achievement-toast:hover {
-      filter: brightness(1.08);
-    }
-
     .achievement-toast-title {
       font-weight: 700;
       font-size: 0.95rem;
@@ -300,84 +272,6 @@ function ensureToastStyle() {
       font-size: 0.92rem;
       opacity: 0.84;
       line-height: 1.35;
-    }
-
-    .achievement-filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .achievement-filter-btn {
-      margin: 0;
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.16);
-      background: rgba(255,255,255,0.08);
-      color: inherit;
-      cursor: pointer;
-      font: inherit;
-      font-weight: 700;
-    }
-
-    .achievement-filter-btn.active {
-      filter: brightness(0.85);
-      background: rgba(175, 200, 75, 0.28);
-    }
-
-    .xp-panel {
-      display: grid;
-      gap: 10px;
-      padding: 14px;
-      border-radius: 14px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.12);
-      margin-bottom: 14px;
-    }
-
-    .xp-panel-topline {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-      font-weight: 700;
-    }
-
-    .xp-track {
-      width: 100%;
-      height: 18px;
-      border-radius: 999px;
-      overflow: hidden;
-      background: rgba(255,255,255,0.12);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
-    }
-
-    .xp-fill {
-      width: 0%;
-      height: 100%;
-      border-radius: 999px;
-      background: linear-gradient(90deg, rgba(175,200,75,0.95), rgba(80,180,255,0.95));
-      transition: width 1.1s cubic-bezier(.22,1,.36,1);
-      will-change: width;
-    }
-
-    .xp-foot {
-      font-size: 0.92rem;
-      opacity: 0.82;
-    }
-
-    .achievement-list-inner {
-      display: grid;
-      gap: 10px;
-    }
-
-    .achievement-empty {
-      padding: 14px;
-      border-radius: 12px;
-      background: rgba(255,255,255,0.05);
-      border: 1px dashed rgba(255,255,255,0.16);
-      opacity: 0.85;
     }
 
     @keyframes achFadeIn {
@@ -424,10 +318,11 @@ function showNextToast() {
     <div class="achievement-toast-title">Achievement unlocked</div>
     <div class="achievement-toast-name">${achievement.name}</div>
     <div class="achievement-toast-desc">${achievement.description}</div>
+    <div class="achievement-toast-desc">+${achievement.reward} XP</div>
   `;
 
   card.addEventListener("click", () => {
-    window.location.href = "account-page.html";
+    window.location.href = "account-page.html?tab=progress";
   });
 
   stack.appendChild(card);
@@ -440,102 +335,40 @@ function showNextToast() {
   }, 5000);
 }
 
-function setAchievementFilter(mode) {
-  if (!["both", "unlocked", "locked"].includes(mode)) return;
-  activeFilter = mode;
-  localStorage.setItem("achievementFilter", mode);
-  renderAchievements(lastProfileState);
-}
-
-window.setAchievementFilter = setAchievementFilter;
-
-function animateBar(targetPercent) {
-  const fill = document.getElementById("xp-bar-fill");
-  if (!fill) return;
-
-  fill.style.width = "0%";
-  fill.getBoundingClientRect();
-
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      fill.style.width = `${targetPercent}%`;
-    });
-  });
-}
-
-function renderProgress(profile) {
-  const unlocked = unlockedSet(profile);
-  const xp = typeof profile?.xp === "number" ? profile.xp : unlocked.size;
-  const rankInfo = getRankInfo(xp);
-
-  const rankEl = document.getElementById("xp-rank");
-  const needEl = document.getElementById("xp-need");
-  const totalEl = document.getElementById("xp-total");
-  const labelEl = document.getElementById("xp-label");
-
-  if (rankEl) rankEl.textContent = rankInfo.rank;
-  if (needEl) needEl.textContent = rankInfo.nextRank ? `${rankInfo.remaining} XP to ${rankInfo.nextRank}` : "Max rank reached";
-  if (totalEl) totalEl.textContent = String(xp);
-  if (labelEl) labelEl.textContent = rankInfo.nextRank ? `Next rank at ${rankInfo.nextXP} XP` : "You have reached the maximum rank";
-
-  animateBar(Math.max(0, Math.min(100, rankInfo.progress * 100)));
-}
-
 function renderAchievements(profile) {
-  lastProfileState = profile || null;
-  renderProgress(profile);
-
   const container = document.getElementById("achievements-list");
+  const xpEl = document.getElementById("xp-count");
   const countEl = document.getElementById("achievement-count");
 
   const unlocked = unlockedSet(profile);
+  const xp = typeof profile?.xp === "number" ? profile.xp : unlocked.size;
+
+  if (xpEl) xpEl.textContent = String(xp);
   if (countEl) countEl.textContent = String(unlocked.size);
+
   if (!container) return;
 
-  const allSorted = [...ACHIEVEMENTS].sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
-  );
+  const ordered = [
+    ...ACHIEVEMENTS.filter(a => unlocked.has(a.id)).sort((a, b) => a.name.localeCompare(b.name)),
+    ...ACHIEVEMENTS.filter(a => !unlocked.has(a.id)).sort((a, b) => a.name.localeCompare(b.name))
+  ];
 
-  const unlockedItems = allSorted.filter(a => unlocked.has(a.id));
-  const lockedItems = allSorted.filter(a => !unlocked.has(a.id));
+  container.innerHTML = ordered.map(achievement => {
+    const isUnlocked = unlocked.has(achievement.id);
+    const title = achievement.secret && !isUnlocked ? "Secret" : achievement.name;
+    const desc = achievement.secret && !isUnlocked ? "Hidden achievement" : achievement.description;
 
-  let items = [];
-  if (activeFilter === "unlocked") items = unlockedItems;
-  else if (activeFilter === "locked") items = lockedItems;
-  else items = [...unlockedItems, ...lockedItems];
-
-  container.innerHTML = `
-    <div class="achievement-filters">
-      <button type="button" class="achievement-filter-btn ${activeFilter === "both" ? "active" : ""}" onclick="window.setAchievementFilter('both')">Both</button>
-      <button type="button" class="achievement-filter-btn ${activeFilter === "unlocked" ? "active" : ""}" onclick="window.setAchievementFilter('unlocked')">Unlocked</button>
-      <button type="button" class="achievement-filter-btn ${activeFilter === "locked" ? "active" : ""}" onclick="window.setAchievementFilter('locked')">Locked</button>
-    </div>
-
-    <div class="achievement-list-inner">
-      ${
-        items.length
-          ? items.map(achievement => {
-              const isUnlocked = unlocked.has(achievement.id);
-              const title = achievement.secret && !isUnlocked ? "Secret" : achievement.name;
-              const desc = achievement.secret && !isUnlocked ? "Hidden achievement" : achievement.description;
-              const icon = isUnlocked ? "🏆" : "🔒";
-
-              return `
-                <div class="achievement-card ${isUnlocked ? "unlocked" : "locked"} ${achievement.secret ? "secret" : ""}">
-                  <div class="achievement-icon">${icon}</div>
-                  <div class="achievement-body">
-                    <div class="achievement-name">${title}</div>
-                    <div class="achievement-desc">${desc}</div>
-                  </div>
-                </div>
-              `;
-            }).join("")
-          : `<div class="achievement-empty">No achievements to show.</div>`
-      }
-    </div>
-  `;
-
-  renderProgress(profile);
+    return `
+      <div class="achievement-card ${isUnlocked ? "unlocked" : "locked"}" id="achievement-card-${achievement.id}" data-achievement-id="${achievement.id}">
+        <div class="achievement-icon">${isUnlocked ? "🏆" : "🔒"}</div>
+        <div>
+          <div class="achievement-name">${title}</div>
+          <div class="achievement-desc">${desc}</div>
+          <div class="achievement-desc">+${achievement.reward} XP</div>
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
 function startAccountWatcher() {
@@ -551,7 +384,11 @@ function startAccountWatcher() {
       renderAchievements(result.profile || profile);
 
       for (const id of result.newlyUnlocked) {
-        showAchievementToast(id);
+        const achievement = achievementById(id);
+        if (achievement) {
+          showAchievementToast(achievement);
+          await sendAchievementMessage(user, achievement);
+        }
       }
     } catch (err) {
       console.error("Achievement tracker error:", err);
@@ -590,7 +427,11 @@ function startPoller() {
       renderAchievements(result.profile || profile);
 
       for (const id of result.newlyUnlocked) {
-        showAchievementToast(id);
+        const achievement = achievementById(id);
+        if (achievement) {
+          showAchievementToast(achievement);
+          await sendAchievementMessage(user, achievement);
+        }
       }
     } catch (err) {
       console.error("Achievement poll error:", err);
@@ -616,5 +457,6 @@ if (document.readyState === "loading") {
 export {
   syncAchievementProgress,
   renderAchievements,
-  showAchievementToast
+  showAchievementToast,
+  ACHIEVEMENTS
 };

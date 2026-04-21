@@ -371,3 +371,182 @@ main {
   pointer-events: none;
 }
 
+/* ===== Panategwa account extras ===== */
+
+.copy-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.09);
+  color: inherit;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: transform 0.15s ease, filter 0.15s ease, background 0.15s ease;
+}
+
+.copy-icon-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.copy-icon-btn:active {
+  transform: translateY(0);
+}
+
+.copy-icon-btn .mini-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.streak-panel {
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+}
+
+.streak-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: start;
+}
+
+.streak-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.streak-stat {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  display: grid;
+  gap: 4px;
+}
+
+.streak-stat span {
+  font-size: 0.88rem;
+  opacity: 0.78;
+}
+
+.streak-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.streak-day {
+  padding: 10px 8px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  text-align: center;
+  display: grid;
+  gap: 4px;
+}
+
+.streak-day.done {
+  background: rgba(175,200,75,0.16);
+  border-color: rgba(175,200,75,0.22);
+}
+
+.streak-day-label {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.streak-day-xp {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.profile-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: start;
+  margin-bottom: 10px;
+}
+
+.profile-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.profile-id {
+  opacity: 0.8;
+  font-size: 0.92rem;
+  word-break: break-all;
+}
+
+.profile-badge {
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.group-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: start;
+  margin-bottom: 10px;
+}
+
+.group-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.group-meta {
+  opacity: 0.8;
+  font-size: 0.92rem;
+}
+
+.group-actions-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.group-manager {
+  display: grid;
+  gap: 12px;
+}
+
+.group-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.group-edit-grid input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(0,0,0,0.26);
+  font: inherit;
+  background: rgba(255,255,255,0.94);
+}
+
+@media (max-width: 700px) {
+  .streak-stats,
+  .streak-week,
+  .group-edit-grid {
+    grid-template-columns: 1fr;
+  }
+}

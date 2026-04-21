@@ -9,6 +9,7 @@ import {
   sendChatMessage,
   sendGroupMessage,
   createGroupChat,
+  joinGroupChatById,
   updateGroupChatInfo,
   addMembersToGroupChat,
   deleteGroupChat,
@@ -21,8 +22,8 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
-let activeTab = "direct";
-let directFilter = "all";
+let activeTab = "system";
+let chatMode = "direct";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -37,36 +38,47 @@ function friendName(uid) {
 }
 
 function resolveMessageTarget(msg) {
-  if (!msg) return { section: "messages", sub: "direct", targetId: null };
+  if (!msg) return { section: "messages", sub: "chat", targetId: null };
+
+  if (msg.kind === "achievement") {
+    return { section: "progress", sub: "progress", targetId: msg.targetId || msg.achievementId || null };
+  }
+
+  if (msg.kind === "streak") {
+    return { section: "streak", sub: "overview", targetId: null };
+  }
 
   if (msg.kind === "friend-request") {
     return { section: "friends", sub: "requests", targetId: msg.fromUid || null };
   }
 
   if (msg.kind === "friend-accepted" || msg.kind === "friend-declined" || msg.kind === "friend-blocked" || msg.kind === "chat") {
-    return { section: "messages", sub: "direct", targetId: msg.conversationUid || msg.fromUid || null };
+    return { section: "messages", sub: "chat", targetId: msg.conversationUid || msg.fromUid || null };
   }
 
   if (msg.kind === "group-invite") {
-    return { section: "messages", sub: "invites", targetId: msg.groupChatId || msg.targetId || null };
-  }
-
-  if (msg.kind === "achievement") {
-    return { section: "progress", sub: "progress", targetId: msg.targetId || msg.achievementId || null };
+    return { section: "messages", sub: "chat", targetId: msg.groupChatId || msg.targetId || null };
   }
 
   return {
     section: msg.targetSection || "messages",
-    sub: msg.targetSubSection || "direct",
+    sub: msg.targetSubSection || "system",
     targetId: msg.targetId || msg.conversationUid || msg.fromUid || null
   };
 }
 
 function showTarget(msg) {
   const target = resolveMessageTarget(msg);
+
+  if (target.section === "streak") {
+    window.location.href = "auth/streak.html";
+    return;
+  }
+
   if (typeof window.openAccountArea === "function") {
     window.openAccountArea(target.section, target.sub, target.targetId);
   }
+
   if (target.section === "progress" && target.targetId) {
     setTimeout(() => {
       document.getElementById(`achievement-card-${target.targetId}`)?.scrollIntoView({
@@ -100,10 +112,21 @@ function messageCard(msg) {
   `;
 }
 
-function renderDirect(state) {
+function renderSystem(state) {
+  const list = $("system-message-list");
+  if (!list) return;
+
+  const messages = (state.messages || []).filter(m => m.kind !== "chat");
+
+  list.innerHTML = messages.length
+    ? messages.map(messageCard).join("")
+    : `<div class="msg-empty">No system messages yet.</div>`;
+}
+
+function renderChat(state) {
   const friends = (state.friends || []).map(uid => ({ uid, name: friendName(uid) }));
-  const q = String($("messages-friend-search")?.value || "").trim().toLowerCase();
-  const filteredFriends = friends.filter(f => !q || f.name.toLowerCase().includes(q) || f.uid.toLowerCase().includes(q));
+  const search = String($("messages-friend-search")?.value || "").trim().toLowerCase();
+  const filteredFriends = friends.filter(f => !search || f.name.toLowerCase().includes(search) || f.uid.toLowerCase().includes(search));
 
   const selectedUid = state.selectedConversationId || filteredFriends[0]?.uid || null;
   if (!state.selectedConversationId && selectedUid) setSelectedConversation(selectedUid);
@@ -127,28 +150,26 @@ function renderDirect(state) {
 
   if (conversation) {
     const msgs = selectedUid ? getConversationMessages(selectedUid) : [];
-    conversation.innerHTML = msgs.length ? msgs.map(messageCard).join("") : `<div class="msg-empty">No messages yet.</div>`;
+    conversation.innerHTML = msgs.length
+      ? msgs.map(messageCard).join("")
+      : `<div class="msg-empty">No messages yet.</div>`;
   }
 
   $("messages-send-btn")?.setAttribute("data-target-uid", selectedUid || "");
-}
 
-function renderGroups(state) {
   const chats = state.groupChats || [];
-  const q = String($("groups-search")?.value || "").trim().toLowerCase();
-  const filteredChats = chats.filter(c => !q || String(c.name || "").toLowerCase().includes(q) || String(c.id || "").toLowerCase().includes(q));
-
-  const selectedId = state.selectedGroupChatId || filteredChats[0]?.id || null;
-  if (!state.selectedGroupChatId && selectedId) setSelectedGroupChatId(selectedId);
+  const groupSearch = String($("groups-search")?.value || "").trim().toLowerCase();
+  const filteredChats = chats.filter(c => !groupSearch || String(c.name || "").toLowerCase().includes(groupSearch) || String(c.id || "").toLowerCase().includes(groupSearch));
+  const selectedGroup = state.selectedGroupChatId || filteredChats[0]?.id || null;
+  if (!state.selectedGroupChatId && selectedGroup) setSelectedGroupChatId(selectedGroup);
 
   const list = $("groups-list");
   const view = $("groups-view");
-  const current = filteredChats.find(c => c.id === selectedId) || filteredChats[0] || null;
 
   if (list) {
     list.innerHTML = filteredChats.length
       ? filteredChats.map(chat => `
-        <button class="group-pill ${chat.id === selectedId ? "active" : ""}" type="button" data-action="pick-group" data-id="${escapeHtml(chat.id)}">
+        <button class="group-pill ${chat.id === selectedGroup ? "active" : ""}" type="button" data-action="pick-group" data-id="${escapeHtml(chat.id)}">
           <span>${escapeHtml(chat.emoji || "👥")} ${escapeHtml(chat.name || "Group chat")}</span>
           <small>${escapeHtml((chat.members || []).length)} members</small>
         </button>
@@ -157,17 +178,19 @@ function renderGroups(state) {
   }
 
   if (view) {
-    const messages = selectedId ? getGroupChatMessages(selectedId) : [];
-    view.innerHTML = selectedId ? `
+    const messages = selectedGroup ? getGroupChatMessages(selectedGroup) : [];
+    const current = filteredChats.find(c => c.id === selectedGroup) || null;
+
+    view.innerHTML = selectedGroup ? `
       <div class="group-header">
         <div>
           <div class="group-name">${escapeHtml(current?.emoji || "👥")} ${escapeHtml(current?.name || "Group chat")}</div>
           <div class="group-meta">${escapeHtml((current?.members || []).length || 0)} members</div>
         </div>
         <div class="group-actions-inline">
-          <button type="button" data-action="copy-group-id" data-id="${escapeHtml(selectedId)}">Copy ID</button>
-          <button type="button" data-action="leave-group" data-id="${escapeHtml(selectedId)}">Leave</button>
-          <button type="button" data-action="delete-group" data-id="${escapeHtml(selectedId)}">Delete</button>
+          <button type="button" data-action="copy-group-id" data-id="${escapeHtml(selectedGroup)}">Copy ID</button>
+          <button type="button" data-action="leave-group" data-id="${escapeHtml(selectedGroup)}">Leave</button>
+          <button type="button" data-action="delete-group" data-id="${escapeHtml(selectedGroup)}">Delete</button>
         </div>
       </div>
 
@@ -175,12 +198,17 @@ function renderGroups(state) {
         <div class="group-edit-grid">
           <input id="group-rename-input" type="text" placeholder="Rename group" value="${escapeHtml(current?.name || "")}" />
           <input id="group-emoji-input" type="text" placeholder="Group emoji" value="${escapeHtml(current?.emoji || "👥")}" />
-          <button type="button" id="group-save-btn" data-group-id="${escapeHtml(selectedId)}">Save group info</button>
+          <button type="button" id="group-save-btn" data-group-id="${escapeHtml(selectedGroup)}">Save group info</button>
         </div>
 
         <div class="group-edit-grid" style="margin-top:12px;">
           <input id="group-add-member-input" type="text" placeholder="Add member by ID" />
-          <button type="button" id="group-add-member-btn" data-group-id="${escapeHtml(selectedId)}">Invite member</button>
+          <button type="button" id="group-add-member-btn" data-group-id="${escapeHtml(selectedGroup)}">Invite member</button>
+        </div>
+
+        <div class="group-edit-grid" style="margin-top:12px;">
+          <input id="join-group-input" type="text" placeholder="Join group by chat ID" />
+          <button type="button" id="join-group-btn">Join chat</button>
         </div>
       </div>
 
@@ -190,7 +218,7 @@ function renderGroups(state) {
 
       <div class="composer-row" style="margin-top:12px;">
         <input id="group-message-input" type="text" placeholder="Write a group message..." />
-        <button id="send-group-message-btn" type="button" data-group-id="${escapeHtml(selectedId)}">Send</button>
+        <button id="send-group-message-btn" type="button" data-group-id="${escapeHtml(selectedGroup)}">Send</button>
       </div>
     ` : `<div class="msg-empty">Pick a group chat.</div>`;
   }
@@ -215,19 +243,6 @@ function renderGroups(state) {
   }
 }
 
-function renderSystem(state) {
-  const list = $("system-message-list");
-  if (!list) return;
-
-  const messages = (state.messages || []).filter(m => {
-    if (directFilter === "system") return ["system", "friend-request", "friend-accepted", "friend-declined", "friend-blocked", "group-invite"].includes(m.kind);
-    if (directFilter === "friends") return m.kind === "chat" || m.kind === "friend-accepted" || m.kind === "friend-declined" || m.kind === "friend-blocked";
-    return true;
-  });
-
-  list.innerHTML = messages.length ? messages.map(messageCard).join("") : `<div class="msg-empty">No messages here.</div>`;
-}
-
 function render(state) {
   const root = $("messages-root");
   if (!root) return;
@@ -240,26 +255,31 @@ function render(state) {
           <p>${state.unreadCount || 0} unread</p>
         </div>
         <div class="messages-toolbar">
-          <button class="tab-chip ${directFilter === "all" ? "active" : ""}" type="button" data-filter="all">All</button>
-          <button class="tab-chip ${directFilter === "system" ? "active" : ""}" type="button" data-filter="system">System</button>
-          <button class="tab-chip ${directFilter === "friends" ? "active" : ""}" type="button" data-filter="friends">Friend messages</button>
+          <button class="tab-chip ${activeTab === "system" ? "active" : ""}" type="button" data-tab="system">System</button>
+          <button class="tab-chip ${activeTab === "chat" ? "active" : ""}" type="button" data-tab="chat">Chat</button>
           <button type="button" id="msg-read-all">Read all</button>
           <button type="button" id="msg-unread-all">Unread all</button>
         </div>
       </div>
 
-      <div class="messages-tabs">
-        <button class="tab-chip ${activeTab === "direct" ? "active" : ""}" type="button" data-tab="direct">Direct</button>
-        <button class="tab-chip ${activeTab === "groups" ? "active" : ""}" type="button" data-tab="groups">Groups</button>
-        <button class="tab-chip ${activeTab === "system" ? "active" : ""}" type="button" data-tab="system">System</button>
+      <div class="messages-panel ${activeTab === "system" ? "active" : ""}" data-panel="system">
+        <div class="system-panel">
+          <div id="system-message-list" class="message-stream"></div>
+        </div>
       </div>
 
-      <div class="messages-panel ${activeTab === "direct" ? "active" : ""}" data-panel="direct">
+      <div class="messages-panel ${activeTab === "chat" ? "active" : ""}" data-panel="chat">
+        <div class="messages-tabs">
+          <button class="tab-chip ${chatMode === "direct" ? "active" : ""}" type="button" data-chatmode="direct">Direct</button>
+          <button class="tab-chip ${chatMode === "groups" ? "active" : ""}" type="button" data-chatmode="groups">Groups</button>
+        </div>
+
         <div class="discord-layout">
           <aside class="discord-side">
             <input id="messages-friend-search" type="text" placeholder="Search friends" />
             <div id="messages-friend-list" class="stack"></div>
           </aside>
+
           <main class="discord-main">
             <div class="channel-bar">
               <div id="direct-composer-target">Pick a friend to start chatting</div>
@@ -271,10 +291,8 @@ function render(state) {
             </div>
           </main>
         </div>
-      </div>
 
-      <div class="messages-panel ${activeTab === "groups" ? "active" : ""}" data-panel="groups">
-        <div class="discord-layout">
+        <div class="discord-layout" style="margin-top:14px;">
           <aside class="discord-side">
             <div class="side-block">
               <div class="side-title">Your groups</div>
@@ -289,30 +307,29 @@ function render(state) {
               <input id="new-group-members" type="text" placeholder="Member IDs, comma separated" />
               <button id="create-group-btn" type="button">Create</button>
             </div>
+
+            <div class="side-block">
+              <div class="side-title">Join existing chat</div>
+              <input id="join-group-input" type="text" placeholder="Chat ID" />
+              <button id="join-group-btn" type="button">Join chat</button>
+            </div>
           </aside>
 
           <main class="discord-main">
             <div id="groups-view" class="message-stream"></div>
           </main>
         </div>
-      </div>
 
-      <div class="messages-panel ${activeTab === "system" ? "active" : ""}" data-panel="system">
-        <div class="system-panel">
-          <div id="system-message-list" class="message-stream"></div>
+        <div class="card" style="margin-top:14px;">
+          <h3>Group invites</h3>
+          <div id="groups-invite-list"></div>
         </div>
-      </div>
-
-      <div class="card">
-        <h3>Group invites</h3>
-        <div id="groups-invite-list"></div>
       </div>
     </div>
   `;
 
-  renderDirect(state);
-  renderGroups(state);
   renderSystem(state);
+  renderChat(state);
 }
 
 function bind(root) {
@@ -331,8 +348,8 @@ function bind(root) {
         return;
       }
 
-      if (btn.dataset.filter) {
-        directFilter = btn.dataset.filter;
+      if (btn.dataset.chatmode) {
+        chatMode = btn.dataset.chatmode;
         render(socialState);
         return;
       }
@@ -373,7 +390,7 @@ function bind(root) {
         const card = btn.closest("[data-msg-id]");
         if (!card) return;
         if (typeof window.openAccountArea === "function") {
-          window.openAccountArea("messages", activeTab, card.dataset.targetId || uid);
+          window.openAccountArea("messages", "system", card.dataset.targetId || uid);
         }
         return;
       }
@@ -396,7 +413,7 @@ function bind(root) {
       }
 
       if (action === "view-group-invite") {
-        activeTab = "groups";
+        activeTab = "chat";
         setSelectedGroupChatId(id);
         render(socialState);
         return;
@@ -417,15 +434,15 @@ function bind(root) {
   });
 
   root.addEventListener("click", async (e) => {
-    const idBtn = e.target.closest("#msg-read-all, #msg-unread-all, #messages-send-btn, #send-group-message-btn, #create-group-btn, #group-save-btn, #group-add-member-btn");
-    if (!idBtn) return;
+    const button = e.target.closest("#msg-read-all, #msg-unread-all, #messages-send-btn, #send-group-message-btn, #create-group-btn, #group-save-btn, #group-add-member-btn, #join-group-btn");
+    if (!button) return;
 
     try {
-      if (idBtn.id === "msg-read-all") await markAllMessagesRead();
-      if (idBtn.id === "msg-unread-all") await markAllMessagesUnread();
+      if (button.id === "msg-read-all") await markAllMessagesRead();
+      if (button.id === "msg-unread-all") await markAllMessagesUnread();
 
-      if (idBtn.id === "messages-send-btn") {
-        const target = idBtn.dataset.targetUid || socialState.selectedConversationId;
+      if (button.id === "messages-send-btn") {
+        const target = button.dataset.targetUid || socialState.selectedConversationId;
         const input = $("direct-message-input");
         if (target && input?.value.trim()) {
           await sendChatMessage(target, input.value.trim());
@@ -433,8 +450,8 @@ function bind(root) {
         }
       }
 
-      if (idBtn.id === "send-group-message-btn") {
-        const chatId = idBtn.dataset.groupId || socialState.selectedGroupChatId;
+      if (button.id === "send-group-message-btn") {
+        const chatId = button.dataset.groupId || socialState.selectedGroupChatId;
         const input = $("group-message-input");
         if (chatId && input?.value.trim()) {
           await sendGroupMessage(chatId, input.value.trim());
@@ -442,29 +459,35 @@ function bind(root) {
         }
       }
 
-      if (idBtn.id === "create-group-btn") {
+      if (button.id === "create-group-btn") {
         const name = $("new-group-name")?.value || "";
         const emoji = $("new-group-emoji")?.value || "👥";
         const members = String($("new-group-members")?.value || "").split(",").map(s => s.trim()).filter(Boolean);
         const chatId = await createGroupChat(name, emoji, members);
         setSelectedGroupChatId(chatId);
-        activeTab = "groups";
+        activeTab = "chat";
         render(socialState);
       }
 
-      if (idBtn.id === "group-save-btn") {
-        const chatId = idBtn.dataset.groupId || socialState.selectedGroupChatId;
+      if (button.id === "group-save-btn") {
+        const chatId = button.dataset.groupId || socialState.selectedGroupChatId;
         await updateGroupChatInfo(chatId, {
           name: $("group-rename-input")?.value || "",
           emoji: $("group-emoji-input")?.value || "👥"
         });
       }
 
-      if (idBtn.id === "group-add-member-btn") {
-        const chatId = idBtn.dataset.groupId || socialState.selectedGroupChatId;
+      if (button.id === "group-add-member-btn") {
+        const chatId = button.dataset.groupId || socialState.selectedGroupChatId;
         const uid = $("group-add-member-input")?.value || "";
         if (chatId && uid) await addMembersToGroupChat(chatId, [uid]);
         $("group-add-member-input").value = "";
+      }
+
+      if (button.id === "join-group-btn") {
+        const chatId = $("join-group-input")?.value || "";
+        await joinGroupChatById(chatId);
+        $("join-group-input").value = "";
       }
     } catch (err) {
       alert(err.message || "Action failed.");

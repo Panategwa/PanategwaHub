@@ -3,11 +3,10 @@ import {
   loginWithGoogle,
   createAccount,
   logout,
-  saveUsername,
-  saveProfileEmoji,
-  resendVerificationEmail,
   requestPasswordReset,
-  deleteAccount
+  resendVerificationEmail,
+  deleteAccount,
+  watchAuth
 } from "./auth.js";
 
 import {
@@ -16,21 +15,15 @@ import {
   respondToFriendRequest,
   removeFriend,
   blockUser,
-  toggleRequestsEnabled,
-  toggleChatEnabled,
-  toggleGroupChatsEnabled,
-  toggleShowNonFriendGroupMessages,
-  toggleProfileHidden,
-  disableSocialSystem,
-  enableSocialSystem,
   viewProfileById,
   getUnreadIncomingCount
 } from "./social.js";
 
+import { auth } from "./firebase-config.js";
+
 const $ = (id) => document.getElementById(id);
 
 let currentState = null;
-let profileUsernameDirty = false;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -66,6 +59,14 @@ function progressPercent(xp) {
   return Math.max(0, Math.min(100, ((xp - info.start) / span) * 100));
 }
 
+function formatDateOnly(value) {
+  if (!value) return "—";
+  if (typeof value?.toDate === "function") return value.toDate().toLocaleDateString();
+  if (typeof value === "number") return new Date(value).toLocaleDateString();
+  if (value instanceof Date) return value.toLocaleDateString();
+  return "—";
+}
+
 function showSection(sectionName) {
   document.querySelectorAll(".account-section").forEach(section => {
     section.classList.toggle("active", section.dataset.section === sectionName);
@@ -90,7 +91,40 @@ function showFriendsSubsection(name) {
   });
 }
 
-window.openAccountArea = function openAccountArea(section = "messages", sub = "direct", targetId = null) {
+function applyInitialTab() {
+  const search = new URLSearchParams(window.location.search);
+  const tab = (search.get("tab") || window.location.hash.replace("#", "") || "info").toLowerCase();
+
+  if (tab === "settings") showSection("settings");
+  else if (tab === "progress") showSection("progress");
+  else if (tab === "friends") showSection("friends");
+  else if (tab === "messages") showSection("messages");
+  else showSection("info");
+}
+
+function avatarLabel(state) {
+  const profile = state.profile || {};
+  const user = state.user || {};
+  const name = profile.username || user.displayName || user.email || "Player";
+  const first = String(name).trim().charAt(0).toUpperCase();
+  return first && /[A-Z0-9]/.test(first) ? first : "👤";
+}
+
+function updateSidebarAvatar(state) {
+  const profile = state.profile || {};
+  const user = state.user || null;
+  const photoURL = user?.photoURL || profile?.photoURL || "";
+  const fallback = avatarLabel(state);
+
+  localStorage.setItem("panategwa_sidebar_avatar_url", photoURL || "");
+  localStorage.setItem("panategwa_sidebar_avatar_label", fallback);
+
+  if (typeof window.PanategwaUpdateSidebarAvatar === "function") {
+    window.PanategwaUpdateSidebarAvatar(photoURL || "", fallback);
+  }
+}
+
+window.openAccountArea = function openAccountArea(section = "messages", sub = "system", targetId = null) {
   showSection(section);
 
   if (section === "friends") {
@@ -108,35 +142,11 @@ window.openAccountArea = function openAccountArea(section = "messages", sub = "d
       });
     }, 150);
   }
+
+  if (section === "messages" && typeof window.PanategwaMessagesRender === "function") {
+    window.PanategwaMessagesRender();
+  }
 };
-
-function formatDate(value) {
-  if (!value) return "—";
-  if (typeof value === "number") return new Date(value).toLocaleString();
-  if (typeof value?.toDate === "function") return value.toDate().toLocaleString();
-  if (value instanceof Date) return value.toLocaleString();
-  return "—";
-}
-
-function syncUsernameInput(force = false) {
-  const input = $("profile-username");
-  if (!input) return;
-  const username = currentState?.profile?.username || currentState?.user?.displayName || "Player";
-  if (force || (!profileUsernameDirty && document.activeElement !== input)) {
-    input.value = username;
-  }
-}
-
-function updateSidebarAvatar(user, profile) {
-  const emoji = profile?.avatarEmoji || "👤";
-  const photoURL = user?.photoURL || profile?.photoURL || "";
-  localStorage.setItem("panategwa_sidebar_avatar_emoji", emoji);
-  localStorage.setItem("panategwa_sidebar_avatar_url", photoURL || "");
-
-  if (typeof window.PanategwaUpdateSidebarAvatar === "function") {
-    window.PanategwaUpdateSidebarAvatar(emoji, photoURL);
-  }
-}
 
 function renderAuth(state) {
   const info = $("user-info");
@@ -148,6 +158,7 @@ function renderAuth(state) {
   if (!state.user) {
     if (authCard) authCard.style.display = "block";
     if (accountCard) accountCard.style.display = "none";
+
     info.innerHTML = `
       <p><b>Status:</b> Not logged in</p>
       <p><b>Username:</b> —</p>
@@ -157,9 +168,10 @@ function renderAuth(state) {
       <p><b>Rank:</b> Explorer</p>
       <p><b>Account ID:</b> —</p>
       <p><b>Created:</b> —</p>
-      <p><b>Last login:</b> —</p>
+      <p><b>Streak:</b> —</p>
     `;
-    updateSidebarAvatar(null, null);
+
+    updateSidebarAvatar(state);
     return;
   }
 
@@ -173,13 +185,14 @@ function renderAuth(state) {
   const verified = user.emailVerified ? "Yes" : "No";
   const xp = typeof profile.xp === "number" ? profile.xp : 0;
   const rank = getRank(xp);
+  const streak = profile?.streak?.current || 0;
 
   info.innerHTML = `
     <div class="account-header">
       ${
-        user.photoURL
-          ? `<img src="${escapeHtml(user.photoURL)}" alt="Avatar" class="account-avatar">`
-          : `<div class="account-avatar-placeholder">${escapeHtml(profile.avatarEmoji || "👤")}</div>`
+        user.photoURL || profile.photoURL
+          ? `<img src="${escapeHtml(user.photoURL || profile.photoURL)}" alt="Avatar" class="account-avatar">`
+          : `<div class="account-avatar-placeholder">${escapeHtml(avatarLabel(state))}</div>`
       }
       <div>
         <p style="margin:0;"><b>${escapeHtml(username)}</b></p>
@@ -192,16 +205,60 @@ function renderAuth(state) {
       <div class="info-row"><span>Username</span><strong>${escapeHtml(username)}</strong></div>
       <div class="info-row"><span>Email</span><strong>${escapeHtml(email)}</strong></div>
       <div class="info-row"><span>Verified</span><strong>${verified}</strong></div>
-      <div class="info-row"><span>Account ID</span><strong style="word-break:break-all;">${escapeHtml(user.uid)}</strong></div>
-      <div class="info-row"><span>Created</span><strong>${escapeHtml(formatDate(profile.createdAt))}</strong></div>
-      <div class="info-row"><span>Last login</span><strong>${escapeHtml(formatDate(profile.lastLoginAt))}</strong></div>
+      <div class="info-row">
+        <span>Account ID</span>
+        <strong style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; word-break:break-all;">
+          <span>${escapeHtml(user.uid)}</span>
+          <button id="copy-user-id-btn" type="button" class="copy-icon-btn" aria-label="Copy account ID" title="Copy account ID">
+            <span class="mini-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path fill="currentColor" d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10z"/>
+                <path fill="currentColor" d="M18 5H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16h-8V7h8z"/>
+              </svg>
+            </span>
+          </button>
+        </strong>
+      </div>
+      <div class="info-row"><span>Display ID</span><strong>${escapeHtml(profile.displayId || "Not set")}</strong></div>
+      <div class="info-row"><span>Created</span><strong>${escapeHtml(formatDateOnly(profile.createdAt))}</strong></div>
       <div class="info-row"><span>XP</span><strong>${xp}</strong></div>
       <div class="info-row"><span>Rank</span><strong>${escapeHtml(rank)}</strong></div>
+      <div class="info-row"><span>Streak</span><strong>${streak} day${streak === 1 ? "" : "s"}</strong></div>
     </div>
   `;
 
-  syncUsernameInput(false);
-  updateSidebarAvatar(user, profile);
+  const copyBtn = $("copy-user-id-btn");
+  if (copyBtn) {
+    copyBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(user.uid);
+        copyBtn.innerHTML = `
+          <span class="mini-icon">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path fill="currentColor" d="M9 12.75 5.75 9.5 4.5 10.75 9 15.25 19.5 4.75 18.25 3.5z"/>
+              <path fill="currentColor" d="M19 20H8a2 2 0 0 1-2-2V7h2v11h11z"/>
+            </svg>
+          </span>
+        `;
+        setTimeout(() => {
+          if (copyBtn.isConnected) {
+            copyBtn.innerHTML = `
+              <span class="mini-icon">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path fill="currentColor" d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10z"/>
+                  <path fill="currentColor" d="M18 5H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16h-8V7h8z"/>
+                </svg>
+              </span>
+            `;
+          }
+        }, 5000);
+      } catch {
+        prompt("Copy this ID:", user.uid);
+      }
+    };
+  }
+
+  updateSidebarAvatar(state);
 }
 
 function renderProgress(state) {
@@ -222,7 +279,7 @@ function renderProgress(state) {
   if (total) total.textContent = String(xp);
   if (count) count.textContent = String(xp);
   if (achCount) achCount.textContent = String((state.profile?.achievements || []).length);
-  if (need) need.textContent = xp >= 20 ? "Max rank reached" : `${info.end - xp} XP to next rank`;
+  if (need) need.textContent = xp >= 20 ? "Max rank" : `${info.end - xp} XP to next rank`;
 }
 
 function renderAchievements(state) {
@@ -270,14 +327,18 @@ function renderAchievements(state) {
 function renderFriends(state) {
   const status = $("friends-status");
   const friendsList = $("friends-list");
+  const blockedList = $("blocked-list");
   const requestsList = $("requests-list");
-  const settingsList = $("friends-settings-list");
   const profileView = $("friend-profile-view");
   const searchInput = $("friend-search-input");
 
   const q = String(searchInput?.value || "").trim().toLowerCase();
   const friends = (state.friends || [])
-    .map(uid => state.friendProfiles?.[uid] || { uid, username: uid, avatarEmoji: "👤" })
+    .map(uid => state.friendProfiles?.[uid] || { uid, username: uid, photoURL: "" })
+    .filter(f => !q || String(f.username || "").toLowerCase().includes(q) || String(f.uid || "").toLowerCase().includes(q));
+
+  const blocked = (state.blocked || [])
+    .map(uid => state.friendProfiles?.[uid] || { uid, username: uid, photoURL: "" })
     .filter(f => !q || String(f.username || "").toLowerCase().includes(q) || String(f.uid || "").toLowerCase().includes(q));
 
   if (status) {
@@ -289,7 +350,7 @@ function renderFriends(state) {
     searchResults.innerHTML = friends.length
       ? friends.map(friend => `
         <div class="social-item">
-          <div class="social-icon">${escapeHtml(friend.avatarEmoji || "👤")}</div>
+          <div class="social-icon">${friend.photoURL ? `<img src="${escapeHtml(friend.photoURL)}" alt="" style="width:40px;height:40px;border-radius:12px;object-fit:cover;">` : "👤"}</div>
           <div class="social-main">
             <div class="social-title">${escapeHtml(friend.username || "Player")}</div>
             <div class="social-sub">${escapeHtml(friend.uid)}</div>
@@ -307,7 +368,7 @@ function renderFriends(state) {
     friendsList.innerHTML = friends.length
       ? friends.map(friend => `
         <div class="social-item">
-          <div class="social-icon">${escapeHtml(friend.avatarEmoji || "👤")}</div>
+          <div class="social-icon">${friend.photoURL ? `<img src="${escapeHtml(friend.photoURL)}" alt="" style="width:40px;height:40px;border-radius:12px;object-fit:cover;">` : "👤"}</div>
           <div class="social-main">
             <div class="social-title">${escapeHtml(friend.username || "Player")}</div>
             <div class="social-sub">${escapeHtml(friend.uid)}</div>
@@ -324,9 +385,24 @@ function renderFriends(state) {
       : `<div class="empty-state">No friends yet.</div>`;
   }
 
+  if (blockedList) {
+    blockedList.innerHTML = blocked.length
+      ? blocked.map(friend => `
+        <div class="social-item">
+          <div class="social-icon">⛔</div>
+          <div class="social-main">
+            <div class="social-title">${escapeHtml(friend.username || "Player")}</div>
+            <div class="social-sub">${escapeHtml(friend.uid)}</div>
+          </div>
+        </div>
+      `).join("")
+      : `<div class="empty-state">No blocked users.</div>`;
+  }
+
   if (requestsList) {
     const incoming = state.incomingRequests || [];
     const outgoing = state.outgoingRequests || [];
+
     requestsList.innerHTML = `
       <div class="subsection-head"><h3>Incoming</h3></div>
       ${
@@ -366,56 +442,13 @@ function renderFriends(state) {
     `;
   }
 
-  if (settingsList) {
-    const s = state.settings || {};
-    settingsList.innerHTML = `
-      <div class="settings-grid">
-        <div class="setting-card">
-          <div class="setting-title">Friend requests</div>
-          <div class="setting-desc">${s.requestsEnabled ? "On" : "Off"}</div>
-          <div class="button-row"><button data-action="requests-toggle" data-enabled="${(!s.requestsEnabled).toString()}" type="button">${s.requestsEnabled ? "Turn off" : "Turn on"}</button></div>
-        </div>
-        <div class="setting-card">
-          <div class="setting-title">Direct messages</div>
-          <div class="setting-desc">${s.chatEnabled ? "On" : "Off"}</div>
-          <div class="button-row"><button data-action="chat-toggle" data-enabled="${(!s.chatEnabled).toString()}" type="button">${s.chatEnabled ? "Turn off" : "Turn on"}</button></div>
-        </div>
-        <div class="setting-card">
-          <div class="setting-title">Group chats</div>
-          <div class="setting-desc">${s.groupChatsEnabled ? "On" : "Off"}</div>
-          <div class="button-row"><button data-action="group-toggle" data-enabled="${(!s.groupChatsEnabled).toString()}" type="button">${s.groupChatsEnabled ? "Turn off" : "Turn on"}</button></div>
-        </div>
-        <div class="setting-card">
-          <div class="setting-title">Show non-friend group messages</div>
-          <div class="setting-desc">${s.showNonFriendGroupMessages ? "On" : "Off"}</div>
-          <div class="button-row"><button data-action="group-nonfriend-toggle" data-enabled="${(!s.showNonFriendGroupMessages).toString()}" type="button">${s.showNonFriendGroupMessages ? "Hide" : "Show"}</button></div>
-        </div>
-        <div class="setting-card">
-          <div class="setting-title">Profile privacy</div>
-          <div class="setting-desc">${s.profileHidden ? "Private" : "Public"}</div>
-          <div class="button-row"><button data-action="privacy-toggle" data-enabled="${(!s.profileHidden).toString()}" type="button">${s.profileHidden ? "Make public" : "Make private"}</button></div>
-        </div>
-        <div class="setting-card">
-          <div class="setting-title">Whole social system</div>
-          <div class="setting-desc">Turn everything on or off at once.</div>
-          <div class="button-row">
-            <button data-action="social-enable-restore" type="button">Enable & restore</button>
-            <button data-action="social-enable-fresh" type="button">Enable fresh</button>
-            <button data-action="social-disable-keep" type="button">Disable & keep backup</button>
-            <button data-action="social-disable-clear" type="button">Disable & clear</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
   if (profileView) {
     const profile = state.selectedProfile || state.profile || {};
     profileView.innerHTML = `
       <div class="profile-card">
         <div class="profile-card-top">
           <div>
-            <div class="profile-name">${escapeHtml(profile.avatarEmoji || "👤")} ${escapeHtml(profile.username || "Player")}</div>
+            <div class="profile-name">${escapeHtml(profile.username || "Player")}</div>
             <div class="profile-id">ID: ${escapeHtml(profile.uid || "")}</div>
           </div>
           <div class="profile-badge">${profile.uid === state.user?.uid ? "You" : (profile.socialSettings?.profileHidden ? "Private" : "Public")}</div>
@@ -433,14 +466,10 @@ function renderFriends(state) {
 
 function bind() {
   $("tab-info")?.addEventListener("click", () => showSection("info"));
-  $("tab-profile")?.addEventListener("click", () => showSection("profile"));
+  $("tab-settings")?.addEventListener("click", () => showSection("settings"));
   $("tab-progress")?.addEventListener("click", () => showSection("progress"));
   $("tab-friends")?.addEventListener("click", () => showSection("friends"));
   $("tab-messages")?.addEventListener("click", () => showSection("messages"));
-
-  document.querySelectorAll("[data-friends-subtab]").forEach(btn => {
-    btn.addEventListener("click", () => showFriendsSubsection(btn.dataset.friendsSubtab));
-  });
 
   $("login-btn")?.addEventListener("click", async () => {
     try {
@@ -483,38 +512,6 @@ function bind() {
     }
   });
 
-  $("save-username-btn")?.addEventListener("click", async () => {
-    try {
-      const nextName = $("profile-username")?.value || "";
-      await saveUsername(nextName);
-      profileUsernameDirty = false;
-      syncUsernameInput(true);
-      setStatus("Name saved.", "success");
-      alert("Name saved.");
-    } catch (error) {
-      console.error(error);
-      setStatus(error?.message || "Could not save name.", "error");
-      alert(error?.message || "Could not save name.");
-    }
-  });
-
-  $("save-avatar-btn")?.addEventListener("click", async () => {
-    try {
-      const emoji = $("profile-emoji")?.value || "👤";
-      await saveProfileEmoji(emoji);
-      const user = currentState?.user || null;
-      const profile = currentState?.profile || {};
-      profile.avatarEmoji = emoji;
-      updateSidebarAvatar(user, profile);
-      setStatus("Profile picture saved.", "success");
-      alert("Profile picture saved.");
-    } catch (error) {
-      console.error(error);
-      setStatus(error?.message || "Could not save profile picture.", "error");
-      alert(error?.message || "Could not save profile picture.");
-    }
-  });
-
   $("reset-password-btn")?.addEventListener("click", async () => {
     try {
       setStatus("Sending reset email...", "info");
@@ -534,25 +531,14 @@ function bind() {
       if (sent === false) {
         setStatus("Your email is already verified.", "info");
         alert("Your email is already verified.");
-        return;
+      } else {
+        setStatus("Verification email sent.", "success");
+        alert("Verification email sent.");
       }
-      setStatus("Verification email sent.", "success");
-      alert("Verification email sent.");
     } catch (error) {
       console.error(error);
       setStatus(error?.message || "Could not resend verification email.", "error");
       alert(error?.message || "Could not resend verification email.");
-    }
-  });
-
-  $("logout-btn")?.addEventListener("click", async () => {
-    try {
-      await logout();
-      setStatus("Logged out.", "info");
-    } catch (error) {
-      console.error(error);
-      setStatus(error?.message || "Logout failed.", "error");
-      alert(error?.message || "Logout failed.");
     }
   });
 
@@ -594,6 +580,7 @@ function bind() {
   document.body.addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-action]");
     if (!btn) return;
+
     const action = btn.dataset.action;
     const uid = btn.dataset.uid;
     const id = btn.dataset.id;
@@ -601,69 +588,65 @@ function bind() {
     try {
       if (action === "friend-view") {
         await viewProfileById(uid);
-        showFriendsSubsection("profile");
       }
+
       if (action === "friend-message" || action === "friend-search-message") {
-        window.openAccountArea("messages", "direct", uid);
+        window.openAccountArea("messages", "chat", uid);
       }
-      if (action === "friend-copy" || action === "friend-search-copy" || action === "profile-copy") {
+
+      if (action === "friend-copy" || action === "friend-search-copy") {
         await navigator.clipboard.writeText(uid || "");
         btn.textContent = "Copied";
-        setTimeout(() => { if (btn.isConnected) btn.textContent = "Copy ID"; }, 900);
+        setTimeout(() => {
+          if (btn.isConnected) btn.textContent = "Copy ID";
+        }, 900);
       }
+
       if (action === "friend-remove") await removeFriend(uid);
       if (action === "friend-block") await blockUser(uid);
 
       if (action === "request-accept") await respondToFriendRequest(id, "accept");
       if (action === "request-decline") await respondToFriendRequest(id, "decline");
       if (action === "request-block") await respondToFriendRequest(id, "block");
-      if (action === "request-view-messages") window.openAccountArea("messages", "direct", uid);
-      if (action === "request-ignore") return;
+      if (action === "request-view-messages") window.openAccountArea("messages", "chat", uid);
 
-      if (action === "requests-toggle") await toggleRequestsEnabled(btn.dataset.enabled === "true");
-      if (action === "chat-toggle") await toggleChatEnabled(btn.dataset.enabled === "true");
-      if (action === "group-toggle") await toggleGroupChatsEnabled(btn.dataset.enabled === "true");
-      if (action === "group-nonfriend-toggle") await toggleShowNonFriendGroupMessages(btn.dataset.enabled === "true");
-      if (action === "privacy-toggle") await toggleProfileHidden(btn.dataset.enabled === "true");
-      if (action === "social-disable-keep") await disableSocialSystem("keep");
-      if (action === "social-disable-clear") await disableSocialSystem("clear");
-      if (action === "social-enable-restore") await enableSocialSystem("restore");
-      if (action === "social-enable-fresh") await enableSocialSystem("fresh");
+      if (action === "profile-open-message") window.openAccountArea("messages", "chat", uid);
     } catch (error) {
       alert(error?.message || "Action failed.");
     }
   });
 }
 
-function render(state) {
-  currentState = state;
-  renderAuth(state);
-  renderProgress(state);
-  renderAchievements(state);
-  renderFriends(state);
-}
-
 function start() {
   bind();
   showSection("info");
   showFriendsSubsection("friends");
+  applyInitialTab();
   setStatus("Checking account...", "info");
 
-  setTimeout(() => {
-    const status = $("auth-status");
-    if (status && String(status.textContent || "").includes("Checking account")) {
-      setStatus("Not logged in.", "info");
-    }
-  }, 5000);
-
   subscribeSocial((state) => {
-    render(state);
+    currentState = state;
+    renderAuth(state);
+    renderProgress(state);
+    renderAchievements(state);
+    renderFriends(state);
+
     if (!state.user) {
       setStatus("Not logged in.", "info");
       return;
     }
+
     setStatus(state.user.emailVerified ? "Logged in and verified." : "Logged in.", "success");
-    if (typeof window.PanategwaMessagesRender === "function") window.PanategwaMessagesRender();
+
+    if (typeof window.PanategwaMessagesRender === "function") {
+      window.PanategwaMessagesRender();
+    }
+  });
+
+  watchAuth((user) => {
+    if (user) {
+      currentState = { ...(currentState || {}), user };
+    }
   });
 }
 

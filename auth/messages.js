@@ -48,6 +48,7 @@ function resolveMessageTarget(msg) {
     return { section: "streak", sub: "overview", targetId: null };
   }
 
+
   if (msg.kind === "friend-request") {
     return { section: "friends", sub: "requests", targetId: msg.fromUid || null };
   }
@@ -70,10 +71,10 @@ function resolveMessageTarget(msg) {
 function showTarget(msg) {
   const target = resolveMessageTarget(msg);
 
-  if (target.section === "streak") {
-    window.location.href = "auth/streak.html";
-    return;
-  }
+if (target.section === "streak") {
+  window.location.href = "streak-page.html";
+  return;
+}
 
   if (typeof window.openAccountArea === "function") {
     window.openAccountArea(target.section, target.sub, target.targetId);

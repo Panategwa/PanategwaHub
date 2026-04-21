@@ -22,29 +22,30 @@ document.addEventListener("DOMContentLoaded", function () {
     return url;
   }
 
-  function getSidebarAvatar() {
-    return {
-      url: localStorage.getItem("panategwa_sidebar_avatar_url") || "",
-      label: localStorage.getItem("panategwa_sidebar_avatar_label") || "👤"
-    };
+  function defaultAvatarIcon() {
+    return `
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <path fill="currentColor" d="M12 12.2a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z"/>
+      </svg>
+    `;
   }
 
   function renderSidebarAvatar() {
     const btn = document.getElementById("menu-account-button");
     if (!btn) return;
 
-    const { url, label } = getSidebarAvatar();
+    const loggedIn = localStorage.getItem("ptg_logged_in") === "1";
+    const url = localStorage.getItem("panategwa_sidebar_avatar_url") || "";
 
-    if (url) {
+    if (loggedIn && url) {
       btn.innerHTML = `<img src="${url}" alt="Account" style="width:22px;height:22px;border-radius:50%;object-fit:cover;display:block;" />`;
     } else {
-      btn.innerHTML = `<span style="font-size:18px;line-height:1;">${label || "👤"}</span>`;
+      btn.innerHTML = defaultAvatarIcon();
     }
   }
 
-  window.PanategwaUpdateSidebarAvatar = function (avatarUrl, label) {
+  window.PanategwaUpdateSidebarAvatar = function (avatarUrl) {
     localStorage.setItem("panategwa_sidebar_avatar_url", avatarUrl || "");
-    localStorage.setItem("panategwa_sidebar_avatar_label", label || "👤");
     renderSidebarAvatar();
   };
 
@@ -56,7 +57,7 @@ document.addEventListener("DOMContentLoaded", function () {
   menuHTML += `
     <div class="line">
       <div class="menu-main-title">The Panategwa Hub</div>
-      <div class="menu-sub-title">Alpha</div>
+      <div class="menu-sub-title">0.0.1 - Alpha</div>
     </div>
   `;
 
@@ -72,9 +73,7 @@ document.addEventListener("DOMContentLoaded", function () {
       <button class="menu-icon-button"
         onclick="window.location.href='${buildUrl("account-page.html")}'"
         title="Account">
-        <span id="menu-account-button"
-          class="${isAccount ? "active-icon" : ""}"
-          style="display:inline-flex; align-items:center; justify-content:center;"></span>
+        <span id="menu-account-button" class="${isAccount ? "active-icon" : ""}" style="display:inline-flex; align-items:center; justify-content:center;"></span>
       </button>
 
       <button class="menu-icon-button"

@@ -12,7 +12,9 @@ import {
   reauthenticateWithCredential,
   reauthenticateWithPopup,
   EmailAuthProvider,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  updateEmail,
+  updatePassword
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
 import {
@@ -48,6 +50,66 @@ function uniqueStrings(value) {
 
 function defaultUsername(user) {
   return user?.displayName || user?.email?.split("@")?.[0] || "Player";
+}
+
+function svgDataUrl(svg) {
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function presetAvatarDataUrl(presetId) {
+  const id = String(presetId || "1");
+
+  if (id === "2") {
+    return svgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#6c5ce7"/><stop offset="1" stop-color="#a29bfe"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <circle cx="64" cy="66" r="26" fill="rgba(255,255,255,0.15)"/>
+        <path d="M64 38a28 28 0 1 0 28 28A28 28 0 0 0 64 38z" fill="none" stroke="white" stroke-width="6"/>
+        <circle cx="50" cy="58" r="5" fill="white"/><circle cx="78" cy="58" r="5" fill="white"/>
+      </svg>
+    `);
+  }
+
+  if (id === "3") {
+    return svgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#00b894"/><stop offset="1" stop-color="#55efc4"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <circle cx="64" cy="64" r="34" fill="rgba(255,255,255,0.15)"/>
+        <circle cx="64" cy="64" r="22" fill="none" stroke="white" stroke-width="6"/>
+        <circle cx="64" cy="64" r="8" fill="white"/>
+      </svg>
+    `);
+  }
+
+  return svgDataUrl(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+      <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0984e3"/><stop offset="1" stop-color="#74b9ff"/></linearGradient></defs>
+      <rect width="128" height="128" rx="64" fill="url(#g)"/>
+      <path d="M64 30l10 20 22 3-16 16 4 22-20-10-20 10 4-22-16-16 22-3z" fill="rgba(255,255,255,0.92)"/>
+    </svg>
+  `);
+}
+
+function letterAvatarDataUrl(letter) {
+  const char = String(letter || "")
+    .trim()
+    .slice(0, 1)
+    .toUpperCase() || "P";
+
+  return svgDataUrl(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+      <rect width="128" height="128" rx="64" fill="#27344f"/>
+      <text x="64" y="76" text-anchor="middle" font-size="62" font-family="Arial, sans-serif" fill="#fff">${char}</text>
+    </svg>
+  `);
+}
+
+function syncSidebarAvatar(photoURL) {
+  if (typeof window.PanategwaUpdateSidebarAvatar === "function") {
+    window.PanategwaUpdateSidebarAvatar(photoURL || "", "👤");
+  }
 }
 
 function baseProfile(user) {
@@ -239,6 +301,7 @@ async function login(email, password) {
   await ensureUserProfile(cred.user);
   await touchLastLoginOnce(cred.user);
   await maybeCreateLoginMessage(cred.user);
+  localStorage.setItem("ptg_logged_in", "1");
   return cred.user;
 }
 
@@ -247,10 +310,12 @@ async function loginWithGoogle() {
   await ensureUserProfile(cred.user);
   await touchLastLoginOnce(cred.user);
   await maybeCreateLoginMessage(cred.user);
+  localStorage.setItem("ptg_logged_in", "1");
   return cred.user;
 }
 
 async function logout() {
+  localStorage.removeItem("ptg_logged_in");
   return signOut(auth);
 }
 
@@ -294,6 +359,41 @@ async function saveProfilePictureFromFile(file) {
     updatedAt: serverTimestamp()
   }, { merge: true });
 
+  syncSidebarAvatar(dataUrl);
+  return dataUrl;
+}
+
+async function setAvatarPreset(presetId) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const dataUrl = presetAvatarDataUrl(presetId);
+  await updateProfile(user, { photoURL: dataUrl });
+  await setDoc(userRef(user.uid), {
+    photoURL: dataUrl,
+    avatarType: "preset",
+    avatarPreset: String(presetId),
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+
+  syncSidebarAvatar(dataUrl);
+  return dataUrl;
+}
+
+async function setAvatarLetter(letter) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const dataUrl = letterAvatarDataUrl(letter || user.displayName || user.email || "P");
+  await updateProfile(user, { photoURL: dataUrl });
+  await setDoc(userRef(user.uid), {
+    photoURL: dataUrl,
+    avatarType: "letter",
+    avatarLetter: String(letter || "").trim().slice(0, 1).toUpperCase() || "P",
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+
+  syncSidebarAvatar(dataUrl);
   return dataUrl;
 }
 
@@ -304,8 +404,56 @@ async function useDefaultProfilePicture() {
   await updateProfile(user, { photoURL: "" });
   await setDoc(userRef(user.uid), {
     photoURL: "",
+    avatarType: "default",
     updatedAt: serverTimestamp()
   }, { merge: true });
+
+  syncSidebarAvatar("");
+  return true;
+}
+
+async function changeEmail(newEmail, currentPassword) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const providers = new Set((user.providerData || []).map(p => p.providerId));
+  if (!providers.has("password")) {
+    throw new Error("This account was created with Google, so email changes are not available here.");
+  }
+
+  const cleanMail = cleanEmail(newEmail);
+  if (!cleanMail) throw new Error("New email is required.");
+  if (!currentPassword) throw new Error("Current password is required.");
+
+  const credential = EmailAuthProvider.credential(user.email, currentPassword);
+  await reauthenticateWithCredential(user, credential);
+  await updateEmail(user, cleanMail);
+
+  await setDoc(userRef(user.uid), {
+    email: cleanMail,
+    emailLower: cleanMail,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+
+  return cleanMail;
+}
+
+async function changePassword(currentPassword, newPassword) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const providers = new Set((user.providerData || []).map(p => p.providerId));
+  if (!providers.has("password")) {
+    throw new Error("This account was created with Google, so password changes are not available here.");
+  }
+
+  const nextPass = String(newPassword || "");
+  if (!currentPassword) throw new Error("Current password is required.");
+  if (!nextPass || nextPass.length < 6) throw new Error("New password must be at least 6 characters.");
+
+  const credential = EmailAuthProvider.credential(user.email, currentPassword);
+  await reauthenticateWithCredential(user, credential);
+  await updatePassword(user, nextPass);
 
   return true;
 }
@@ -341,17 +489,20 @@ async function deleteAccount(password) {
   }
 
   await deleteDoc(userRef(user.uid));
+  localStorage.removeItem("ptg_logged_in");
   await deleteUser(user);
 }
 
 function watchAuth(callback) {
   return onAuthStateChanged(auth, async (user) => {
     if (!user) {
+      localStorage.removeItem("ptg_logged_in");
       callback(null, null);
       return;
     }
 
     try {
+      localStorage.setItem("ptg_logged_in", "1");
       const profile = await ensureUserProfile(user);
       await touchLastLoginOnce(user);
       await maybeCreateLoginMessage(user);
@@ -374,7 +525,11 @@ export {
   logout,
   saveUsername,
   saveProfilePictureFromFile,
+  setAvatarPreset,
+  setAvatarLetter,
   useDefaultProfilePicture,
+  changeEmail,
+  changePassword,
   resendVerificationEmail,
   requestPasswordReset,
   deleteAccount,

@@ -141,6 +141,106 @@ function computeUnlocks(user, profile, pages) {
   return pending;
 }
 
+function ensureToastSystem() {
+  if (window.PanategwaToast) return;
+
+  if (!document.getElementById("achievement-toast-style")) {
+    const style = document.createElement("style");
+    style.id = "achievement-toast-style";
+    style.textContent = `
+      #achievement-toast-stack {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        z-index: 99999;
+        display: grid;
+        gap: 10px;
+        width: min(360px, calc(100vw - 32px));
+        pointer-events: none;
+      }
+
+      .achievement-toast {
+        pointer-events: auto;
+        cursor: pointer;
+        border-radius: 14px;
+        padding: 14px 16px;
+        background: rgba(20, 20, 30, 0.94);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,0.14);
+        box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+        backdrop-filter: blur(8px);
+        display: grid;
+        gap: 6px;
+        animation: achFadeIn 180ms ease-out;
+        user-select: none;
+      }
+
+      .achievement-toast-title {
+        font-weight: 700;
+        font-size: 0.95rem;
+        opacity: 0.95;
+      }
+
+      .achievement-toast-name {
+        font-weight: 700;
+        font-size: 1rem;
+      }
+
+      .achievement-toast-desc {
+        font-size: 0.92rem;
+        opacity: 0.84;
+        line-height: 1.35;
+      }
+
+      @keyframes achFadeIn {
+        from { transform: translateY(8px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  const stackId = "achievement-toast-stack";
+  const stack = () => {
+    let el = document.getElementById(stackId);
+    if (!el) {
+      el = document.createElement("div");
+      el.id = stackId;
+      document.body.appendChild(el);
+    }
+    return el;
+  };
+
+  window.PanategwaToast = ({ title = "Message", body = "", xp = null, href = "" } = {}) => {
+    toastQueue.push({ title, body, xp, href });
+    if (!toastActive) showNextToast(stack);
+  };
+
+  function showNextToast(getStack) {
+    if (toastActive || toastQueue.length === 0) return;
+    toastActive = true;
+    const item = toastQueue.shift();
+    const el = document.createElement("div");
+    el.className = "achievement-toast";
+    el.innerHTML = `
+      <div class="achievement-toast-title">${item.title}</div>
+      <div class="achievement-toast-desc">${item.body}</div>
+      ${item.xp != null ? `<div class="achievement-toast-desc">+${item.xp} XP</div>` : ""}
+    `;
+    el.addEventListener("click", () => {
+      if (item.href) window.location.href = item.href;
+    });
+    getStack().appendChild(el);
+
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      el.remove();
+      toastActive = false;
+      showNextToast(getStack);
+    }, 5000);
+  }
+}
+
 async function sendAchievementMessage(user, achievement) {
   await addDoc(collection(db, "messages"), {
     fromUid: user.uid,
@@ -191,7 +291,6 @@ async function syncAchievementProgress(user, profile) {
 
     const pending = computeUnlocks(user, mergedProfile, nextVisited);
     const mergedAchievements = uniqueKnown([...currentAchievements, ...pending]);
-
     const addedReward = pending.reduce((sum, id) => sum + rewardForId(id), 0);
     const xp = (typeof data.xp === "number" ? data.xp : currentAchievements.length) + addedReward;
 
@@ -222,117 +321,6 @@ async function syncAchievementProgress(user, profile) {
   });
 
   return result;
-}
-
-function ensureToastStyle() {
-  if (document.getElementById("achievement-toast-style")) return;
-
-  const style = document.createElement("style");
-  style.id = "achievement-toast-style";
-  style.textContent = `
-    #achievement-toast-stack {
-      position: fixed;
-      right: 16px;
-      bottom: 16px;
-      z-index: 99999;
-      display: grid;
-      gap: 10px;
-      width: min(360px, calc(100vw - 32px));
-      pointer-events: none;
-    }
-
-    .achievement-toast {
-      pointer-events: auto;
-      cursor: pointer;
-      border-radius: 14px;
-      padding: 14px 16px;
-      background: rgba(20, 20, 30, 0.94);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.14);
-      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
-      backdrop-filter: blur(8px);
-      display: grid;
-      gap: 6px;
-      animation: achFadeIn 180ms ease-out;
-      user-select: none;
-    }
-
-    .achievement-toast-title {
-      font-weight: 700;
-      font-size: 0.95rem;
-      opacity: 0.95;
-    }
-
-    .achievement-toast-name {
-      font-weight: 700;
-      font-size: 1rem;
-    }
-
-    .achievement-toast-desc {
-      font-size: 0.92rem;
-      opacity: 0.84;
-      line-height: 1.35;
-    }
-
-    @keyframes achFadeIn {
-      from { transform: translateY(8px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-  `;
-  document.head.appendChild(style);
-}
-
-function ensureToastStack() {
-  let stack = document.getElementById("achievement-toast-stack");
-  if (!stack) {
-    stack = document.createElement("div");
-    stack.id = "achievement-toast-stack";
-    document.body.appendChild(stack);
-  }
-  return stack;
-}
-
-function showAchievementToast(achievementOrId) {
-  const achievement =
-    typeof achievementOrId === "string"
-      ? achievementById(achievementOrId)
-      : achievementOrId;
-
-  if (!achievement) return;
-
-  toastQueue.push(achievement);
-  showNextToast();
-}
-
-function showNextToast() {
-  if (toastActive || toastQueue.length === 0) return;
-
-  toastActive = true;
-  ensureToastStyle();
-  const stack = ensureToastStack();
-
-  const achievement = toastQueue.shift();
-  const card = document.createElement("div");
-  card.className = "achievement-toast";
-  card.innerHTML = `
-    <div class="achievement-toast-title">Achievement unlocked</div>
-    <div class="achievement-toast-name">${achievement.name}</div>
-    <div class="achievement-toast-desc">${achievement.description}</div>
-    <div class="achievement-toast-desc">+${achievement.reward} XP</div>
-  `;
-
-  card.addEventListener("click", () => {
-    window.location.href = "account-page.html?tab=progress";
-  });
-
-  stack.appendChild(card);
-
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    card.remove();
-    toastActive = false;
-    showNextToast();
-  }, 5000);
 }
 
 function renderAchievements(profile) {
@@ -386,7 +374,13 @@ function startAccountWatcher() {
       for (const id of result.newlyUnlocked) {
         const achievement = achievementById(id);
         if (achievement) {
-          showAchievementToast(achievement);
+          ensureToastSystem();
+          window.PanategwaToast({
+            title: "Achievement unlocked",
+            body: `${achievement.name} — +${achievement.reward} XP`,
+            xp: achievement.reward,
+            href: "account-page.html?tab=progress"
+          });
           await sendAchievementMessage(user, achievement);
         }
       }
@@ -429,7 +423,13 @@ function startPoller() {
       for (const id of result.newlyUnlocked) {
         const achievement = achievementById(id);
         if (achievement) {
-          showAchievementToast(achievement);
+          ensureToastSystem();
+          window.PanategwaToast({
+            title: "Achievement unlocked",
+            body: `${achievement.name} — +${achievement.reward} XP`,
+            xp: achievement.reward,
+            href: "account-page.html?tab=progress"
+          });
           await sendAchievementMessage(user, achievement);
         }
       }
@@ -457,6 +457,5 @@ if (document.readyState === "loading") {
 export {
   syncAchievementProgress,
   renderAchievements,
-  showAchievementToast,
   ACHIEVEMENTS
 };

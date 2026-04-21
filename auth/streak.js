@@ -12,10 +12,12 @@ import {
 
 const $ = (id) => document.getElementById(id);
 const DAY_MS = 24 * 60 * 60 * 1000;
-const WEEK_MS = 7 * DAY_MS;
 
 let currentUser = null;
 let currentProfile = null;
+let toastQueue = [];
+let toastActive = false;
+let toastTimer = null;
 
 function userRef(uid) {
   return doc(db, "users", uid);
@@ -31,9 +33,7 @@ function todayKey() {
 
 function loadStreak(uid) {
   const raw = localStorage.getItem(streakKey(uid));
-  if (!raw) {
-    return { streak: 0, lastClaimAt: 0, lastClaimDay: "", totalClaims: 0 };
-  }
+  if (!raw) return { streak: 0, lastClaimAt: 0, lastClaimDay: "", totalClaims: 0 };
 
   try {
     return JSON.parse(raw);
@@ -47,30 +47,102 @@ function saveStreak(uid, data) {
 }
 
 function rewardForDay(day) {
-  const week = Math.min(5, Math.max(1, Math.ceil(day / 7)));
-  return week;
+  return Math.min(5, Math.max(1, Math.ceil(day / 7)));
 }
 
-function prettyDate(value) {
-  if (!value) return "—";
-  if (typeof value?.toDate === "function") return value.toDate().toLocaleDateString();
-  if (typeof value === "number") return new Date(value).toLocaleDateString();
-  if (value instanceof Date) return value.toLocaleDateString();
-  return "—";
-}
+function ensureToastSystem() {
+  if (!document.getElementById("streak-toast-style")) {
+    const style = document.createElement("style");
+    style.id = "streak-toast-style";
+    style.textContent = `
+      #streak-toast-stack {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        z-index: 99999;
+        display: grid;
+        gap: 10px;
+        width: min(360px, calc(100vw - 32px));
+        pointer-events: none;
+      }
 
-function weekPreviewHtml(currentStreak) {
-  return Array.from({ length: 35 }, (_, i) => {
-    const day = i + 1;
-    const reward = rewardForDay(day);
-    const done = currentStreak >= day;
-    return `
-      <div class="streak-day ${done ? "done" : ""}">
-        <div class="streak-day-label">Day ${day}</div>
-        <div class="streak-day-xp">${reward} XP</div>
-      </div>
+      .streak-toast {
+        pointer-events: auto;
+        cursor: pointer;
+        border-radius: 14px;
+        padding: 14px 16px;
+        background: rgba(20, 20, 30, 0.94);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,0.14);
+        box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+        backdrop-filter: blur(8px);
+        display: grid;
+        gap: 6px;
+        animation: streakFadeIn 180ms ease-out;
+        user-select: none;
+      }
+
+      .streak-toast-title {
+        font-weight: 700;
+        font-size: 0.95rem;
+      }
+
+      .streak-toast-body {
+        font-size: 0.92rem;
+        opacity: 0.84;
+        line-height: 1.35;
+      }
+
+      @keyframes streakFadeIn {
+        from { transform: translateY(8px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
     `;
-  }).join("");
+    document.head.appendChild(style);
+  }
+
+  let stack = document.getElementById("streak-toast-stack");
+  if (!stack) {
+    stack = document.createElement("div");
+    stack.id = "streak-toast-stack";
+    document.body.appendChild(stack);
+  }
+
+  return stack;
+}
+
+function showToast({ title, body, xp, href }) {
+  toastQueue.push({ title, body, xp, href });
+  if (!toastActive) showNextToast();
+}
+
+function showNextToast() {
+  if (toastActive || toastQueue.length === 0) return;
+  toastActive = true;
+
+  const stack = ensureToastSystem();
+  const item = toastQueue.shift();
+
+  const card = document.createElement("div");
+  card.className = "streak-toast";
+  card.innerHTML = `
+    <div class="streak-toast-title">${item.title}</div>
+    <div class="streak-toast-body">${item.body}</div>
+    ${item.xp != null ? `<div class="streak-toast-body">+${item.xp} XP</div>` : ""}
+  `;
+
+  card.addEventListener("click", () => {
+    if (item.href) window.location.href = item.href;
+  });
+
+  stack.appendChild(card);
+
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    card.remove();
+    toastActive = false;
+    showNextToast();
+  }, 5000);
 }
 
 async function sendStreakMessage(uid, reward, streakDay) {
@@ -95,6 +167,28 @@ async function sendStreakMessage(uid, reward, streakDay) {
   });
 }
 
+function prettyDate(value) {
+  if (!value) return "—";
+  if (typeof value?.toDate === "function") return value.toDate().toLocaleDateString();
+  if (typeof value === "number") return new Date(value).toLocaleDateString();
+  if (value instanceof Date) return value.toLocaleDateString();
+  return "—";
+}
+
+function weekPreviewHtml(currentStreak) {
+  return Array.from({ length: 35 }, (_, i) => {
+    const day = i + 1;
+    const reward = rewardForDay(day);
+    const done = currentStreak >= day;
+    return `
+      <div class="streak-day ${done ? "done" : ""}">
+        <div class="streak-day-label">Day ${day}</div>
+        <div class="streak-day-xp">${reward} XP</div>
+      </div>
+    `;
+  }).join("");
+}
+
 async function claimStreak() {
   if (!currentUser) return;
 
@@ -106,7 +200,11 @@ async function claimStreak() {
   }
 
   if (local.lastClaimDay === todayKey()) {
-    alert("You already claimed today.");
+    showToast({
+      title: "Streak",
+      body: "You already claimed today.",
+      href: "streak-page.html"
+    });
     return;
   }
 
@@ -133,10 +231,14 @@ async function claimStreak() {
   }, { merge: true });
 
   await sendStreakMessage(currentUser.uid, reward, local.streak);
-
   currentProfile = await getProfile(currentUser.uid);
-  renderPage();
-  alert(`Streak claimed: +${reward} XP`);
+
+  showToast({
+    title: "Streak claimed",
+    body: `You claimed ${reward} XP from your ${local.streak} day streak.`,
+    xp: reward,
+    href: "streak-page.html"
+  });
 }
 
 function renderPage() {
@@ -209,6 +311,7 @@ function start() {
       return;
     }
 
+    ensureToastSystem();
     renderPage();
   });
 }

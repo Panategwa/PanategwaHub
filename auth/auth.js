@@ -1,4 +1,4 @@
-import { auth, db, googleProvider, microsoftProvider } from "./firebase-config.js";
+import { auth, db, googleProvider } from "./firebase-config.js";
 
 import {
   createUserWithEmailAndPassword,
@@ -45,7 +45,7 @@ function cleanText(text) {
 
 function uniqueStrings(value) {
   const arr = Array.isArray(value) ? value : [];
-  return [...new Set(arr.map(v => String(v || "").trim()).filter(Boolean))];
+  return [...new Set(arr.map((item) => String(item || "").trim()).filter(Boolean))];
 }
 
 function defaultUsername(user) {
@@ -93,11 +93,7 @@ function presetAvatarDataUrl(presetId) {
 }
 
 function letterAvatarDataUrl(letter) {
-  const char = String(letter || "")
-    .trim()
-    .slice(0, 1)
-    .toUpperCase() || "P";
-
+  const char = String(letter || "").trim().slice(0, 1).toUpperCase() || "P";
   return svgDataUrl(`
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
       <rect width="128" height="128" rx="64" fill="#27344f"/>
@@ -108,7 +104,7 @@ function letterAvatarDataUrl(letter) {
 
 function syncSidebarAvatar(photoURL) {
   if (typeof window.PanategwaUpdateSidebarAvatar === "function") {
-    window.PanategwaUpdateSidebarAvatar(photoURL || "", "👤");
+    window.PanategwaUpdateSidebarAvatar(photoURL || "", "Account");
   }
 }
 
@@ -159,7 +155,29 @@ function normalizeSocialSettings(settings = {}) {
   };
 }
 
-async function getProfile(uid = auth.currentUser?.uid) {
+function friendlyAuthError(error) {
+  const code = String(error?.code || "");
+
+  if (code === "auth/email-already-in-use") return "That email is already being used by another account.";
+  if (code === "auth/invalid-email") return "That email address is not valid.";
+  if (code === "auth/missing-password") return "Enter your password first.";
+  if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+    return "That email or password is incorrect.";
+  }
+  if (code === "auth/too-many-requests") return "Too many attempts. Please wait a moment and try again.";
+  if (code === "auth/operation-not-allowed") {
+    return "This sign-in method is not enabled in Firebase Authentication yet.";
+  }
+  if (code === "auth/popup-closed-by-user") return "The Google sign-in popup was closed before the login finished.";
+  if (code === "auth/popup-blocked") return "Your browser blocked the Google sign-in popup.";
+  if (code === "auth/unauthorized-domain") {
+    return "This domain is not authorized in Firebase yet. Add it in Firebase Authentication -> Settings -> Authorized domains.";
+  }
+  if (code === "auth/network-request-failed") return "The network request failed. Check your internet connection and try again.";
+  return error?.message || "Authentication failed.";
+}
+
+export async function getProfile(uid = auth.currentUser?.uid) {
   if (!uid) return null;
   const snap = await getDoc(userRef(uid));
   return snap.exists() ? snap.data() : null;
@@ -186,7 +204,7 @@ async function createSystemMessage(user, title, body, targetSection = "messages"
   });
 }
 
-async function ensureUserProfile(user) {
+export async function ensureUserProfile(user) {
   const ref = userRef(user.uid);
   const snap = await getDoc(ref);
 
@@ -258,94 +276,89 @@ async function maybeCreateLoginMessage(user) {
   );
 }
 
-function providerIdsForUser(user) {
-  return new Set((user?.providerData || []).map((provider) => provider.providerId));
-}
-
-function socialProviderInfo(user) {
-  const providers = providerIdsForUser(user);
-  if (providers.has("google.com")) return { provider: googleProvider, label: "Google" };
-  if (providers.has("microsoft.com")) return { provider: microsoftProvider, label: "Microsoft" };
-  return null;
-}
-
-async function createAccount(email, password, username) {
+export async function createAccount(email, password, username) {
   const cleanName = cleanText(username).slice(0, 20);
   const cleanMail = cleanEmail(email);
   const cleanPass = String(password || "");
 
   if (!cleanName) throw new Error("Username is required.");
-  if (cleanName.length > 20) throw new Error("Username must be 20 characters or less.");
   if (!cleanMail) throw new Error("Email is required.");
-  if (!cleanPass) throw new Error("Password is required.");
+  if (!cleanPass || cleanPass.length < 6) throw new Error("Password must be at least 6 characters.");
 
-  const cred = await createUserWithEmailAndPassword(auth, cleanMail, cleanPass);
-  await updateProfile(cred.user, { displayName: cleanName });
-  await sendEmailVerification(cred.user);
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, cleanMail, cleanPass);
+    await updateProfile(cred.user, { displayName: cleanName });
+    await sendEmailVerification(cred.user);
 
-  await setDoc(userRef(cred.user.uid), {
-    ...baseProfile(cred.user),
-    username: cleanName,
-    verified: false
-  });
+    await setDoc(userRef(cred.user.uid), {
+      ...baseProfile(cred.user),
+      username: cleanName,
+      verified: false
+    });
 
-  await createSystemMessage(
-    cred.user,
-    "Welcome",
-    "Your account was created successfully.",
-    "messages",
-    "system",
-    null
-  );
+    await createSystemMessage(
+      cred.user,
+      "Welcome",
+      "Your account was created successfully.",
+      "messages",
+      "system",
+      null
+    );
 
-  return cred.user;
+    localStorage.setItem("ptg_logged_in", "1");
+    return cred.user;
+  } catch (error) {
+    throw new Error(friendlyAuthError(error));
+  }
 }
 
-async function login(email, password) {
+export async function login(email, password) {
   const cleanMail = cleanEmail(email);
   const cleanPass = String(password || "");
 
   if (!cleanMail) throw new Error("Email is required.");
   if (!cleanPass) throw new Error("Password is required.");
 
-  const cred = await signInWithEmailAndPassword(auth, cleanMail, cleanPass);
-  await ensureUserProfile(cred.user);
-  await touchLastLoginOnce(cred.user);
-  await maybeCreateLoginMessage(cred.user);
-  localStorage.setItem("ptg_logged_in", "1");
-  return cred.user;
+  try {
+    const cred = await signInWithEmailAndPassword(auth, cleanMail, cleanPass);
+    await ensureUserProfile(cred.user);
+    await touchLastLoginOnce(cred.user);
+    await maybeCreateLoginMessage(cred.user);
+    localStorage.setItem("ptg_logged_in", "1");
+    return cred.user;
+  } catch (error) {
+    throw new Error(friendlyAuthError(error));
+  }
 }
 
-async function loginWithGoogle() {
-  const cred = await signInWithPopup(auth, googleProvider);
-  await ensureUserProfile(cred.user);
-  await touchLastLoginOnce(cred.user);
-  await maybeCreateLoginMessage(cred.user);
-  localStorage.setItem("ptg_logged_in", "1");
-  return cred.user;
+export async function loginWithGoogle() {
+  if (window.location.protocol === "file:") {
+    throw new Error("Google sign-in needs the site to run from localhost or a real domain, not directly as a file.");
+  }
+
+  try {
+    const cred = await signInWithPopup(auth, googleProvider);
+    await ensureUserProfile(cred.user);
+    await touchLastLoginOnce(cred.user);
+    await maybeCreateLoginMessage(cred.user);
+    localStorage.setItem("ptg_logged_in", "1");
+    return cred.user;
+  } catch (error) {
+    throw new Error(friendlyAuthError(error));
+  }
 }
 
-async function loginWithMicrosoft() {
-  const cred = await signInWithPopup(auth, microsoftProvider);
-  await ensureUserProfile(cred.user);
-  await touchLastLoginOnce(cred.user);
-  await maybeCreateLoginMessage(cred.user);
-  localStorage.setItem("ptg_logged_in", "1");
-  return cred.user;
-}
-
-async function logout() {
+export async function logout() {
   localStorage.removeItem("ptg_logged_in");
   return signOut(auth);
 }
 
-async function saveUsername(username) {
+export async function saveUsername(username) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
   const cleanName = cleanText(username).slice(0, 20);
   if (!cleanName) throw new Error("Username cannot be empty.");
-  if (cleanName.length > 20) throw new Error("Username must be 20 characters or less.");
 
   await updateProfile(user, { displayName: cleanName });
   await setDoc(userRef(user.uid), {
@@ -356,34 +369,7 @@ async function saveUsername(username) {
   return cleanName;
 }
 
-async function saveProfilePictureFromFile(file) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  if (!file) throw new Error("Choose an image first.");
-  if (!String(file.type || "").startsWith("image/")) throw new Error("That file is not an image.");
-
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("Could not read the image file."));
-    reader.readAsDataURL(file);
-  });
-
-  if (dataUrl.length > 250000) {
-    throw new Error("Image is too large. Use a smaller image.");
-  }
-
-  await updateProfile(user, { photoURL: dataUrl });
-  await setDoc(userRef(user.uid), {
-    photoURL: dataUrl,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
-
-  syncSidebarAvatar(dataUrl);
-  return dataUrl;
-}
-
-async function setAvatarPreset(presetId) {
+export async function setAvatarPreset(presetId) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
@@ -400,7 +386,7 @@ async function setAvatarPreset(presetId) {
   return dataUrl;
 }
 
-async function setAvatarLetter(letter) {
+export async function setAvatarLetter(letter) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
@@ -417,7 +403,7 @@ async function setAvatarLetter(letter) {
   return dataUrl;
 }
 
-async function useDefaultProfilePicture() {
+export async function useDefaultProfilePicture() {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
@@ -432,55 +418,58 @@ async function useDefaultProfilePicture() {
   return true;
 }
 
-async function changeEmail(newEmail, currentPassword) {
+export async function changeEmail(newEmail, currentPassword) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
-  const providers = providerIdsForUser(user);
+  const providers = new Set((user.providerData || []).map((provider) => provider.providerId));
   if (!providers.has("password")) {
-    const providerInfo = socialProviderInfo(user);
-    throw new Error(`This account uses ${providerInfo?.label || "social"} sign-in, so email changes are not available here.`);
+    throw new Error("This account uses Google sign-in, so email changes are not available here.");
   }
 
   const cleanMail = cleanEmail(newEmail);
   if (!cleanMail) throw new Error("New email is required.");
   if (!currentPassword) throw new Error("Current password is required.");
 
-  const credential = EmailAuthProvider.credential(user.email, currentPassword);
-  await reauthenticateWithCredential(user, credential);
-  await updateEmail(user, cleanMail);
-
-  await setDoc(userRef(user.uid), {
-    email: cleanMail,
-    emailLower: cleanMail,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
-
-  return cleanMail;
+  try {
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+    await updateEmail(user, cleanMail);
+    await setDoc(userRef(user.uid), {
+      email: cleanMail,
+      emailLower: cleanMail,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    return cleanMail;
+  } catch (error) {
+    throw new Error(friendlyAuthError(error));
+  }
 }
 
-async function changePassword(currentPassword, newPassword) {
+export async function changePassword(currentPassword, newPassword) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
-  const providers = providerIdsForUser(user);
+  const providers = new Set((user.providerData || []).map((provider) => provider.providerId));
   if (!providers.has("password")) {
-    const providerInfo = socialProviderInfo(user);
-    throw new Error(`This account uses ${providerInfo?.label || "social"} sign-in, so password changes are not available here.`);
+    throw new Error("This account uses Google sign-in, so password changes are not available here.");
   }
 
   const nextPass = String(newPassword || "");
   if (!currentPassword) throw new Error("Current password is required.");
-  if (!nextPass || nextPass.length < 6) throw new Error("New password must be at least 6 characters.");
+  if (nextPass.length < 6) throw new Error("New password must be at least 6 characters.");
 
-  const credential = EmailAuthProvider.credential(user.email, currentPassword);
-  await reauthenticateWithCredential(user, credential);
-  await updatePassword(user, nextPass);
-
-  return true;
+  try {
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+    await updatePassword(user, nextPass);
+    return true;
+  } catch (error) {
+    throw new Error(friendlyAuthError(error));
+  }
 }
 
-async function resendVerificationEmail() {
+export async function resendVerificationEmail() {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
   if (user.emailVerified) return false;
@@ -489,35 +478,45 @@ async function resendVerificationEmail() {
   return true;
 }
 
-async function requestPasswordReset(email) {
+export async function requestPasswordReset(email) {
   const cleanMail = cleanEmail(email);
   if (!cleanMail) throw new Error("Email is required.");
-  await sendPasswordResetEmail(auth, cleanMail);
+
+  try {
+    await sendPasswordResetEmail(auth, cleanMail);
+  } catch (error) {
+    throw new Error(friendlyAuthError(error));
+  }
 }
 
-async function deleteAccount(password) {
+export async function deleteAccount(password) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
-  const providerIds = providerIdsForUser(user);
-  const cleanPass = String(password || "");
+  const providerIds = new Set((user.providerData || []).map((provider) => provider.providerId));
 
-  if (!providerIds.has("password")) {
-    const providerInfo = socialProviderInfo(user);
-    if (!providerInfo) throw new Error("This account needs a supported provider reauthentication flow before it can be deleted.");
-    await reauthenticateWithPopup(user, providerInfo.provider);
-  } else {
-    if (!cleanPass) throw new Error("Password is required to delete your account.");
-    const credential = EmailAuthProvider.credential(user.email, cleanPass);
-    await reauthenticateWithCredential(user, credential);
+  try {
+    if (providerIds.has("google.com") && !providerIds.has("password")) {
+      if (window.location.protocol === "file:") {
+        throw new Error("Google accounts must be reauthenticated from localhost or a real domain, not directly as a file.");
+      }
+      await reauthenticateWithPopup(user, googleProvider);
+    } else {
+      const cleanPass = String(password || "");
+      if (!cleanPass) throw new Error("Password is required to delete your account.");
+      const credential = EmailAuthProvider.credential(user.email, cleanPass);
+      await reauthenticateWithCredential(user, credential);
+    }
+
+    await deleteDoc(userRef(user.uid));
+    localStorage.removeItem("ptg_logged_in");
+    await deleteUser(user);
+  } catch (error) {
+    throw new Error(friendlyAuthError(error));
   }
-
-  await deleteDoc(userRef(user.uid));
-  localStorage.removeItem("ptg_logged_in");
-  await deleteUser(user);
 }
 
-function watchAuth(callback) {
+export function watchAuth(callback) {
   return onAuthStateChanged(auth, async (user) => {
     if (!user) {
       localStorage.removeItem("ptg_logged_in");
@@ -531,35 +530,9 @@ function watchAuth(callback) {
       await touchLastLoginOnce(user);
       await maybeCreateLoginMessage(user);
       callback(user, profile);
-    } catch (err) {
-      console.error("Auth watch error:", err);
+    } catch (error) {
+      console.error("Auth watch error:", error);
       callback(user, null);
     }
   });
 }
-
-function getCurrentUser() {
-  return auth.currentUser;
-}
-
-export {
-  createAccount,
-  login,
-  loginWithGoogle,
-  loginWithMicrosoft,
-  logout,
-  saveUsername,
-  saveProfilePictureFromFile,
-  setAvatarPreset,
-  setAvatarLetter,
-  useDefaultProfilePicture,
-  changeEmail,
-  changePassword,
-  resendVerificationEmail,
-  requestPasswordReset,
-  deleteAccount,
-  watchAuth,
-  getCurrentUser,
-  getProfile,
-  ensureUserProfile
-};

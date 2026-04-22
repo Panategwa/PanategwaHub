@@ -9,12 +9,11 @@ import {
   deleteAccount,
   watchAuth,
   getProfile,
-  logout
+  logout,
+  requestPasswordReset
 } from "./auth.js";
 
 const $ = (id) => document.getElementById(id);
-
-let activeUid = null;
 
 function setStatus(message, kind = "info") {
   const el = $("auth-status");
@@ -41,15 +40,11 @@ function syncForm(profile, user) {
     letterInput.value = (profile?.username || user.displayName || "P").slice(0, 1).toUpperCase();
   }
 
-  const providerIds = new Set((user.providerData || []).map(p => p.providerId));
-  const socialProvider = providerIds.has("google.com")
-    ? "Google"
-    : (providerIds.has("microsoft.com") ? "Microsoft" : "social");
-
+  const providerIds = new Set((user.providerData || []).map((provider) => provider.providerId));
   if (note) {
     note.textContent = providerIds.has("password")
       ? "Email and password changes work for email/password accounts."
-      : `This account uses ${socialProvider} sign-in, so email/password changes are not available here.`;
+      : "This account uses Google sign-in, so email/password changes are not available here.";
   }
 }
 
@@ -63,9 +58,9 @@ async function applyUsername() {
   try {
     await saveUsername(value);
     setStatus("Username updated.", "success");
-  } catch (err) {
-    console.error(err);
-    setStatus(err.message || "Could not save username.", "error");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "Could not save username.", "error");
   }
 }
 
@@ -73,9 +68,9 @@ async function applyAvatarPreset(presetId) {
   try {
     await setAvatarPreset(presetId);
     setStatus("Profile picture updated.", "success");
-  } catch (err) {
-    console.error(err);
-    setStatus(err.message || "Could not update profile picture.", "error");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "Could not update profile picture.", "error");
   }
 }
 
@@ -89,9 +84,9 @@ async function applyAvatarLetter() {
   try {
     await setAvatarLetter(letter);
     setStatus("Letter avatar saved.", "success");
-  } catch (err) {
-    console.error(err);
-    setStatus(err.message || "Could not save letter avatar.", "error");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "Could not save letter avatar.", "error");
   }
 }
 
@@ -99,9 +94,9 @@ async function applyDefaultAvatar() {
   try {
     await useDefaultProfilePicture();
     setStatus("Default profile picture restored.", "success");
-  } catch (err) {
-    console.error(err);
-    setStatus(err.message || "Could not reset profile picture.", "error");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "Could not reset profile picture.", "error");
   }
 }
 
@@ -112,9 +107,9 @@ async function applyEmailChange() {
   try {
     await changeEmail(nextEmail, currentPassword);
     setStatus("Email updated. Check the new inbox for verification if needed.", "success");
-  } catch (err) {
-    console.error(err);
-    setStatus(err.message || "Could not change email.", "error");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "Could not change email.", "error");
   }
 }
 
@@ -131,12 +126,12 @@ async function applyPasswordChange() {
   try {
     await changePassword(currentPassword, nextPassword);
     setStatus("Password updated.", "success");
-    $("current-password").value = "";
-    $("new-password").value = "";
-    $("confirm-password").value = "";
-  } catch (err) {
-    console.error(err);
-    setStatus(err.message || "Could not change password.", "error");
+    if ($("current-password")) $("current-password").value = "";
+    if ($("new-password")) $("new-password").value = "";
+    if ($("confirm-password")) $("confirm-password").value = "";
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "Could not change password.", "error");
   }
 }
 
@@ -151,33 +146,28 @@ function bindButtons() {
   $("change-email-btn")?.addEventListener("click", applyEmailChange);
   $("change-password-btn")?.addEventListener("click", applyPasswordChange);
   $("send-reset-email-btn")?.addEventListener("click", async () => {
-    const email = String($("change-email-input")?.value || $("profile-email")?.value || "").trim();
+    const email = String($("change-email-input")?.value || "").trim();
+    if (!email) {
+      setStatus("Type an email first.", "error");
+      return;
+    }
+
     try {
-      if (!email) {
-        setStatus("Type an email first.", "error");
-        return;
-      }
-      // uses the built-in reset email flow
-      const { requestPasswordReset } = await import("./auth.js");
       await requestPasswordReset(email);
       setStatus("Reset email sent.", "success");
-    } catch (err) {
-      console.error(err);
-      setStatus(err.message || "Could not send reset email.", "error");
+    } catch (error) {
+      console.error(error);
+      setStatus(error.message || "Could not send reset email.", "error");
     }
   });
 
   $("resend-verification-btn")?.addEventListener("click", async () => {
     try {
       const sent = await resendVerificationEmail();
-      if (sent === false) {
-        setStatus("Your email is already verified.", "info");
-      } else {
-        setStatus("Verification email sent.", "success");
-      }
-    } catch (err) {
-      console.error(err);
-      setStatus(err.message || "Could not resend verification email.", "error");
+      setStatus(sent === false ? "Your email is already verified." : "Verification email sent.", sent === false ? "info" : "success");
+    } catch (error) {
+      console.error(error);
+      setStatus(error.message || "Could not resend verification email.", "error");
     }
   });
 
@@ -188,20 +178,15 @@ function bindButtons() {
 
   $("delete-account-btn")?.addEventListener("click", async () => {
     const password = String($("delete-password")?.value || "");
-    if (!confirm("Delete your account permanently?")) return;
+    if (!window.confirm("Delete your account permanently?")) return;
 
     try {
       await deleteAccount(password);
       window.location.reload();
-    } catch (err) {
-      console.error(err);
-      setStatus(err.message || "Could not delete account.", "error");
+    } catch (error) {
+      console.error(error);
+      setStatus(error.message || "Could not delete account.", "error");
     }
-  });
-
-  $("profile-username")?.addEventListener("input", () => {
-    const el = $("profile-username");
-    if (el && el.value.length > 20) el.value = el.value.slice(0, 20);
   });
 }
 
@@ -209,8 +194,6 @@ function start() {
   bindButtons();
 
   watchAuth(async (user, profile) => {
-    activeUid = user?.uid || null;
-
     if (!user) {
       setStatus("Not logged in.", "info");
       return;

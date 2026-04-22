@@ -1,7 +1,6 @@
 import {
   login,
   loginWithGoogle,
-  loginWithMicrosoft,
   createAccount,
   requestPasswordReset,
   watchAuth,
@@ -36,6 +35,9 @@ let currentState = {
 };
 
 let authMode = "login";
+const baseOpenAccountArea = typeof window.openAccountArea === "function"
+  ? window.openAccountArea.bind(window)
+  : null;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -132,7 +134,7 @@ function setAuthMode(mode = "login") {
   if (heading) heading.textContent = loginActive ? "Log in" : "Create account";
   if (copy) {
     copy.textContent = loginActive
-      ? "Use your email and password or a provider to sign in."
+      ? "Use your email and password or Google to sign in."
       : "Create your account to unlock friends, messages, and synced progress.";
   }
   if (switchCopy) switchCopy.textContent = loginActive ? "Don't have an account?" : "Already have an account?";
@@ -186,46 +188,57 @@ function applyInitialAccountArea() {
 }
 
 window.openAccountArea = function openAccountArea(section = "info", sub = null, targetId = null) {
-  const nextSection = String(section || "info").toLowerCase();
+  if (baseOpenAccountArea) {
+    baseOpenAccountArea(section, sub, targetId);
+  }
 
-  document.querySelectorAll(".account-section").forEach((el) => {
-    el.classList.toggle("active", el.dataset.section === nextSection);
-  });
+  try {
+    const nextSection = String(section || "info").toLowerCase();
 
-  document.querySelectorAll(".tab-button").forEach((button) => {
-    button.classList.toggle("active", button.dataset.target === nextSection);
-  });
+    document.querySelectorAll(".account-section").forEach((el) => {
+      el.classList.toggle("active", el.dataset.section === nextSection);
+    });
 
-  if (nextSection === "friends") {
-    const nextSub = sub || "friends";
-    showFriendsSubsection(nextSub);
-    if (currentState.user && targetId) {
-      viewProfileById(targetId).catch((error) => {
-        console.error(error);
-      });
+    document.querySelectorAll(".tab-button").forEach((button) => {
+      button.classList.toggle("active", button.dataset.target === nextSection);
+    });
+
+    if (nextSection === "friends") {
+      const nextSub = sub || "friends";
+      showFriendsSubsection(nextSub);
+      if (currentState.user && targetId) {
+        viewProfileById(targetId).catch((error) => {
+          console.error(error);
+        });
+      }
+      syncQuery(nextSection, nextSub, targetId);
+      return;
     }
-    syncQuery(nextSection, nextSub, targetId);
-    return;
-  }
 
-  if (nextSection === "messages" && currentState.user) {
-    if (typeof window.PanategwaMessagesOpen === "function") {
-      window.PanategwaMessagesOpen(sub || "system", targetId || null);
-    } else if (typeof window.PanategwaMessagesRender === "function") {
-      window.PanategwaMessagesRender();
+    if (nextSection === "messages" && currentState.user) {
+      if (typeof window.PanategwaMessagesOpen === "function") {
+        window.PanategwaMessagesOpen(sub || "system", targetId || null);
+      } else if (typeof window.PanategwaMessagesRender === "function") {
+        window.PanategwaMessagesRender();
+      }
+    }
+
+    if (nextSection === "progress" && targetId) {
+      setTimeout(() => {
+        document.getElementById(`achievement-card-${targetId}`)?.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+      }, 180);
+    }
+
+    syncQuery(nextSection, sub, targetId);
+  } catch (error) {
+    console.error("Account navigation error:", error);
+    if (baseOpenAccountArea) {
+      baseOpenAccountArea(section, sub, targetId);
     }
   }
-
-  if (nextSection === "progress" && targetId) {
-    setTimeout(() => {
-      document.getElementById(`achievement-card-${targetId}`)?.scrollIntoView({
-        behavior: "smooth",
-        block: "center"
-      });
-    }, 180);
-  }
-
-  syncQuery(nextSection, sub, targetId);
 };
 
 function renderAuth(state) {
@@ -641,18 +654,6 @@ function bindAuthForms() {
       console.error(error);
       setStatus(error?.message || "Google sign-in failed.", "error");
       window.alert(error?.message || "Google sign-in failed.");
-    }
-  });
-
-  $("microsoft-btn")?.addEventListener("click", async () => {
-    try {
-      setStatus("Opening Microsoft sign-in...", "info");
-      await loginWithMicrosoft();
-      setStatus("Logged in with Microsoft.", "success");
-    } catch (error) {
-      console.error(error);
-      setStatus(error?.message || "Microsoft sign-in failed.", "error");
-      window.alert(error?.message || "Microsoft sign-in failed.");
     }
   });
 

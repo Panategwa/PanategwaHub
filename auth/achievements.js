@@ -36,22 +36,17 @@ export const ACHIEVEMENTS = [
   { id: "veteran", name: "Veteran", description: "Reach 20 XP.", secret: false, reward: 5 }
 ];
 
-const ACHIEVEMENT_MAP = new Map(ACHIEVEMENTS.map(a => [a.id, a]));
-const KNOWN_IDS = new Set(ACHIEVEMENTS.map(a => a.id));
+const ACHIEVEMENT_MAP = new Map(ACHIEVEMENTS.map((achievement) => [achievement.id, achievement]));
+const KNOWN_IDS = new Set(ACHIEVEMENTS.map((achievement) => achievement.id));
 
 let started = false;
 let profileUnsub = null;
 let pollTimer = null;
 let toastQueue = [];
 let toastActive = false;
-let toastTimer = null;
 
 function pageId() {
   return (window.location.pathname.split("/").pop() || "index.html").toLowerCase();
-}
-
-function isAccountPage() {
-  return pageId() === "account-page.html";
 }
 
 function currentTheme() {
@@ -64,33 +59,26 @@ function currentTextSize() {
 
 function uniqueKnown(list) {
   const seen = new Set();
-  const out = [];
+  const result = [];
   for (const raw of Array.isArray(list) ? list : []) {
     const id = String(raw || "").trim();
-    if (!KNOWN_IDS.has(id)) continue;
-    if (seen.has(id)) continue;
+    if (!KNOWN_IDS.has(id) || seen.has(id)) continue;
     seen.add(id);
-    out.push(id);
+    result.push(id);
   }
-  return out;
+  return result;
 }
 
 function unlockedSet(profile) {
   return new Set(uniqueKnown(profile?.achievements));
 }
 
-function achievementById(id) {
-  return ACHIEVEMENT_MAP.get(id) || null;
-}
-
 function visitedPages(profile) {
-  return [...new Set((Array.isArray(profile?.visitedPages) ? profile.visitedPages : [])
-    .map(v => String(v || "").trim())
-    .filter(Boolean))];
+  return [...new Set((Array.isArray(profile?.visitedPages) ? profile.visitedPages : []).map((value) => String(value || "").trim()).filter(Boolean))];
 }
 
 function rewardForId(id) {
-  return achievementById(id)?.reward || 1;
+  return ACHIEVEMENT_MAP.get(id)?.reward || 1;
 }
 
 function computeUnlocks(user, profile, pages) {
@@ -105,7 +93,7 @@ function computeUnlocks(user, profile, pages) {
   add("first_login", true);
   add("profile_name", !!(profile?.username || user.displayName));
   add("verified_email", !!user.emailVerified);
-  add("account_viewed", isAccountPage());
+  add("account_viewed", page === "account-page.html");
   add("panategwa_b", page === "panategwa-b-page.html");
   add("panategwa_c", page === "panategwa-c-page.html");
   add("panategwa_d", page === "panategwa-d-page.html");
@@ -114,11 +102,15 @@ function computeUnlocks(user, profile, pages) {
   add("panategwa_g", page === "panategwa-g-page.html");
   add("thrinsachelom_history", page === "panategwa-d-thrinsachelom-history.html");
 
-  add(
-    "all_planets",
-    ["panategwa-page.html", "panategwa-b-page.html", "panategwa-c-page.html", "panategwa-d-page.html", "panategwa-e-page.html", "panategwa-f-page.html", "panategwa-g-page.html"]
-      .every(p => pages.includes(p))
-  );
+  add("all_planets", [
+    "panategwa-page.html",
+    "panategwa-b-page.html",
+    "panategwa-c-page.html",
+    "panategwa-d-page.html",
+    "panategwa-e-page.html",
+    "panategwa-f-page.html",
+    "panategwa-g-page.html"
+  ].every((targetPage) => pages.includes(targetPage)));
 
   const theme = currentTheme();
   add("theme_shifter", theme !== "Panategwa Mode (Default)");
@@ -148,9 +140,10 @@ function computeUnlocks(user, profile, pages) {
 function ensureToastSystem() {
   if (window.PanategwaToast) return;
 
-  if (!document.getElementById("achievement-toast-style")) {
+  const styleId = "achievement-toast-style";
+  if (!document.getElementById(styleId)) {
     const style = document.createElement("style");
-    style.id = "achievement-toast-style";
+    style.id = styleId;
     style.textContent = `
       #achievement-toast-stack {
         position: fixed;
@@ -160,11 +153,9 @@ function ensureToastSystem() {
         display: grid;
         gap: 10px;
         width: min(360px, calc(100vw - 32px));
-        pointer-events: none;
       }
 
       .achievement-toast {
-        pointer-events: auto;
         cursor: pointer;
         border-radius: 14px;
         padding: 14px 16px;
@@ -172,22 +163,12 @@ function ensureToastSystem() {
         color: #fff;
         border: 1px solid rgba(255,255,255,0.14);
         box-shadow: 0 12px 30px rgba(0,0,0,0.35);
-        backdrop-filter: blur(8px);
         display: grid;
         gap: 6px;
-        animation: achFadeIn 180ms ease-out;
-        user-select: none;
       }
 
       .achievement-toast-title {
         font-weight: 700;
-        font-size: 0.95rem;
-        opacity: 0.95;
-      }
-
-      .achievement-toast-name {
-        font-weight: 700;
-        font-size: 1rem;
       }
 
       .achievement-toast-desc {
@@ -195,56 +176,52 @@ function ensureToastSystem() {
         opacity: 0.84;
         line-height: 1.35;
       }
-
-      @keyframes achFadeIn {
-        from { transform: translateY(8px); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
-      }
     `;
     document.head.appendChild(style);
   }
 
-  const stackId = "achievement-toast-stack";
-  const getStack = () => {
-    let el = document.getElementById(stackId);
-    if (!el) {
-      el = document.createElement("div");
-      el.id = stackId;
-      document.body.appendChild(el);
+  function getStack() {
+    let stack = document.getElementById("achievement-toast-stack");
+    if (!stack) {
+      stack = document.createElement("div");
+      stack.id = "achievement-toast-stack";
+      document.body.appendChild(stack);
     }
-    return el;
-  };
+    return stack;
+  }
 
-  window.PanategwaToast = ({ title = "Message", body = "", xp = null, href = "" } = {}) => {
-    toastQueue.push({ title, body, xp, href });
-    if (!toastActive) showNextToast();
-  };
-
-  function showNextToast() {
-    if (toastActive || toastQueue.length === 0) return;
+  window.PanategwaToast = ({ title = "Message", body = "", href = "" } = {}) => {
+    toastQueue.push({ title, body, href });
+    if (toastActive) return;
     toastActive = true;
 
-    const item = toastQueue.shift();
-    const el = document.createElement("div");
-    el.className = "achievement-toast";
-    el.innerHTML = `
-      <div class="achievement-toast-title">${item.title}</div>
-      <div class="achievement-toast-desc">${item.body}</div>
-      ${item.xp != null ? `<div class="achievement-toast-desc">+${item.xp} XP</div>` : ""}
-    `;
-    el.addEventListener("click", () => {
-      if (item.href) window.location.href = item.href;
-    });
+    const next = () => {
+      const item = toastQueue.shift();
+      if (!item) {
+        toastActive = false;
+        return;
+      }
 
-    getStack().appendChild(el);
+      const toast = document.createElement("div");
+      toast.className = "achievement-toast";
+      toast.innerHTML = `
+        <div class="achievement-toast-title">${item.title}</div>
+        <div class="achievement-toast-desc">${item.body}</div>
+      `;
+      toast.addEventListener("click", () => {
+        if (item.href) window.location.href = item.href;
+      });
 
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => {
-      el.remove();
-      toastActive = false;
-      showNextToast();
-    }, 5000);
-  }
+      getStack().appendChild(toast);
+
+      setTimeout(() => {
+        toast.remove();
+        next();
+      }, 4200);
+    };
+
+    next();
+  };
 }
 
 async function sendAchievementMessage(user, achievement) {
@@ -266,7 +243,7 @@ async function sendAchievementMessage(user, achievement) {
   });
 }
 
-async function syncAchievementProgress(user, profile) {
+export async function syncAchievementProgress(user, profile) {
   const ref = doc(db, "users", user.uid);
   let result = { profile: profile || null, newlyUnlocked: [] };
 
@@ -276,8 +253,7 @@ async function syncAchievementProgress(user, profile) {
 
     const currentAchievements = uniqueKnown(data.achievements || profile?.achievements || []);
     const currentVisited = visitedPages(data);
-    const page = pageId();
-    const nextVisited = [...new Set([...currentVisited, page])];
+    const nextVisited = [...new Set([...currentVisited, pageId()])];
 
     const mergedProfile = {
       ...data,
@@ -287,12 +263,7 @@ async function syncAchievementProgress(user, profile) {
       verified: !!user.emailVerified,
       achievements: currentAchievements,
       visitedPages: nextVisited,
-      xp: typeof data.xp === "number" ? data.xp : currentAchievements.length,
-      stats: data.stats || {
-        pagesVisited: 0,
-        planetsFound: 0,
-        secretsFound: 0
-      }
+      xp: typeof data.xp === "number" ? data.xp : currentAchievements.length
     };
 
     const pending = computeUnlocks(user, mergedProfile, nextVisited);
@@ -319,35 +290,32 @@ async function syncAchievementProgress(user, profile) {
     };
 
     tx.set(ref, nextDoc, { merge: true });
-
-    result = {
-      profile: nextDoc,
-      newlyUnlocked: pending
-    };
+    result = { profile: nextDoc, newlyUnlocked: pending };
   });
 
   return result;
 }
 
-function renderAchievements(profile) {
+export function renderAchievements(profile) {
   const container = document.getElementById("achievements-list");
   const xpEl = document.getElementById("xp-count");
+  const totalEl = document.getElementById("xp-total");
   const countEl = document.getElementById("achievement-count");
 
   const unlocked = unlockedSet(profile);
   const xp = typeof profile?.xp === "number" ? profile.xp : unlocked.size;
 
   if (xpEl) xpEl.textContent = String(xp);
+  if (totalEl) totalEl.textContent = String(xp);
   if (countEl) countEl.textContent = String(unlocked.size);
-
   if (!container) return;
 
   const ordered = [
-    ...ACHIEVEMENTS.filter(a => unlocked.has(a.id)).sort((a, b) => a.name.localeCompare(b.name)),
-    ...ACHIEVEMENTS.filter(a => !unlocked.has(a.id)).sort((a, b) => a.name.localeCompare(b.name))
+    ...ACHIEVEMENTS.filter((achievement) => unlocked.has(achievement.id)).sort((a, b) => a.name.localeCompare(b.name)),
+    ...ACHIEVEMENTS.filter((achievement) => !unlocked.has(achievement.id)).sort((a, b) => a.name.localeCompare(b.name))
   ];
 
-  container.innerHTML = ordered.map(achievement => {
+  container.innerHTML = ordered.map((achievement) => {
     const isUnlocked = unlocked.has(achievement.id);
     const title = achievement.secret && !isUnlocked ? "Secret" : achievement.name;
     const desc = achievement.secret && !isUnlocked ? "Hidden achievement" : achievement.description;
@@ -365,6 +333,23 @@ function renderAchievements(profile) {
   }).join("");
 }
 
+function emitAchievementToasts(user, newlyUnlocked) {
+  if (!newlyUnlocked.length) return;
+  ensureToastSystem();
+
+  newlyUnlocked.forEach(async (id) => {
+    const achievement = ACHIEVEMENT_MAP.get(id);
+    if (!achievement) return;
+
+    window.PanategwaToast({
+      title: "Achievement unlocked",
+      body: `${achievement.name} - +${achievement.reward} XP`,
+      href: "account-page.html?tab=progress"
+    });
+    await sendAchievementMessage(user, achievement);
+  });
+}
+
 function startAccountWatcher() {
   watchAuth(async (user, profile) => {
     if (!user) {
@@ -376,22 +361,9 @@ function startAccountWatcher() {
       await ensureUserProfile(user);
       const result = await syncAchievementProgress(user, profile);
       renderAchievements(result.profile || profile);
-
-      for (const id of result.newlyUnlocked) {
-        const achievement = achievementById(id);
-        if (achievement) {
-          ensureToastSystem();
-          window.PanategwaToast({
-            title: "Achievement unlocked",
-            body: `${achievement.name} - +${achievement.reward} XP`,
-            xp: achievement.reward,
-            href: "account-page.html?tab=progress"
-          });
-          await sendAchievementMessage(user, achievement);
-        }
-      }
-    } catch (err) {
-      console.error("Achievement tracker error:", err);
+      emitAchievementToasts(user, result.newlyUnlocked);
+    } catch (error) {
+      console.error("Achievement tracker error:", error);
       renderAchievements(profile || null);
     }
   });
@@ -407,8 +379,7 @@ function startLiveProfileListener() {
     if (!user) return;
 
     profileUnsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
-      const liveProfile = snap.exists() ? snap.data() : null;
-      renderAchievements(liveProfile);
+      renderAchievements(snap.exists() ? snap.data() : null);
     });
   });
 }
@@ -423,24 +394,10 @@ function startPoller() {
     try {
       const profile = await getProfile(user.uid);
       const result = await syncAchievementProgress(user, profile);
-
       renderAchievements(result.profile || profile);
-
-      for (const id of result.newlyUnlocked) {
-        const achievement = achievementById(id);
-        if (achievement) {
-          ensureToastSystem();
-          window.PanategwaToast({
-            title: "Achievement unlocked",
-            body: `${achievement.name} - +${achievement.reward} XP`,
-            xp: achievement.reward,
-            href: "account-page.html?tab=progress"
-          });
-          await sendAchievementMessage(user, achievement);
-        }
-      }
-    } catch (err) {
-      console.error("Achievement poll error:", err);
+      emitAchievementToasts(user, result.newlyUnlocked);
+    } catch (error) {
+      console.error("Achievement poll error:", error);
     }
   }, 3000);
 }
@@ -459,9 +416,3 @@ if (document.readyState === "loading") {
 } else {
   startAchievementSystem();
 }
-
-export {
-  syncAchievementProgress,
-  renderAchievements,
-  ACHIEVEMENTS
-};

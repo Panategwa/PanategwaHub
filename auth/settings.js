@@ -10,6 +10,7 @@ import {
   useDefaultProfilePicture,
   updatePrivacySettings,
   resendVerificationEmail,
+  resetAccountData,
   deleteAccount,
   watchAuth,
   getProfile,
@@ -18,7 +19,7 @@ import {
 } from "./auth.js";
 
 const $ = (id) => document.getElementById(id);
-const PRESET_IDS = ["1", "2", "3", "4"];
+const PRESET_IDS = ["1", "2", "3", "4", "5", "6", "7", "8"];
 
 function setStatus(message, kind = "info") {
   const el = $("auth-status");
@@ -184,10 +185,9 @@ async function applyPasswordChange() {
 
 function bindButtons() {
   $("save-username-btn")?.addEventListener("click", applyUsername);
-  $("avatar-preset-1-btn")?.addEventListener("click", () => applyAvatarPreset("1"));
-  $("avatar-preset-2-btn")?.addEventListener("click", () => applyAvatarPreset("2"));
-  $("avatar-preset-3-btn")?.addEventListener("click", () => applyAvatarPreset("3"));
-  $("avatar-preset-4-btn")?.addEventListener("click", () => applyAvatarPreset("4"));
+  for (const presetId of PRESET_IDS) {
+    $(`avatar-preset-${presetId}-btn`)?.addEventListener("click", () => applyAvatarPreset(presetId));
+  }
   $("avatar-default-btn")?.addEventListener("click", applyDefaultAvatar);
   $("avatar-letter-btn")?.addEventListener("click", applyAvatarLetter);
 
@@ -222,6 +222,20 @@ function bindButtons() {
   $("logout-btn")?.addEventListener("click", async () => {
     await logout();
     window.location.reload();
+  });
+
+  $("reset-data-btn")?.addEventListener("click", async () => {
+    const mode = String($("reset-data-select")?.value || "progress");
+    const label = mode === "all" ? "all social and progress data" : mode;
+    if (!window.confirm(`Delete ${label} from this account?`)) return;
+
+    try {
+      await resetAccountData(mode);
+      setStatus("Selected account data deleted.", "success");
+    } catch (error) {
+      console.error(error);
+      setStatus(error.message || "Could not reset account data.", "error");
+    }
   });
 
   $("delete-account-btn")?.addEventListener("click", async () => {

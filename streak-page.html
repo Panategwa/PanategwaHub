@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Panategwa Hub - Streak</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
@@ -78,6 +79,85 @@
       gap: 8px;
     }
 
+    .month-panel {
+      display: grid;
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .month-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .month-grid-head,
+    .month-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .month-grid-label {
+      text-align: center;
+      font-size: 0.82rem;
+      opacity: 0.72;
+      padding-bottom: 4px;
+    }
+
+    .month-day {
+      min-height: 98px;
+      padding: 12px 10px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.05);
+      display: grid;
+      gap: 6px;
+      align-content: start;
+    }
+
+    .month-day.claimed {
+      background: rgba(59,130,246,0.16);
+      border-color: rgba(125,211,252,0.24);
+    }
+
+    .month-day.missed {
+      background: rgba(127,29,29,0.18);
+      border-color: rgba(248,113,113,0.24);
+    }
+
+    .month-day.today {
+      background: rgba(15,118,110,0.2);
+      border-color: rgba(45,212,191,0.24);
+    }
+
+    .month-day-muted,
+    .month-day-spacer {
+      opacity: 0.4;
+    }
+
+    .month-day-spacer {
+      background: transparent;
+      border-color: transparent;
+    }
+
+    .month-day-number {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .month-day-state {
+      font-size: 0.84rem;
+      opacity: 0.78;
+    }
+
+    .month-day-reward {
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
     .streak-day {
       padding: 10px 8px;
       border-radius: 14px;
@@ -107,7 +187,9 @@
       .streak-summary {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
-      .streak-week {
+      .streak-week,
+      .month-grid-head,
+      .month-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }

@@ -135,7 +135,7 @@ function saveSeenToastIds(uid, ids, channel = "messages") {
 }
 
 function normalizeAccountSection(section) {
-  return String(section || "info").trim().toLowerCase() === "friends" ? "info" : String(section || "info").trim().toLowerCase();
+  return String(section || "info").trim().toLowerCase() === "friends" ? "messages" : String(section || "info").trim().toLowerCase();
 }
 
 function buildAccountHref(section, sub = null, targetId = null) {
@@ -156,9 +156,21 @@ function usernameOf(profile) {
 }
 
 function rankFromXp(xp) {
-  if (Number(xp || 0) < 5) return "Explorer";
-  if (Number(xp || 0) < 20) return "Adventurer";
-  return "Veteran";
+  if (Number(xp || 0) >= 30) return "Veteran";
+  if (Number(xp || 0) >= 20) return "Expert";
+  if (Number(xp || 0) >= 10) return "Explorer";
+  return "Adventurer";
+}
+
+function syncUnreadCount() {
+  const uid = socialState.user?.uid;
+  if (!uid) {
+    socialState.unreadCount = 0;
+    return;
+  }
+
+  const unreadDirect = (socialState.messages || []).filter((message) => message.kind === "chat" && isUnreadForUser(message, uid)).length;
+  socialState.unreadCount = unreadDirect + Number(socialState.incomingRequests?.length || 0) + Number(socialState.groupInvites?.length || 0);
 }
 
 function currentStreakOf(profile) {
@@ -342,7 +354,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Friend request",
       body: message.body || `${message.fromName || "Someone"} sent you a friend request.`,
-      href: buildAccountHref("friends", "requests", message.fromUid || message.targetId || null)
+      href: buildAccountHref("messages", "requests", message.fromUid || message.targetId || null)
     };
   }
 
@@ -350,7 +362,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Friend request accepted",
       body: message.body || `${message.fromName || "Someone"} accepted your friend request.`,
-      href: buildAccountHref("friends", "friends", message.targetId || message.fromUid || null)
+      href: buildAccountHref("messages", "direct", message.fromUid || message.targetId || null)
     };
   }
 
@@ -358,7 +370,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Friend request declined",
       body: message.body || `${message.fromName || "Someone"} declined your friend request.`,
-      href: buildAccountHref("messages", "system")
+      href: buildAccountHref("messages", "requests")
     };
   }
 
@@ -366,7 +378,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Friend removed",
       body: message.body || `${message.fromName || "Someone"} removed you from their friends list.`,
-      href: buildAccountHref("info", "friends", message.targetId || message.fromUid || null)
+      href: buildAccountHref("messages", "direct", message.fromUid || message.targetId || null)
     };
   }
 
@@ -374,7 +386,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Blocked",
       body: message.body || `${message.fromName || "Someone"} blocked you.`,
-      href: buildAccountHref("messages", "system")
+      href: buildAccountHref("messages", "direct", message.fromUid || message.targetId || null)
     };
   }
 
@@ -391,14 +403,14 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || `Message from ${message.fromName || "Someone"}`,
       body: shortenToastBody(message.body || ""),
-      href: buildAccountHref("messages", "chat", targetUid || null)
+      href: buildAccountHref("messages", "direct", targetUid || null)
     };
   }
 
   return {
     title: message.title || "New message",
     body: shortenToastBody(message.body || ""),
-    href: buildAccountHref(message.targetSection || "messages", message.targetSubSection || "system", message.targetId || null)
+    href: buildAccountHref(message.targetSection || "messages", message.targetSubSection || "direct", message.targetId || null)
   };
 }
 
@@ -418,7 +430,10 @@ function maybeToastNewMessages(messages) {
 
   if (typeof window.PanategwaToast !== "function") return;
 
-  const toastable = freshIncoming.filter(message => !!toastConfigForMessage(message));
+  const toastable = freshIncoming.filter((message) => {
+    return ["chat", "friend-request", "friend-accepted", "friend-declined", "friend-removed", "friend-blocked", "group-invite"].includes(message.kind)
+      && !!toastConfigForMessage(message);
+  });
   if (!toastable.length) return;
 
   toastable
@@ -582,7 +597,7 @@ async function sendFriendRequestById(targetUid, note = "") {
       status: "pending",
       title: "Friend request",
       body: note ? `${usernameOf(me)}: ${note}` : `${usernameOf(me)} sent you a friend request.`,
-      targetSection: "info",
+      targetSection: "messages",
       targetSubSection: "requests",
       requestId: null,
       readBy: [user.uid]
@@ -627,8 +642,8 @@ async function respondToFriendRequest(requestId, action) {
         kind: "friend-accepted",
         title: "Friend request accepted",
         body: `${currentName} accepted your friend request.`,
-        targetSection: "info",
-        targetSubSection: "friends",
+        targetSection: "messages",
+        targetSubSection: "direct",
         targetId: user.uid,
         readBy: [user.uid]
       });
@@ -652,7 +667,7 @@ async function respondToFriendRequest(requestId, action) {
         title: "Friend request declined",
         body: `${currentName} declined your friend request.`,
         targetSection: "messages",
-        targetSubSection: "system",
+        targetSubSection: "requests",
         targetId: null,
         readBy: [user.uid]
       });
@@ -672,7 +687,7 @@ async function respondToFriendRequest(requestId, action) {
         title: "Blocked",
         body: `${currentName} blocked you.`,
         targetSection: "messages",
-        targetSubSection: "system",
+        targetSubSection: "direct",
         targetId: user.uid,
         readBy: [user.uid]
       });
@@ -711,7 +726,7 @@ async function sendChatMessage(friendUid, text) {
     title: `Message from ${usernameOf(me)}`,
     body,
     targetSection: "messages",
-    targetSubSection: "chat",
+    targetSubSection: "direct",
     conversationUid: id,
     readBy: [user.uid]
   });
@@ -739,8 +754,8 @@ async function removeFriend(friendUid) {
         kind: "friend-removed",
         title: "Friend removed",
         body: `${usernameOf(me)} removed you from their friends list.`,
-        targetSection: "info",
-        targetSubSection: "friends",
+        targetSection: "messages",
+        targetSubSection: "direct",
         targetId: user.uid,
         readBy: [user.uid]
       });
@@ -773,7 +788,7 @@ async function blockUser(targetUid) {
         title: "Blocked",
         body: `${usernameOf(me)} blocked you.`,
         targetSection: "messages",
-        targetSubSection: "system",
+        targetSubSection: "direct",
         targetId: user.uid,
         readBy: [user.uid]
       });
@@ -1053,7 +1068,7 @@ async function inviteToGroupChat(chatId, targetUid) {
     title: "Group invite",
     body: `${usernameOf(await loadUser(user.uid))} invited you to "${chat.name || "Group chat"}".`,
     targetSection: "messages",
-    targetSubSection: "chat",
+    targetSubSection: "groups",
     targetId: chatId,
     groupChatId: chatId,
     readBy: [user.uid]
@@ -1234,9 +1249,7 @@ function getGroupChatMessages(chatId) {
 }
 
 function getUnreadIncomingCount() {
-  const uid = socialState.user?.uid;
-  if (!uid) return 0;
-  return (socialState.messages || []).filter(m => m.toUid === uid && !unique(m.readBy).includes(uid)).length;
+  return socialState.unreadCount || 0;
 }
 
 function teardownGroupListeners() {
@@ -1282,6 +1295,7 @@ function startRealtime() {
       socialState.groupChats = [];
       socialState.groupMessagesByChat = {};
       socialState.groupInvites = [];
+      syncUnreadCount();
       emit();
       return;
     }
@@ -1324,7 +1338,7 @@ function startRealtime() {
       socialState.messages = visible;
       socialState.incomingRequests = sortNewestFirst(visible.filter(m => m.kind === "friend-request" && m.toUid === user.uid && (m.status || "pending") === "pending"));
       socialState.outgoingRequests = sortNewestFirst(visible.filter(m => m.kind === "friend-request" && m.fromUid === user.uid && (m.status || "pending") === "pending"));
-      socialState.unreadCount = visible.filter(m => isUnreadForUser(m, user.uid)).length;
+      syncUnreadCount();
       await syncRelationshipSignals(sorted);
       emit();
     }, (error) => {
@@ -1332,7 +1346,7 @@ function startRealtime() {
         socialState.messages = [];
         socialState.incomingRequests = [];
         socialState.outgoingRequests = [];
-        socialState.unreadCount = 0;
+        syncUnreadCount();
       });
     });
 
@@ -1390,10 +1404,12 @@ function startRealtime() {
       const pendingInvites = sortNewestFirst(invites.filter(i => i.status === "pending"));
       maybeToastPendingGroupInvites(pendingInvites);
       socialState.groupInvites = pendingInvites;
+      syncUnreadCount();
       emit();
     }, (error) => {
       setListenerError("groupInvites", "group invites", error, () => {
         socialState.groupInvites = [];
+        syncUnreadCount();
       });
     });
   });

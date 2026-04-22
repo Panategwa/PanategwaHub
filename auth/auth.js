@@ -20,19 +20,19 @@ import {
 import {
   doc,
   getDoc,
+  getDocs,
   setDoc,
   deleteDoc,
   addDoc,
+  updateDoc,
   collection,
+  query,
+  where,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 function userRef(uid) {
   return doc(db, "users", uid);
-}
-
-function messagesRef() {
-  return collection(db, "messages");
 }
 
 function cleanEmail(email) {
@@ -61,22 +61,28 @@ function defaultUsername(user) {
 }
 
 const RANK_LEVELS = Object.freeze({
-  Explorer: 0,
-  Adventurer: 1,
-  Veteran: 2
+  Adventurer: 0,
+  Explorer: 1,
+  Expert: 2,
+  Veteran: 3
 });
 
 export const AVATAR_PRESET_REQUIREMENTS = Object.freeze({
-  "1": "Explorer",
-  "2": "Explorer",
-  "3": "Adventurer",
-  "4": "Veteran"
+  "1": "Adventurer",
+  "2": "Adventurer",
+  "3": "Explorer",
+  "4": "Explorer",
+  "5": "Expert",
+  "6": "Expert",
+  "7": "Veteran",
+  "8": "Veteran"
 });
 
 export function getRankFromXp(xp) {
-  if (Number(xp || 0) < 5) return "Explorer";
-  if (Number(xp || 0) < 20) return "Adventurer";
-  return "Veteran";
+  if (Number(xp || 0) >= 30) return "Veteran";
+  if (Number(xp || 0) >= 20) return "Expert";
+  if (Number(xp || 0) >= 10) return "Explorer";
+  return "Adventurer";
 }
 
 export function doesRankMeetRequirement(rank, requiredRank) {
@@ -93,11 +99,10 @@ function presetAvatarDataUrl(presetId) {
   if (id === "2") {
     return svgDataUrl(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#6c5ce7"/><stop offset="1" stop-color="#a29bfe"/></linearGradient></defs>
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#ef4444"/><stop offset="1" stop-color="#f59e0b"/></linearGradient></defs>
         <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <circle cx="64" cy="66" r="26" fill="rgba(255,255,255,0.15)"/>
-        <path d="M64 38a28 28 0 1 0 28 28A28 28 0 0 0 64 38z" fill="none" stroke="white" stroke-width="6"/>
-        <circle cx="50" cy="58" r="5" fill="white"/><circle cx="78" cy="58" r="5" fill="white"/>
+        <path d="M64 18 84 42l26 6-17 22 1 28-30-11-30 11 1-28-17-22 26-6z" fill="rgba(255,255,255,0.92)"/>
+        <path d="M64 38 76 54l18 4-12 16 1 18-19-7-19 7 1-18-12-16 18-4z" fill="rgba(239,68,68,0.55)"/>
       </svg>
     `);
   }
@@ -105,11 +110,10 @@ function presetAvatarDataUrl(presetId) {
   if (id === "3") {
     return svgDataUrl(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#00b894"/><stop offset="1" stop-color="#55efc4"/></linearGradient></defs>
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0f766e"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
         <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <circle cx="64" cy="64" r="34" fill="rgba(255,255,255,0.15)"/>
-        <circle cx="64" cy="64" r="22" fill="none" stroke="white" stroke-width="6"/>
-        <circle cx="64" cy="64" r="8" fill="white"/>
+        <circle cx="64" cy="64" r="36" fill="rgba(255,255,255,0.12)"/>
+        <path d="M64 28 76 53h28L81 72l9 28-26-17-26 17 9-28-23-19h28z" fill="rgba(255,255,255,0.94)"/>
       </svg>
     `);
   }
@@ -117,19 +121,66 @@ function presetAvatarDataUrl(presetId) {
   if (id === "4") {
     return svgDataUrl(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#d35400"/><stop offset="1" stop-color="#f1c40f"/></linearGradient></defs>
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#2563eb"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
         <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <path d="M64 22l13 26 29 4-21 20 5 29-26-13-26 13 5-29-21-20 29-4z" fill="rgba(255,255,255,0.95)"/>
-        <circle cx="64" cy="61" r="12" fill="rgba(211,84,0,0.72)"/>
+        <circle cx="64" cy="64" r="40" fill="rgba(255,255,255,0.12)"/>
+        <path d="M64 24c15 10 26 24 26 39 0 19-14 31-26 41-12-10-26-22-26-41 0-15 11-29 26-39z" fill="rgba(255,255,255,0.94)"/>
+        <path d="M64 40c8 6 13 13 13 22 0 11-7 18-13 24-6-6-13-13-13-24 0-9 5-16 13-22z" fill="rgba(37,99,235,0.55)"/>
+      </svg>
+    `);
+  }
+
+  if (id === "5") {
+    return svgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#6366f1"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <circle cx="64" cy="64" r="42" fill="rgba(255,255,255,0.09)"/>
+        <path d="M64 20 84 36l24 2-15 19 5 23-22-8-12 20-12-20-22 8 5-23-15-19 24-2z" fill="rgba(255,255,255,0.94)"/>
+      </svg>
+    `);
+  }
+
+  if (id === "6") {
+    return svgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#1d4ed8"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <path d="M64 18 86 34l24 6-14 23 2 26-24-11-10 22-10-22-24 11 2-26-14-23 24-6z" fill="rgba(255,255,255,0.94)"/>
+        <circle cx="64" cy="58" r="12" fill="rgba(29,78,216,0.48)"/>
+        <path d="M64 40v36" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+    `);
+  }
+
+  if (id === "7") {
+    return svgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#7c2d12"/><stop offset="1" stop-color="#f59e0b"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <path d="M64 16 88 32l24 16-8 31-24 17H48L24 79l-8-31 24-16z" fill="rgba(255,255,255,0.94)"/>
+        <path d="M40 52h48v10H40zm8 18h32v10H48z" fill="rgba(124,45,18,0.42)"/>
+      </svg>
+    `);
+  }
+
+  if (id === "8") {
+    return svgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#431407"/><stop offset="1" stop-color="#facc15"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <path d="M64 18 86 44l28 4-20 21 5 29-35-16-35 16 5-29-20-21 28-4z" fill="rgba(255,255,255,0.95)"/>
+        <circle cx="64" cy="58" r="11" fill="rgba(250,204,21,0.68)"/>
       </svg>
     `);
   }
 
   return svgDataUrl(`
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-      <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0984e3"/><stop offset="1" stop-color="#74b9ff"/></linearGradient></defs>
+      <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#f97316"/><stop offset="1" stop-color="#facc15"/></linearGradient></defs>
       <rect width="128" height="128" rx="64" fill="url(#g)"/>
-      <path d="M64 30l10 20 22 3-16 16 4 22-20-10-20 10 4-22-16-16 22-3z" fill="rgba(255,255,255,0.92)"/>
+      <path d="M64 24 78 52h28L83 70l8 26-27-13-27 13 8-26-23-18h28z" fill="rgba(255,255,255,0.94)"/>
+      <circle cx="64" cy="60" r="10" fill="rgba(249,115,22,0.48)"/>
     </svg>
   `);
 }
@@ -176,6 +227,14 @@ function baseProfile(user) {
       blocked: []
     },
     privacySettings: normalizePrivacySettings(),
+    streak: {
+      current: 0,
+      longest: 0,
+      lastClaimAt: null,
+      lastClaimDay: ""
+    },
+    longestStreak: 0,
+    streakHistory: {},
     stats: {
       pagesVisited: 0,
       planetsFound: 0,
@@ -196,6 +255,30 @@ function normalizeSocialSettings(settings = {}) {
     showNonFriendGroupMessages: settings.showNonFriendGroupMessages !== false,
     profileHidden: !!settings.profileHidden
   };
+}
+
+function normalizeStreak(value = {}) {
+  return {
+    current: Number(value.current || 0),
+    longest: Number(value.longest || 0),
+    lastClaimAt: value.lastClaimAt || null,
+    lastClaimDay: String(value.lastClaimDay || "")
+  };
+}
+
+function normalizeStreakHistory(history = {}) {
+  if (!history || typeof history !== "object" || Array.isArray(history)) return {};
+  const next = {};
+  for (const [key, value] of Object.entries(history)) {
+    const cleanKey = String(key || "").trim();
+    if (!cleanKey || !value || typeof value !== "object") continue;
+    next[cleanKey] = {
+      reward: Number(value.reward || 0),
+      streakDay: Number(value.streakDay || 0),
+      claimedAt: value.claimedAt || null
+    };
+  }
+  return next;
 }
 
 function friendlyAuthError(error) {
@@ -224,27 +307,6 @@ export async function getProfile(uid = auth.currentUser?.uid) {
   if (!uid) return null;
   const snap = await getDoc(userRef(uid));
   return snap.exists() ? snap.data() : null;
-}
-
-async function createSystemMessage(user, title, body, targetSection = "messages", targetSubSection = "system", targetId = null) {
-  if (!user) return;
-
-  await addDoc(messagesRef(), {
-    fromUid: user.uid,
-    toUid: user.uid,
-    participants: [user.uid],
-    fromName: user.displayName || user.email?.split("@")?.[0] || "System",
-    toName: user.displayName || user.email?.split("@")?.[0] || "System",
-    kind: "system",
-    title,
-    body,
-    targetSection,
-    targetSubSection,
-    targetId,
-    readBy: [user.uid],
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  });
 }
 
 export async function ensureUserProfile(user) {
@@ -282,6 +344,9 @@ export async function ensureUserProfile(user) {
     socialSettings: normalizeSocialSettings(data.socialSettings),
     socialBackup,
     privacySettings: normalizePrivacySettings(data.privacySettings),
+    streak: normalizeStreak(data.streak),
+    longestStreak: Number(data.longestStreak || data.streak?.longest || 0),
+    streakHistory: normalizeStreakHistory(data.streakHistory),
     stats: {
       pagesVisited: visitedPages.length,
       planetsFound: data.stats?.planetsFound || 0,
@@ -322,22 +387,6 @@ async function touchLastLoginOnce(user) {
   await setDoc(userRef(user.uid), { lastLoginAt: serverTimestamp() }, { merge: true });
 }
 
-async function maybeCreateLoginMessage(user) {
-  const today = new Date().toISOString().slice(0, 10);
-  const key = `ptg_login_msg_${user.uid}_${today}`;
-  if (sessionStorage.getItem(key)) return;
-  sessionStorage.setItem(key, "1");
-
-  await createSystemMessage(
-    user,
-    "Logged in",
-    `You signed in as ${user.displayName || user.email?.split("@")?.[0] || "Player"}.`,
-    "messages",
-    "system",
-    null
-  );
-}
-
 export async function createAccount(email, password, username) {
   const cleanName = cleanText(username).slice(0, 20);
   const cleanMail = cleanEmail(email);
@@ -358,15 +407,6 @@ export async function createAccount(email, password, username) {
       verified: false
     });
 
-    await createSystemMessage(
-      cred.user,
-      "Welcome",
-      "Your account was created successfully.",
-      "messages",
-      "system",
-      null
-    );
-
     localStorage.setItem("ptg_logged_in", "1");
     return cred.user;
   } catch (error) {
@@ -385,7 +425,6 @@ export async function login(email, password) {
     const cred = await signInWithEmailAndPassword(auth, cleanMail, cleanPass);
     await ensureUserProfile(cred.user);
     await touchLastLoginOnce(cred.user);
-    await maybeCreateLoginMessage(cred.user);
     localStorage.setItem("ptg_logged_in", "1");
     return cred.user;
   } catch (error) {
@@ -402,7 +441,6 @@ export async function loginWithGoogle() {
     const cred = await signInWithPopup(auth, googleProvider);
     await ensureUserProfile(cred.user);
     await touchLastLoginOnce(cred.user);
-    await maybeCreateLoginMessage(cred.user);
     localStorage.setItem("ptg_logged_in", "1");
     return cred.user;
   } catch (error) {
@@ -560,6 +598,152 @@ export async function requestPasswordReset(email) {
   }
 }
 
+async function sendRelationshipResetMessage(user, targetUid, targetProfile, kind, body, targetId = null) {
+  const fromName = user.displayName || user.email?.split("@")?.[0] || "Player";
+  const toName = targetProfile?.username || targetProfile?.email?.split("@")?.[0] || "Player";
+
+  await addDoc(collection(db, "messages"), {
+    fromUid: user.uid,
+    toUid: targetUid,
+    participants: [user.uid, targetUid],
+    fromName,
+    toName,
+    kind,
+    title: kind === "friend-removed" ? "Friend removed" : "Blocked",
+    body,
+    targetSection: "messages",
+    targetSubSection: "direct",
+    targetId,
+    readBy: [user.uid],
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+}
+
+async function removeUserFromGroups(uid) {
+  const chatsSnap = await getDocs(query(collection(db, "groupChats"), where("members", "array-contains", uid)));
+  for (const chatDoc of chatsSnap.docs) {
+    const chat = chatDoc.data() || {};
+    const members = uniqueStrings(chat.members).filter((memberUid) => memberUid !== uid);
+    const payload = {
+      members,
+      updatedAt: serverTimestamp()
+    };
+
+    if (!members.length) {
+      payload.deleted = true;
+    } else if (chat.ownerUid === uid) {
+      payload.ownerUid = members[0];
+    }
+
+    await updateDoc(chatDoc.ref, payload);
+  }
+
+  const inviteQueries = await Promise.all([
+    getDocs(query(collection(db, "groupChatInvites"), where("toUid", "==", uid))),
+    getDocs(query(collection(db, "groupChatInvites"), where("fromUid", "==", uid)))
+  ]);
+
+  for (const inviteSnap of inviteQueries) {
+    for (const invite of inviteSnap.docs) {
+      const data = invite.data() || {};
+      if ((data.status || "pending") !== "pending") continue;
+      await updateDoc(invite.ref, {
+        status: "cancelled",
+        updatedAt: serverTimestamp()
+      });
+    }
+  }
+}
+
+export async function resetAccountData(mode = "progress") {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const nextMode = new Set(["progress", "friends", "all"]).has(String(mode || "").trim().toLowerCase())
+    ? String(mode || "").trim().toLowerCase()
+    : "progress";
+
+  const profile = (await getProfile(user.uid)) || {};
+  const updates = {
+    updatedAt: serverTimestamp()
+  };
+
+  if (nextMode === "progress" || nextMode === "all") {
+    updates.xp = 0;
+    updates.achievements = [];
+    updates.visitedPages = [];
+    updates.stats = {
+      ...(profile.stats || {}),
+      pagesVisited: 0,
+      planetsFound: 0,
+      secretsFound: 0
+    };
+    updates.longestStreak = 0;
+    updates.streak = {
+      current: 0,
+      longest: 0,
+      lastClaimAt: null,
+      lastClaimDay: ""
+    };
+    updates.streakHistory = {};
+  }
+
+  if (nextMode === "friends" || nextMode === "all") {
+    const friends = uniqueStrings(profile.friends);
+    const blocked = uniqueStrings(profile.blocked);
+    const nextBlocked = nextMode === "all" ? [] : blocked;
+
+    updates.friends = [];
+    updates.blocked = nextBlocked;
+    updates.socialBackup = {
+      friends: [],
+      blocked: nextBlocked
+    };
+
+    const messagesSnap = await getDocs(query(collection(db, "messages"), where("participants", "array-contains", user.uid)));
+    for (const messageDoc of messagesSnap.docs) {
+      const data = messageDoc.data() || {};
+      if (data.kind !== "friend-request" || (data.status || "pending") !== "pending") continue;
+      await updateDoc(messageDoc.ref, {
+        status: data.toUid === user.uid ? "ignored" : "cancelled",
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    for (const friendUid of friends) {
+      const friendProfile = await getProfile(friendUid);
+      await sendRelationshipResetMessage(
+        user,
+        friendUid,
+        friendProfile,
+        "friend-removed",
+        `${user.displayName || profile.username || "Player"} reset their friends list.`,
+        user.uid
+      );
+    }
+
+    if (nextMode === "all") {
+      for (const blockedUid of blocked) {
+        const blockedProfile = await getProfile(blockedUid);
+        await sendRelationshipResetMessage(
+          user,
+          blockedUid,
+          blockedProfile,
+          "friend-blocked",
+          `${user.displayName || profile.username || "Player"} reset their social data.`,
+          user.uid
+        );
+      }
+      await removeUserFromGroups(user.uid);
+    }
+  }
+
+  await setDoc(userRef(user.uid), updates, { merge: true });
+  localStorage.removeItem(`ptg_streak_${user.uid}`);
+  return true;
+}
+
 export async function deleteAccount(password) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
@@ -599,7 +783,6 @@ export function watchAuth(callback) {
       localStorage.setItem("ptg_logged_in", "1");
       const profile = await ensureUserProfile(user);
       await touchLastLoginOnce(user);
-      await maybeCreateLoginMessage(user);
       callback(user, profile);
     } catch (error) {
       console.error("Auth watch error:", error);

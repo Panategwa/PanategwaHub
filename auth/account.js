@@ -79,31 +79,57 @@ function checkIcon() {
 }
 
 function getRank(xp) {
-  if (xp < 5) return "Explorer";
-  if (xp < 20) return "Adventurer";
-  return "Veteran";
+  if (xp >= 30) return "Veteran";
+  if (xp >= 20) return "Expert";
+  if (xp >= 10) return "Explorer";
+  return "Adventurer";
 }
 
 function getRankInfo(xp) {
-  if (xp < 5) return { current: "Explorer", next: "Adventurer", start: 0, end: 5 };
-  if (xp < 20) return { current: "Adventurer", next: "Veteran", start: 5, end: 20 };
-  return { current: "Veteran", next: "Max rank", start: 20, end: 20 };
+  if (xp >= 30) return { current: "Veteran", next: "Max rank", start: 30, end: 30 };
+  if (xp >= 20) return { current: "Expert", next: "Veteran", start: 20, end: 30 };
+  if (xp >= 10) return { current: "Explorer", next: "Expert", start: 10, end: 20 };
+  return { current: "Adventurer", next: "Explorer", start: 0, end: 10 };
 }
 
 function progressPercent(xp) {
   const info = getRankInfo(xp);
-  if (xp >= 20) return 100;
+  if (xp >= 30) return 100;
   return Math.max(0, Math.min(100, ((xp - info.start) / Math.max(1, info.end - info.start)) * 100));
+}
+
+function relativeSince(value) {
+  let ms = 0;
+  if (value?.toDate) ms = value.toDate().getTime();
+  else if (typeof value?.toMillis === "function") ms = value.toMillis();
+  else if (typeof value?.seconds === "number") ms = value.seconds * 1000;
+  else if (typeof value === "number") ms = value;
+  else if (value instanceof Date) ms = value.getTime();
+  if (!ms) return "--";
+
+  const diff = Math.max(0, Date.now() - ms);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  if (diff < hour) return `${Math.max(1, Math.floor(diff / minute))} mins`;
+  if (diff < day) return `${Math.floor(diff / hour)} hours`;
+  if (diff < month) return `${Math.floor(diff / day)} days`;
+  if (diff < year) return `${Math.floor(diff / month)} months`;
+  return `${Math.floor(diff / year)} years`;
 }
 
 function normalizeAccountSection(section = "info") {
   const nextSection = String(section || "info").trim().toLowerCase();
-  return nextSection === "friends" ? "info" : nextSection;
+  return nextSection === "friends" ? "messages" : nextSection;
 }
 
 function isFriendsView(section = "info", sub = null) {
   const rawSection = String(section || "info").trim().toLowerCase();
-  return rawSection === "friends" || FRIENDS_SUBSECTIONS.has(String(sub || "").trim().toLowerCase());
+  const nextSub = String(sub || "").trim().toLowerCase();
+  return rawSection === "messages" || rawSection === "friends" || ["direct", "chat", "groups", "requests", "blocked"].includes(nextSub);
 }
 
 function isSettingsView(section = "info", sub = null) {
@@ -168,8 +194,8 @@ function syncMessagesTabBadge(state) {
 
   const unread = Number(state.unreadCount || 0);
   button.classList.toggle("has-dot", unread > 0);
-  button.setAttribute("aria-label", unread > 0 ? `Messages (${unread} unread)` : "Messages");
-  button.title = unread > 0 ? `${unread} unread message${unread === 1 ? "" : "s"}` : "Messages";
+  button.setAttribute("aria-label", unread > 0 ? `Friends (${unread} unread)` : "Friends");
+  button.title = unread > 0 ? `${unread} unread chat${unread === 1 ? "" : "s"}` : "Friends";
 }
 
 function setVisible(id, visible) {
@@ -239,8 +265,6 @@ function applyAuthGuards() {
   const loggedIn = !!currentState.user;
   setVisible("settings-locked", !loggedIn);
   setVisible("settings-content", loggedIn);
-  setVisible("friends-locked", !loggedIn);
-  setVisible("friends-content", loggedIn);
   setVisible("messages-locked", !loggedIn);
   setVisible("messages-content", loggedIn);
 
@@ -269,7 +293,7 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
   try {
     const requestedSection = String(section || "info").toLowerCase();
     const nextSection = normalizeAccountSection(requestedSection);
-    const nextSub = isFriendsView(requestedSection, sub) ? (sub || "friends") : sub;
+    const nextSub = isFriendsView(requestedSection, sub) ? (sub || "direct") : sub;
     let finalSub = nextSub || null;
 
     document.querySelectorAll(".account-section").forEach((el) => {
@@ -281,21 +305,15 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
     });
 
     if (isFriendsView(requestedSection, sub)) {
-      showFriendsSubsection(nextSub);
-      if (currentState.user && targetId) {
-        viewProfileById(targetId).catch((error) => {
-          console.error(error);
-        });
+      finalSub = nextSub || "direct";
+      if (typeof window.PanategwaMessagesOpen === "function") {
+        window.PanategwaMessagesOpen(finalSub, targetId || null);
+      } else if (typeof window.PanategwaMessagesRender === "function") {
+        window.PanategwaMessagesRender();
       }
     } else if (nextSection === "settings") {
       finalSub = nextSub || "account";
       showSettingsSubsection(finalSub);
-    } else if (nextSection === "messages" && currentState.user) {
-      if (typeof window.PanategwaMessagesOpen === "function") {
-        window.PanategwaMessagesOpen(sub || "system", targetId || null);
-      } else if (typeof window.PanategwaMessagesRender === "function") {
-        window.PanategwaMessagesRender();
-      }
     }
 
     if (nextSection === "progress" && targetId) {
@@ -342,6 +360,7 @@ function renderAuth(state) {
   const xp = typeof profile.xp === "number" ? profile.xp : 0;
   const streak = profile?.streak?.current || 0;
   const longestStreak = profile?.longestStreak || profile?.streak?.longest || streak || 0;
+  const memberFor = relativeSince(profile.createdAt);
   const avatar = user.photoURL || profile.photoURL
     ? `<img src="${escapeHtml(user.photoURL || profile.photoURL)}" alt="Avatar" class="account-avatar" />`
     : `<div class="account-avatar-placeholder">${escapeHtml(initials(username))}</div>`;
@@ -371,6 +390,7 @@ function renderAuth(state) {
         </strong>
       </div>
       <div class="info-row"><span>Created</span><strong>${escapeHtml(formatDateOnly(profile.createdAt))}</strong></div>
+      <div class="info-row"><span>On the site for</span><strong>${escapeHtml(memberFor)}</strong></div>
       <div class="info-row"><span>XP</span><strong>${xp}</strong></div>
       <div class="info-row"><span>Rank</span><strong>${escapeHtml(getRank(xp))}</strong></div>
       <div class="info-row"><span>Streak</span><strong>${streak} day${streak === 1 ? "" : "s"}</strong></div>
@@ -404,7 +424,7 @@ function renderProgress(state) {
   if ($("xp-count")) $("xp-count").textContent = String(xp);
   if ($("achievement-count")) $("achievement-count").textContent = String(unlockedCount);
   if ($("xp-need")) {
-    $("xp-need").textContent = xp >= 20 ? "You reached the top rank." : `${info.end - xp} XP to next rank`;
+    $("xp-need").textContent = xp >= 30 ? "You reached the top rank." : `${info.end - xp} XP to next rank`;
   }
 }
 
@@ -671,13 +691,39 @@ function renderFriends(state) {
 }
 
 function renderAll(state) {
-  renderAuth(state);
-  renderProgress(state);
-  renderAchievements(state);
-  renderFriends(state);
+  const authSignature = JSON.stringify({
+    uid: state.user?.uid || "",
+    username: state.profile?.username || "",
+    email: state.user?.email || state.profile?.email || "",
+    verified: !!state.user?.emailVerified,
+    photoURL: state.user?.photoURL || state.profile?.photoURL || "",
+    xp: state.profile?.xp || 0,
+    streak: state.profile?.streak?.current || 0,
+    longest: state.profile?.longestStreak || state.profile?.streak?.longest || 0,
+    createdAt: formatDateOnly(state.profile?.createdAt),
+    copied: isUserIdCopied(state.user?.uid || "")
+  });
+  if (renderAll.lastAuthSignature !== authSignature) {
+    renderAuth(state);
+    renderAll.lastAuthSignature = authSignature;
+  }
+
+  const progressSignature = JSON.stringify({
+    uid: state.user?.uid || "",
+    xp: state.profile?.xp || 0,
+    achievements: [...new Set(state.profile?.achievements || [])].sort()
+  });
+  if (renderAll.lastProgressSignature !== progressSignature) {
+    renderProgress(state);
+    renderAchievements(state);
+    renderAll.lastProgressSignature = progressSignature;
+  }
+
   applyAuthGuards();
   syncMessagesTabBadge(state);
 }
+renderAll.lastAuthSignature = "";
+renderAll.lastProgressSignature = "";
 
 async function copyText(value) {
   try {
@@ -691,7 +737,7 @@ async function copyText(value) {
 
 function bindNavigation() {
   document.addEventListener("click", (event) => {
-    const sectionButton = event.target.closest("[data-target], [data-open-section], [data-auth-mode], [data-friends-subtab], [data-settings-subtab]");
+    const sectionButton = event.target.closest("[data-target], [data-open-section], [data-auth-mode], [data-settings-subtab]");
     if (!sectionButton) return;
 
     if (sectionButton.dataset.target) {
@@ -706,11 +752,6 @@ function bindNavigation() {
 
     if (sectionButton.dataset.authMode) {
       setAuthMode(sectionButton.dataset.authMode);
-      return;
-    }
-
-    if (sectionButton.dataset.friendsSubtab) {
-      window.openAccountArea("info", sectionButton.dataset.friendsSubtab, currentState.selectedProfileId || null);
       return;
     }
 
@@ -905,9 +946,7 @@ function bindFriends() {
 function start() {
   bindNavigation();
   bindAuthForms();
-  bindFriends();
   setAuthMode("login");
-  showFriendsSubsection("friends");
   showSettingsSubsection("account");
   renderAll(currentState);
   applyInitialAccountArea();

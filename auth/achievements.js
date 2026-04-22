@@ -5,9 +5,7 @@ import {
   doc,
   onSnapshot,
   runTransaction,
-  serverTimestamp,
-  addDoc,
-  collection
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 export const ACHIEVEMENTS = [
@@ -27,13 +25,19 @@ export const ACHIEVEMENTS = [
   { id: "panategwa_e", name: "Panategwa E", description: "Visit Panategwa E.", secret: false, reward: 1 },
   { id: "panategwa_f", name: "Panategwa F", description: "Visit Panategwa F.", secret: false, reward: 1 },
   { id: "panategwa_g", name: "Panategwa G", description: "Visit Panategwa G.", secret: false, reward: 1 },
+  { id: "first_friend", name: "First Signal", description: "Add your first friend.", secret: false, reward: 2 },
+  { id: "three_friends", name: "Small Crew", description: "Add 3 friends.", secret: false, reward: 3 },
   { id: "profile_name", name: "True Name", description: "Set your username.", secret: false, reward: 1 },
+  { id: "site_20_minutes", name: "Settled In", description: "Be part of the site for over 20 minutes.", secret: false, reward: 2 },
   { id: "space_mode", name: "Stargazer", description: "Use the Space theme.", secret: false, reward: 1 },
+  { id: "explorer_rank", name: "Explorer Rank", description: "Reach Explorer rank (10 XP).", secret: false, reward: 2 },
+  { id: "expert_rank", name: "Expert Rank", description: "Reach Expert rank (20 XP).", secret: false, reward: 3 },
   { id: "theme_shifter", name: "Aesthetic Control", description: "Change your theme.", secret: false, reward: 1 },
   { id: "thrinsachelom_history", name: "Historian", description: "View the history of the Thrinsacheloms.", secret: false, reward: 2 },
   { id: "tiny_text", name: "Microscopic Text", description: "Set text size to Small.", secret: true, reward: 2 },
   { id: "verified_email", name: "Verified Signal", description: "Verify your email address.", secret: false, reward: 2 },
-  { id: "veteran", name: "Veteran", description: "Reach 20 XP.", secret: false, reward: 5 }
+  { id: "week_streak", name: "Seven Sunrises", description: "Reach a 7 day streak.", secret: false, reward: 4 },
+  { id: "veteran", name: "Veteran", description: "Reach Veteran rank (30 XP).", secret: false, reward: 5 }
 ];
 
 const ACHIEVEMENT_MAP = new Map(ACHIEVEMENTS.map((achievement) => [achievement.id, achievement]));
@@ -79,6 +83,15 @@ function visitedPages(profile) {
 
 function rewardForId(id) {
   return ACHIEVEMENT_MAP.get(id)?.reward || 1;
+}
+
+function createdAtMs(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (typeof value.seconds === "number") return value.seconds * 1000;
+  if (typeof value === "number") return value;
+  if (value instanceof Date) return value.getTime();
+  return 0;
 }
 
 function computeUnlocks(user, profile, pages) {
@@ -127,12 +140,21 @@ function computeUnlocks(user, profile, pages) {
   add("nocturnal", hour >= 21 || hour < 3);
   add("morning_person", hour >= 3 && hour < 11);
 
-  const projectedAchievementCount = unlocked.size + pending.length;
   const currentXp = typeof profile?.xp === "number" ? profile.xp : unlocked.size;
-  const projectedXp = currentXp + pending.reduce((sum, id) => sum + rewardForId(id), 0);
+  const friendsCount = Array.isArray(profile?.friends) ? profile.friends.length : 0;
+  const streakCurrent = Number(profile?.streak?.current || 0);
+  const joinedMs = createdAtMs(profile?.createdAt);
 
+  add("first_friend", friendsCount >= 1);
+  add("three_friends", friendsCount >= 3);
+  add("site_20_minutes", joinedMs > 0 && (Date.now() - joinedMs) >= 20 * 60 * 1000);
+  add("explorer_rank", currentXp >= 10);
+  add("expert_rank", currentXp >= 20);
+  add("week_streak", streakCurrent >= 7);
+  add("veteran", currentXp >= 30);
+
+  const projectedAchievementCount = unlocked.size + pending.length;
   add("achievement_collector", projectedAchievementCount >= 10);
-  add("veteran", projectedXp >= 20);
 
   return pending;
 }
@@ -222,25 +244,6 @@ function ensureToastSystem() {
 
     next();
   };
-}
-
-async function sendAchievementMessage(user, achievement) {
-  await addDoc(collection(db, "messages"), {
-    fromUid: user.uid,
-    toUid: user.uid,
-    participants: [user.uid],
-    fromName: user.displayName || user.email?.split("@")?.[0] || "System",
-    toName: user.displayName || user.email?.split("@")?.[0] || "System",
-    kind: "achievement",
-    title: `Achievement unlocked: ${achievement.name}`,
-    body: `You unlocked ${achievement.name} and earned +${achievement.reward} XP.`,
-    targetSection: "progress",
-    targetSubSection: "progress",
-    targetId: achievement.id,
-    readBy: [user.uid],
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  });
 }
 
 export async function syncAchievementProgress(user, profile) {
@@ -350,7 +353,6 @@ function emitAchievementToasts(user, newlyUnlocked) {
       body: `${achievement.name} - +${achievement.reward} XP`,
       href: "account-page.html?tab=progress"
     });
-    await sendAchievementMessage(user, achievement);
   });
 }
 

@@ -4,8 +4,6 @@ import {
   setSelectedConversation,
   setSelectedGroupChatId,
   markMessageRead,
-  setMessagesReadState,
-  deleteMessageForCurrentUser,
   sendChatMessage,
   sendGroupMessage,
   createGroupChat,
@@ -17,30 +15,22 @@ import {
   respondToFriendRequest,
   leaveGroupChat,
   getConversationMessages,
-  getGroupChatMessages
+  getGroupChatMessages,
+  sendFriendRequestById,
+  removeFriend,
+  blockUser,
+  viewProfileById
 } from "./social.js";
 
 const $ = (id) => document.getElementById(id);
 
-let activeReadFilter = "unread";
-let activeTypeFilter = "system";
-let chatMode = "direct";
-
+let activeView = "direct";
 let directSearchValue = "";
 let groupSearchValue = "";
-
 const directDrafts = {};
 const groupDrafts = {};
-let lastSelectedConversationId = null;
-let lastSelectedGroupId = null;
-
-const SCROLL_SELECTORS = [
-  "#system-message-list",
-  "#messages-friend-list",
-  "#messages-conversation",
-  "#groups-list",
-  "#groups-view .message-stream"
-];
+let lastThreadKey = "";
+let pendingForceBottomKey = "";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -63,6 +53,7 @@ function toMs(value) {
   if (typeof value === "number") return value;
   if (typeof value.toMillis === "function") return value.toMillis();
   if (typeof value.seconds === "number") return value.seconds * 1000;
+  if (value instanceof Date) return value.getTime();
   return 0;
 }
 
@@ -70,26 +61,9 @@ function sortOldestFirst(list) {
   return [...list].sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt));
 }
 
-function formatTimestamp(value) {
-  const ms = toMs(value);
-  if (!ms) return "";
-
-  try {
-    return new Date(ms).toLocaleString([], {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit"
-    });
-  } catch {
-    return "";
-  }
-}
-
 function formatRelativeTime(value) {
   const ms = toMs(value);
   if (!ms) return "";
-
   const diff = Math.max(0, Date.now() - ms);
   const minute = 60 * 1000;
   const hour = 60 * minute;
@@ -97,911 +71,586 @@ function formatRelativeTime(value) {
   const week = 7 * day;
   const month = 30 * day;
   const year = 365 * day;
-
   if (diff < minute) return "Just now";
-  if (diff < hour) {
-    const amount = Math.floor(diff / minute);
-    return `${amount} min${amount === 1 ? "" : "s"} ago`;
-  }
-  if (diff < day) {
-    const amount = Math.floor(diff / hour);
-    return `${amount} hour${amount === 1 ? "" : "s"} ago`;
-  }
-  if (diff < week) {
-    const amount = Math.floor(diff / day);
-    return `${amount} day${amount === 1 ? "" : "s"} ago`;
-  }
-  if (diff < month) {
-    const amount = Math.floor(diff / week);
-    return `${amount} week${amount === 1 ? "" : "s"} ago`;
-  }
-  if (diff < year) {
-    const amount = Math.floor(diff / month);
-    return `${amount} month${amount === 1 ? "" : "s"} ago`;
-  }
+  if (diff < hour) return `${Math.floor(diff / minute)} min${Math.floor(diff / minute) === 1 ? "" : "s"} ago`;
+  if (diff < day) return `${Math.floor(diff / hour)} hour${Math.floor(diff / hour) === 1 ? "" : "s"} ago`;
+  if (diff < week) return `${Math.floor(diff / day)} day${Math.floor(diff / day) === 1 ? "" : "s"} ago`;
+  if (diff < month) return `${Math.floor(diff / week)} week${Math.floor(diff / week) === 1 ? "" : "s"} ago`;
+  if (diff < year) return `${Math.floor(diff / month)} month${Math.floor(diff / month) === 1 ? "" : "s"} ago`;
+  return `${Math.floor(diff / year)} year${Math.floor(diff / year) === 1 ? "" : "s"} ago`;
+}
 
-  const amount = Math.floor(diff / year);
-  return `${amount} year${amount === 1 ? "" : "s"} ago`;
+function formatExactTime(value) {
+  const ms = toMs(value);
+  if (!ms) return "";
+  return new Date(ms).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function relativeSince(value) {
+  const ms = toMs(value);
+  if (!ms) return "--";
+  const diff = Math.max(0, Date.now() - ms);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const month = 30 * day;
+  const year = 365 * day;
+  if (diff < hour) return `${Math.max(1, Math.floor(diff / minute))} mins`;
+  if (diff < day) return `${Math.floor(diff / hour)} hours`;
+  if (diff < month) return `${Math.floor(diff / day)} days`;
+  if (diff < year) return `${Math.floor(diff / month)} months`;
+  return `${Math.floor(diff / year)} years`;
+}
+
+function initials(value, fallback = "P") {
+  return String(value || "").trim().slice(0, 1).toUpperCase() || fallback;
+}
+
+function isIncoming(message) {
+  const uid = socialState.user?.uid;
+  return !!uid && cleanId(message?.toUid) === uid;
+}
+
+function isUnread(message) {
+  const uid = socialState.user?.uid;
+  return !!uid && isIncoming(message) && !unique(message.readBy).includes(uid);
+}
+
+function friendProfile(uid) {
+  return socialState.friendProfiles?.[uid] || socialState.selectedProfile || null;
+}
+
+function friendName(uid) {
+  return friendProfile(uid)?.username || uid || "Player";
+}
+
+function conversationEntries(state) {
+  return (state.friends || []).map((uid) => {
+    const messages = sortOldestFirst(getConversationMessages(uid));
+    const last = messages[messages.length - 1] || null;
+    return {
+      uid,
+      profile: state.friendProfiles?.[uid] || { uid, username: uid, photoURL: "" },
+      messages,
+      unreadCount: messages.filter((message) => isUnread(message)).length,
+      last,
+      lastAt: toMs(last?.createdAt)
+    };
+  }).sort((left, right) => {
+    if (right.lastAt !== left.lastAt) return right.lastAt - left.lastAt;
+    return String(left.profile?.username || left.uid).localeCompare(String(right.profile?.username || right.uid));
+  });
+}
+
+function groupEntries(state) {
+  return [...(state.groupChats || [])].sort((left, right) => toMs(right.updatedAt) - toMs(left.updatedAt));
+}
+
+function activeThreadKey(state) {
+  if (activeView === "groups") return `group:${cleanId(state.selectedGroupChatId)}`;
+  if (activeView === "direct") return `direct:${cleanId(state.selectedConversationId)}`;
+  return activeView;
 }
 
 function captureUiState() {
-  const scrollState = {};
-
-  for (const selector of SCROLL_SELECTORS) {
-    const element = document.querySelector(selector);
-    if (!element) continue;
-
-    const offsetFromBottom = Math.max(0, element.scrollHeight - element.clientHeight - element.scrollTop);
-    scrollState[selector] = {
-      top: element.scrollTop,
-      atBottom: offsetFromBottom < 28
-    };
-  }
-
+  const list = $("social-list-scroll");
+  const stream = $("social-message-stream");
   const activeElement = document.activeElement;
-  const focusedInput = activeElement && (activeElement.id === "direct-message-input" || activeElement.id === "group-message-input")
-    ? {
-        id: activeElement.id,
-        start: activeElement.selectionStart ?? null,
-        end: activeElement.selectionEnd ?? null
-      }
+  const focus = activeElement && ["direct-message-input", "group-message-input"].includes(activeElement.id)
+    ? { id: activeElement.id, start: activeElement.selectionStart ?? null, end: activeElement.selectionEnd ?? null }
     : null;
 
-  return { scrollState, focusedInput };
+  const captureScroll = (element) => {
+    if (!element) return null;
+    const offsetFromBottom = Math.max(0, element.scrollHeight - element.clientHeight - element.scrollTop);
+    return { top: element.scrollTop, atBottom: offsetFromBottom < 28, offsetFromBottom };
+  };
+
+  return { list: captureScroll(list), stream: captureScroll(stream), focus };
 }
 
 function restoreUiState(state = {}, options = {}) {
   requestAnimationFrame(() => {
-    const scrollState = state.scrollState || {};
+    const list = $("social-list-scroll");
+    const stream = $("social-message-stream");
 
-    for (const selector of SCROLL_SELECTORS) {
-      const memory = scrollState[selector];
-      const element = document.querySelector(selector);
-      if (!memory || !element) continue;
+    if (list && state.list) {
+      list.scrollTop = Math.min(state.list.top, Math.max(0, list.scrollHeight - list.clientHeight));
+    }
 
-      if (memory.atBottom) {
-        element.scrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
-      } else {
-        element.scrollTop = Math.min(memory.top, Math.max(0, element.scrollHeight - element.clientHeight));
+    if (stream) {
+      if (options.forceBottom) {
+        stream.scrollTop = Math.max(0, stream.scrollHeight - stream.clientHeight);
+      } else if (state.stream) {
+        stream.scrollTop = state.stream.atBottom
+          ? Math.max(0, stream.scrollHeight - stream.clientHeight)
+          : Math.max(0, stream.scrollHeight - stream.clientHeight - state.stream.offsetFromBottom);
       }
     }
 
-    if (options.forceConversationBottom) {
-      const conversation = $("#messages-conversation");
-      if (conversation) conversation.scrollTop = Math.max(0, conversation.scrollHeight - conversation.clientHeight);
-    }
-
-    if (options.forceGroupBottom) {
-      const stream = document.querySelector("#groups-view .message-stream");
-      if (stream) stream.scrollTop = Math.max(0, stream.scrollHeight - stream.clientHeight);
-    }
-
-    if (state.focusedInput) {
-      const input = document.getElementById(state.focusedInput.id);
+    if (state.focus) {
+      const input = document.getElementById(state.focus.id);
       if (input) {
         input.focus();
-        if (typeof state.focusedInput.start === "number" && typeof state.focusedInput.end === "number") {
-          input.setSelectionRange(state.focusedInput.start, state.focusedInput.end);
+        if (typeof state.focus.start === "number" && typeof state.focus.end === "number") {
+          input.setSelectionRange(state.focus.start, state.focus.end);
         }
       }
     }
+
+    updateJumpButton();
   });
 }
 
-function isIncoming(msg) {
-  const currentUid = socialState.user?.uid;
-  return !!currentUid && cleanId(msg?.toUid) === currentUid;
-}
-
-function isUnread(msg) {
-  const currentUid = socialState.user?.uid;
-  if (!currentUid || !isIncoming(msg)) return false;
-  return !unique(msg.readBy).includes(currentUid);
-}
-
-function isPendingFriendRequest(msg) {
-  return msg?.kind === "friend-request" && (msg.status || "pending") === "pending";
-}
-
-function friendName(uid) {
-  return socialState.friendProfiles?.[uid]?.username || uid || "Player";
-}
-
-function groupName(chatId) {
-  const chat = (socialState.groupChats || []).find((item) => item.id === chatId);
-  return chat?.name || "Group chat";
-}
-
-function directConversationTarget(msg) {
-  const currentUid = socialState.user?.uid;
-  if (!msg || !currentUid) return msg?.targetId || msg?.conversationUid || msg?.fromUid || null;
-  if (msg.fromUid === currentUid) return msg.toUid || msg.targetId || msg.conversationUid || null;
-  return msg.fromUid || msg.targetId || msg.conversationUid || null;
-}
-
-function resolveMessageTarget(msg) {
-  if (!msg) return { section: "messages", sub: "system", targetId: null };
-
-  if (msg.kind === "achievement") {
-    return { section: "progress", sub: "progress", targetId: msg.targetId || msg.achievementId || null };
+async function copyText(value) {
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    window.prompt("Copy this value:", value);
+    return false;
   }
-
-  if (msg.kind === "streak") {
-    return { section: "streak", sub: "overview", targetId: null };
-  }
-
-  if (msg.kind === "friend-request") {
-    return { section: "info", sub: "requests", targetId: msg.fromUid || msg.targetId || null };
-  }
-
-  if (msg.kind === "chat") {
-    return { section: "messages", sub: "chat", targetId: directConversationTarget(msg) };
-  }
-
-  if (msg.kind === "group-invite") {
-    return { section: "messages", sub: "groups", targetId: msg.groupChatId || msg.targetId || null };
-  }
-
-  return {
-    section: msg.targetSection || "messages",
-    sub: msg.targetSubSection || "system",
-    targetId: msg.targetId || directConversationTarget(msg) || null
-  };
 }
 
-async function showTarget(msg) {
-  const target = resolveMessageTarget(msg);
+async function markConversationRead(uid) {
+  const targetUid = cleanId(uid);
+  if (!targetUid) return;
 
-  if (msg?.id && isIncoming(msg) && isUnread(msg)) {
+  const unread = getConversationMessages(targetUid).filter((message) => cleanId(message.fromUid) === targetUid && isUnread(message));
+  for (const message of unread) {
     try {
-      await markMessageRead(msg.id, true);
+      await markMessageRead(message.id, true);
     } catch (error) {
       console.error(error);
     }
   }
+}
 
-  if (target.section === "streak") {
-    window.location.href = "streak-page.html";
-    return;
+function profileAvatarMarkup(profile) {
+  if (profile?.photoURL) {
+    return `<img src="${escapeHtml(profile.photoURL)}" alt="" class="social-avatar-img" />`;
   }
-
-  if (typeof window.openAccountArea === "function") {
-    window.openAccountArea(target.section, target.sub, target.targetId);
-  }
-
-  if (target.section === "progress" && target.targetId) {
-    setTimeout(() => {
-      document.getElementById(`achievement-card-${target.targetId}`)?.scrollIntoView({
-        behavior: "smooth",
-        block: "center"
-      });
-    }, 180);
-  }
+  return `<span>${escapeHtml(initials(profile?.username || profile?.uid || "P"))}</span>`;
 }
 
-function matchesReadFilter(msg) {
-  if (activeReadFilter === "all") {
-    return true;
-  }
-
-  if (activeReadFilter === "unread") {
-    return isUnread(msg);
-  }
-
-  if (isIncoming(msg)) {
-    return !isUnread(msg);
-  }
-
-  return true;
-}
-
-function systemMessages(state) {
-  return (state.messages || []).filter((message) => message.kind !== "chat");
-}
-
-function directChatMessages(state) {
-  return (state.messages || []).filter((message) => message.kind === "chat");
-}
-
-function visibleInboxMessages(state) {
-  const source = activeTypeFilter === "all"
-    ? (state.messages || [])
-    : (activeTypeFilter === "chat" ? directChatMessages(state) : systemMessages(state));
-  return source.filter(matchesReadFilter);
-}
-
-function hasUnreadChatFrom(uid) {
-  const targetUid = cleanId(uid);
-  if (!targetUid) return false;
-  return getConversationMessages(targetUid).some((message) => isUnread(message));
-}
-
-function openMessagesView(sub = "system", targetId = null) {
-  if (!socialState.user) {
-    activeReadFilter = "unread";
-    activeTypeFilter = "system";
-    render(socialState);
-    return;
-  }
-
-  if (sub === "chat") {
-    activeTypeFilter = "chat";
-    chatMode = "direct";
-    if (targetId) {
-      setSelectedConversation(targetId);
-      activeReadFilter = hasUnreadChatFrom(targetId) ? "unread" : "all";
-    }
-  } else if (sub === "groups") {
-    activeTypeFilter = "chat";
-    chatMode = "groups";
-    activeReadFilter = "all";
-    if (targetId) setSelectedGroupChatId(targetId);
-  } else {
-    activeTypeFilter = "system";
-    activeReadFilter = "unread";
-  }
-
-  render(socialState);
-}
-
-function messageIcon(msg) {
-  if (msg.kind === "chat") return "DM";
-  if (msg.kind === "group-invite") return "GR";
-  if (isUnread(msg)) return "NEW";
-  return "SYS";
-}
-
-function messageKindLabel(msg) {
-  return msg.kind === "chat" ? "Chat" : "System";
-}
-
-function messageMeta(msg) {
-  const pieces = [];
-  const sender = msg.kind === "chat"
-    ? (msg.fromUid === socialState.user?.uid ? `You to ${friendName(msg.toUid)}` : friendName(msg.fromUid))
-    : (msg.fromName || msg.kind || "");
-  const time = formatRelativeTime(msg.createdAt);
-
-  if (sender) pieces.push(sender);
-  if (time) pieces.push(time);
-  return pieces.join(" - ");
-}
-
-function requestButtons(msg) {
-  if (!(msg.kind === "friend-request" && isIncoming(msg) && isPendingFriendRequest(msg))) {
-    return "";
-  }
-
+function messageBubble(message, group = false) {
+  const mine = cleanId(message.fromUid) === cleanId(socialState.user?.uid);
+  const who = mine ? "You" : (group ? (message.fromName || "Member") : friendName(message.fromUid));
   return `
-    <button type="button" data-action="accept-friend-request" data-id="${escapeHtml(msg.id)}" data-uid="${escapeHtml(msg.fromUid || "")}">Accept</button>
-    <button type="button" data-action="ignore-friend-request" data-id="${escapeHtml(msg.id)}" data-uid="${escapeHtml(msg.fromUid || "")}">Ignore</button>
-    <button type="button" data-action="decline-friend-request" data-id="${escapeHtml(msg.id)}" data-uid="${escapeHtml(msg.fromUid || "")}">Decline</button>
-  `;
-}
-
-function messageMenu(msg) {
-  const canToggleRead = isIncoming(msg);
-  const showDelete = !isPendingFriendRequest(msg);
-
-  if (!canToggleRead && !showDelete) return "";
-
-  return `
-    <details class="message-entry-menu">
-      <summary aria-label="Message actions">&#8942;</summary>
-      <div class="friend-entry-popover message-entry-popover">
-        ${canToggleRead ? `<button type="button" data-action="${isUnread(msg) ? "mark-read" : "mark-unread"}" data-id="${escapeHtml(msg.id)}">${isUnread(msg) ? "Mark read" : "Mark unread"}</button>` : ""}
-        ${showDelete ? `<button type="button" data-action="delete-message" data-id="${escapeHtml(msg.id)}">Delete</button>` : ""}
-      </div>
-    </details>
-  `;
-}
-
-function messageCard(msg, { showOpen = true } = {}) {
-  const unread = isUnread(msg);
-  const target = resolveMessageTarget(msg);
-  const exactTime = formatTimestamp(msg.createdAt);
-
-  return `
-    <div class="msg-card ${unread ? "unread" : "read"}" data-msg-id="${escapeHtml(msg.id)}" data-kind="${escapeHtml(msg.kind || "system")}" data-target-id="${escapeHtml(target.targetId || "")}" data-target-section="${escapeHtml(target.section)}" data-target-sub="${escapeHtml(target.sub)}">
-      <div class="msg-avatar">${escapeHtml(messageIcon(msg))}</div>
-      <div class="msg-body">
-        <div class="msg-top">
-          <div class="msg-title-row">
-            <div class="msg-title">${escapeHtml(msg.title || msg.kind || "Message")}</div>
-            <span class="msg-state-pill ${unread ? "unread" : "read"}">${unread ? "Unread" : "Read"}</span>
-          </div>
-          <div class="msg-meta" title="${escapeHtml(exactTime)}">${escapeHtml(messageMeta(msg))}</div>
-        </div>
-        <div class="msg-text">${escapeHtml(msg.body || "")}</div>
-        <div class="msg-kind-line">${escapeHtml(messageKindLabel(msg))}</div>
-      </div>
-      <div class="msg-actions">
-        ${showOpen ? `<button type="button" data-action="open-target" data-id="${escapeHtml(msg.id)}">Open</button>` : ""}
-        ${requestButtons(msg)}
-        ${messageMenu(msg)}
+    <div class="chat-message ${mine ? "mine" : "theirs"}">
+      <div class="chat-bubble-shell">
+        ${group && !mine ? `<div class="chat-author">${escapeHtml(who)}</div>` : ""}
+        <div class="chat-bubble">${escapeHtml(message.body || "")}</div>
+        <div class="chat-meta" title="${escapeHtml(formatExactTime(message.createdAt))}">${escapeHtml(`${who} - ${formatRelativeTime(message.createdAt)}`)}</div>
       </div>
     </div>
   `;
 }
 
-function groupMessageCard(msg) {
-  const exactTime = formatTimestamp(msg.createdAt);
+function profileFacts(profile) {
+  if (!profile) return `<div class="social-empty">Pick someone to see details.</div>`;
+
+  const rank = profile.currentRank || "Hidden";
+  const joined = toMs(profile.createdAt) ? new Date(toMs(profile.createdAt)).toLocaleDateString() : "Hidden";
+  const memberFor = toMs(profile.createdAt) ? relativeSince(profile.createdAt) : "Hidden";
+  const streakCurrent = profile.streakCurrent == null ? "Hidden" : `${profile.streakCurrent} day${profile.streakCurrent === 1 ? "" : "s"}`;
+  const streakLongest = profile.streakLongest == null ? "Hidden" : `${profile.streakLongest} day${profile.streakLongest === 1 ? "" : "s"}`;
+
   return `
-    <div class="msg-card read group-msg-card">
-      <div class="msg-avatar">GR</div>
-      <div class="msg-body">
-        <div class="msg-top">
-          <div class="msg-title-row">
-            <div class="msg-title">${escapeHtml(msg.fromName || "Group member")}</div>
-          </div>
-          <div class="msg-meta" title="${escapeHtml(exactTime)}">${escapeHtml(formatRelativeTime(msg.createdAt))}</div>
-        </div>
-        <div class="msg-text">${escapeHtml(msg.body || "")}</div>
-        <div class="msg-kind-line">Group</div>
-      </div>
-    </div>
-  `;
-}
-
-function summaryCopy(messages) {
-  const typeLabel = activeTypeFilter === "all" ? "messages" : (activeTypeFilter === "chat" ? "chat messages" : "system messages");
-  const readLabel = activeReadFilter === "all" ? "all" : activeReadFilter;
-  return `${messages.length} ${readLabel} ${typeLabel}`;
-}
-
-function renderSystem(state) {
-  const list = $("system-message-list");
-  const summary = $("messages-view-summary");
-  if (!list) return;
-
-  const messages = visibleInboxMessages(state);
-
-  if (summary) summary.textContent = summaryCopy(messages);
-
-  list.innerHTML = messages.length
-    ? messages.map((message) => messageCard(message, { showOpen: true })).join("")
-    : `<div class="msg-empty">No ${activeReadFilter === "all" ? "" : `${activeReadFilter} `}${activeTypeFilter === "all" ? "" : "system "}messages right now.</div>`;
-}
-
-function directFriendEntries(state) {
-  return (state.friends || [])
-    .map((uid) => {
-      const allMessages = sortOldestFirst(getConversationMessages(uid));
-      return {
-        uid,
-        name: friendName(uid),
-        allMessages,
-        visibleMessages: allMessages.filter(matchesReadFilter),
-        unreadCount: allMessages.filter((message) => isUnread(message)).length,
-        lastMessageAt: Math.max(0, ...allMessages.map((message) => toMs(message.createdAt)))
-      };
-    })
-    .sort((a, b) => {
-      if (b.lastMessageAt !== a.lastMessageAt) return b.lastMessageAt - a.lastMessageAt;
-      return a.name.localeCompare(b.name);
-    });
-}
-
-function renderChat(state) {
-  const summary = $("messages-view-summary");
-  const friendList = $("messages-friend-list");
-  const conversation = $("messages-conversation");
-  const targetLabel = $("direct-composer-target");
-  const directInput = $("direct-message-input");
-
-  const filteredFriends = directFriendEntries(state).filter((friend) => {
-    if (!directSearchValue) return true;
-    const query = directSearchValue.toLowerCase();
-    return friend.name.toLowerCase().includes(query) || friend.uid.toLowerCase().includes(query);
-  });
-
-  let selectedUid = cleanId(state.selectedConversationId);
-  if (!filteredFriends.some((friend) => friend.uid === selectedUid)) {
-    selectedUid = filteredFriends.find((friend) => friend.visibleMessages.length)?.uid || filteredFriends[0]?.uid || null;
-    if (selectedUid && selectedUid !== state.selectedConversationId) {
-      setSelectedConversation(selectedUid);
-    }
-  }
-
-  const selectedFriend = filteredFriends.find((friend) => friend.uid === selectedUid) || null;
-  const visibleConversation = selectedFriend?.visibleMessages || [];
-
-  if (summary) {
-    const totalVisibleChats = visibleInboxMessages(state);
-    summary.textContent = summaryCopy(totalVisibleChats);
-  }
-
-  if (friendList) {
-    friendList.innerHTML = filteredFriends.length
-      ? filteredFriends.map((friend) => `
-        <button class="friend-pill ${friend.uid === selectedUid ? "active" : ""}" type="button" data-action="pick-friend" data-uid="${escapeHtml(friend.uid)}">
-          <span>${escapeHtml(friend.name)}</span>
-          <small>
-            ${escapeHtml(friend.uid)}
-            ${friend.unreadCount ? `<span class="pill-counter">${escapeHtml(String(friend.unreadCount))}</span>` : ""}
-          </small>
-        </button>
-      `).join("")
-      : `<div class="msg-empty">No matching friends.</div>`;
-  }
-
-  if (targetLabel) {
-    const modeLabel = activeReadFilter === "all" ? "Chat" : `${activeReadFilter === "unread" ? "Unread" : "Read"} chat`;
-    targetLabel.textContent = selectedUid ? `${modeLabel} with ${friendName(selectedUid)}` : "Pick a friend to start chatting";
-  }
-
-  if (conversation) {
-    conversation.innerHTML = selectedUid
-      ? (visibleConversation.length
-        ? visibleConversation.map((message) => messageCard(message, { showOpen: false })).join("")
-        : `<div class="msg-empty">No ${activeReadFilter === "all" ? "" : `${activeReadFilter} `}chat messages with ${escapeHtml(friendName(selectedUid))}.</div>`)
-      : `<div class="msg-empty">Pick a friend to open your chat.</div>`;
-  }
-
-  $("messages-send-btn")?.setAttribute("data-target-uid", selectedUid || "");
-  if (directInput) {
-    directInput.value = selectedUid ? (directDrafts[selectedUid] || "") : "";
-  }
-
-  const chats = (state.groupChats || []).filter((chat) => {
-    if (!groupSearchValue) return true;
-    const query = groupSearchValue.toLowerCase();
-    return String(chat.name || "").toLowerCase().includes(query) || String(chat.id || "").toLowerCase().includes(query);
-  });
-
-  let selectedGroup = cleanId(state.selectedGroupChatId);
-  if (!chats.some((chat) => chat.id === selectedGroup)) {
-    selectedGroup = chats[0]?.id || null;
-    if (selectedGroup && selectedGroup !== state.selectedGroupChatId) {
-      setSelectedGroupChatId(selectedGroup);
-    }
-  }
-
-  const list = $("groups-list");
-  const view = $("groups-view");
-
-  if (list) {
-    list.innerHTML = chats.length
-      ? chats.map((chat) => `
-        <button class="group-pill ${chat.id === selectedGroup ? "active" : ""}" type="button" data-action="pick-group" data-id="${escapeHtml(chat.id)}">
-          <span>${escapeHtml(chat.emoji || "#")} ${escapeHtml(chat.name || "Group chat")}</span>
-          <small>${escapeHtml(String((chat.members || []).length))} members</small>
-        </button>
-      `).join("")
-      : `<div class="msg-empty">No group chats yet.</div>`;
-  }
-
-  if (view) {
-    const messages = selectedGroup ? sortOldestFirst(getGroupChatMessages(selectedGroup)) : [];
-    const current = chats.find((chat) => chat.id === selectedGroup) || null;
-
-    view.innerHTML = selectedGroup ? `
-      <div class="group-header">
+    <div class="social-detail-profile">
+      <div class="social-detail-hero">
+        <span class="social-avatar detail">${profileAvatarMarkup(profile)}</span>
         <div>
-          <div class="group-name">${escapeHtml(current?.emoji || "#")} ${escapeHtml(current?.name || "Group chat")}</div>
-          <div class="group-meta">${escapeHtml(String((current?.members || []).length || 0))} members</div>
-        </div>
-        <div class="group-actions-inline">
-          <button type="button" data-action="copy-group-id" data-id="${escapeHtml(selectedGroup)}">Copy ID</button>
-          <button type="button" data-action="leave-group" data-id="${escapeHtml(selectedGroup)}">Leave</button>
-          <button type="button" data-action="delete-group" data-id="${escapeHtml(selectedGroup)}">Delete</button>
+          <div class="social-detail-name">${escapeHtml(profile.username || "Player")}</div>
+          <div class="social-detail-id">${escapeHtml(profile.uid || "--")}</div>
         </div>
       </div>
-
-      <div class="group-manager">
-        <div class="group-edit-grid">
-          <input id="group-rename-input" type="text" placeholder="Rename group" value="${escapeHtml(current?.name || "")}" />
-          <input id="group-emoji-input" type="text" placeholder="Group emoji" value="${escapeHtml(current?.emoji || "#")}" />
-          <button type="button" id="group-save-btn" data-group-id="${escapeHtml(selectedGroup)}">Save group info</button>
-        </div>
-
-        <div class="group-edit-grid" style="margin-top:12px;">
-          <input id="group-add-member-input" type="text" placeholder="Add member by ID" />
-          <button type="button" id="group-add-member-btn" data-group-id="${escapeHtml(selectedGroup)}">Invite member</button>
-        </div>
+      <div class="profile-meta compact">
+        <div><span>Rank</span><strong>${escapeHtml(rank)}</strong></div>
+        <div><span>Joined</span><strong>${escapeHtml(joined)}</strong></div>
+        <div><span>Member for</span><strong>${escapeHtml(memberFor)}</strong></div>
+        <div><span>Friends</span><strong>${escapeHtml(String((profile.friends || []).length || 0))}</strong></div>
+        <div><span>Current streak</span><strong>${escapeHtml(streakCurrent)}</strong></div>
+        <div><span>Longest streak</span><strong>${escapeHtml(streakLongest)}</strong></div>
       </div>
+    </div>
+  `;
+}
 
-      <div class="message-stream" style="margin-top:12px;">
-        ${messages.length ? messages.map(groupMessageCard).join("") : `<div class="msg-empty">No messages in this group yet.</div>`}
+function railMarkup(state) {
+  const directUnread = (state.friends || []).reduce((sum, uid) => sum + getConversationMessages(uid).filter((message) => isUnread(message)).length, 0);
+  return `
+    <div class="social-rail-card">
+      <button class="social-switch ${activeView === "direct" ? "active" : ""}" type="button" data-social-view="direct">Direct${directUnread ? ` <span class="social-counter">${directUnread}</span>` : ""}</button>
+      <button class="social-switch ${activeView === "groups" ? "active" : ""}" type="button" data-social-view="groups">Groups${state.groupInvites?.length ? ` <span class="social-counter">${state.groupInvites.length}</span>` : ""}</button>
+      <button class="social-switch ${activeView === "requests" ? "active" : ""}" type="button" data-social-view="requests">Requests${state.incomingRequests?.length ? ` <span class="social-counter">${state.incomingRequests.length}</span>` : ""}</button>
+      <button class="social-switch ${activeView === "blocked" ? "active" : ""}" type="button" data-social-view="blocked">Blocked</button>
+    </div>
+    <div class="social-quick-card">
+      <h3>Quick add</h3>
+      <div class="social-form-stack">
+        <input id="quick-friend-id" type="text" placeholder="User ID" />
+        <input id="quick-friend-note" type="text" placeholder="Optional note" />
       </div>
-
-      <div class="composer-row" style="margin-top:12px;">
-        <input id="group-message-input" type="text" placeholder="Write a group message..." />
-        <button id="send-group-message-btn" type="button" data-group-id="${escapeHtml(selectedGroup)}">Send</button>
+      <div class="button-row split">
+        <button type="button" data-action="social-send-request">Send request</button>
+        <button type="button" data-action="social-quick-block">Block</button>
       </div>
-    ` : `<div class="msg-empty">Pick a group chat.</div>`;
+    </div>
+  `;
+}
 
-    const groupInput = $("group-message-input");
-    if (groupInput) {
-      groupInput.value = selectedGroup ? (groupDrafts[selectedGroup] || "") : "";
-    }
+function listMarkup(state) {
+  if (activeView === "groups") {
+    const query = groupSearchValue.trim().toLowerCase();
+    const groups = groupEntries(state).filter((group) => !query || String(group.name || "").toLowerCase().includes(query) || String(group.id || "").toLowerCase().includes(query));
+    const selectedGroupId = cleanId(state.selectedGroupChatId);
+    return `
+      <div class="social-list-head"><div><h3>Group chats</h3><p>${groups.length} active</p></div><input id="social-group-search" type="text" placeholder="Search groups" value="${escapeHtml(groupSearchValue)}" /></div>
+      <div id="social-list-scroll" class="social-list-scroll">
+        ${groups.length ? groups.map((group) => `
+          <button class="social-entry social-entry-buttononly ${group.id === selectedGroupId ? "active" : ""}" type="button" data-action="social-pick-group" data-id="${escapeHtml(group.id)}">
+            <span class="social-avatar group">${escapeHtml(group.emoji || "#")}</span>
+            <span class="social-entry-copy"><span class="social-entry-topline"><strong>${escapeHtml(group.name || "Group chat")}</strong><small>${escapeHtml(String((group.members || []).length || 0))} members</small></span><span class="social-entry-subline"><span>${escapeHtml(group.lastMessage || "No messages yet")}</span></span></span>
+          </button>
+        `).join("") : `<div class="social-empty">No group chats yet.</div>`}
+        <div class="social-subsection"><h4>Invites</h4>${(state.groupInvites || []).length ? state.groupInvites.map((invite) => `
+          <div class="invite-card compact">
+            <div><div class="invite-title">${escapeHtml(invite.chatEmoji || "#")} ${escapeHtml(invite.chatName || "Group chat")}</div><div class="invite-sub">${escapeHtml(invite.fromName || invite.fromUid || "Invite")}</div></div>
+            <div class="invite-actions"><button type="button" data-action="social-accept-group-invite" data-id="${escapeHtml(invite.id)}">Accept</button><button type="button" data-action="social-decline-group-invite" data-id="${escapeHtml(invite.id)}">Decline</button><button type="button" data-action="social-open-group-invite" data-id="${escapeHtml(invite.chatId)}">Open</button></div>
+          </div>
+        `).join("") : `<div class="social-empty inline">No pending invites.</div>`}</div>
+      </div>
+    `;
   }
 
-  const invites = $("groups-invite-list");
-  if (invites) {
-    invites.innerHTML = (state.groupInvites || []).length
-      ? state.groupInvites.map((invite) => `
-        <div class="invite-card">
-          <div>
-            <div class="invite-title">${escapeHtml(invite.chatEmoji || "#")} ${escapeHtml(invite.chatName || "Group invite")}</div>
-            <div class="invite-sub">${escapeHtml(invite.fromName || invite.fromUid || "")}</div>
+  if (activeView === "requests") {
+    return `
+      <div class="social-list-head"><div><h3>Friend requests</h3><p>${(state.incomingRequests || []).length} incoming, ${(state.outgoingRequests || []).length} outgoing</p></div></div>
+      <div id="social-list-scroll" class="social-list-scroll">
+        <div class="social-subsection"><h4>Incoming</h4>${(state.incomingRequests || []).length ? state.incomingRequests.map((request) => `
+          <div class="request-card request-tight">
+            <div class="request-card-top"><div><div class="request-card-title">${escapeHtml(request.fromName || request.fromUid || "Friend request")}</div><div class="request-card-meta">${escapeHtml(request.fromUid || "")}</div></div><span class="profile-badge">Pending</span></div>
+            <div class="request-card-note">${escapeHtml(request.body || "Friend request")}</div>
+            <div class="request-card-actions"><button type="button" data-action="social-view-profile" data-uid="${escapeHtml(request.fromUid || "")}">View</button><button type="button" data-action="social-accept-request" data-id="${escapeHtml(request.id)}" data-uid="${escapeHtml(request.fromUid || "")}">Accept</button><button type="button" data-action="social-ignore-request" data-id="${escapeHtml(request.id)}">Ignore</button><button type="button" data-action="social-decline-request" data-id="${escapeHtml(request.id)}">Decline</button></div>
           </div>
-          <div class="invite-actions">
-            <button type="button" data-action="accept-group-invite" data-id="${escapeHtml(invite.id)}">Accept</button>
-            <button type="button" data-action="decline-group-invite" data-id="${escapeHtml(invite.id)}">Decline</button>
-            <button type="button" data-action="open-group-invite" data-id="${escapeHtml(invite.chatId)}">Open group</button>
-          </div>
-        </div>
-      `).join("")
-      : `<div class="msg-empty">No group invites.</div>`;
+        `).join("") : `<div class="social-empty inline">No incoming requests.</div>`}</div>
+        <div class="social-subsection"><h4>Outgoing</h4>${(state.outgoingRequests || []).length ? state.outgoingRequests.map((request) => `
+          <div class="request-card request-tight"><div class="request-card-top"><div><div class="request-card-title">${escapeHtml(request.toName || request.toUid || "Pending request")}</div><div class="request-card-meta">${escapeHtml(request.toUid || "")}</div></div><span class="profile-badge">${escapeHtml(request.status || "pending")}</span></div><div class="request-card-note">${escapeHtml(request.body || "Friend request sent.")}</div></div>
+        `).join("") : `<div class="social-empty inline">No outgoing requests.</div>`}</div>
+      </div>
+    `;
   }
+
+  if (activeView === "blocked") {
+    const blocked = (state.blocked || []).map((uid) => state.friendProfiles?.[uid] || { uid, username: uid });
+    return `
+      <div class="social-list-head"><div><h3>Blocked users</h3><p>${blocked.length} blocked</p></div></div>
+      <div id="social-list-scroll" class="social-list-scroll">
+        ${blocked.length ? blocked.map((profile) => `<button class="social-entry social-entry-buttononly" type="button" data-action="social-view-profile" data-uid="${escapeHtml(profile.uid)}"><span class="social-avatar">${profileAvatarMarkup(profile)}</span><span class="social-entry-copy"><span class="social-entry-topline"><strong>${escapeHtml(profile.username || "Player")}</strong></span><span class="social-entry-subline"><span>${escapeHtml(profile.uid || "")}</span></span></span></button>`).join("") : `<div class="social-empty">No blocked users.</div>`}
+      </div>
+    `;
+  }
+
+  const query = directSearchValue.trim().toLowerCase();
+  const entries = conversationEntries(state).filter((entry) => !query || String(entry.profile?.username || "").toLowerCase().includes(query) || entry.uid.toLowerCase().includes(query));
+  const selectedUid = cleanId(state.selectedConversationId);
+  return `
+    <div class="social-list-head"><div><h3>Direct messages</h3><p>${entries.length} friend${entries.length === 1 ? "" : "s"}</p></div><input id="social-direct-search" type="text" placeholder="Search friends" value="${escapeHtml(directSearchValue)}" /></div>
+    <div id="social-list-scroll" class="social-list-scroll">
+      ${entries.length ? entries.map((entry) => `
+        <div class="social-entry ${entry.uid === selectedUid ? "active" : ""}">
+          <button class="social-entry-main" type="button" data-action="social-pick-direct" data-uid="${escapeHtml(entry.uid)}">
+            <span class="social-avatar">${profileAvatarMarkup(entry.profile)}</span>
+            <span class="social-entry-copy"><span class="social-entry-topline"><strong>${escapeHtml(entry.profile?.username || "Player")}</strong><small>${escapeHtml(entry.last ? formatRelativeTime(entry.last.createdAt) : "No messages yet")}</small></span><span class="social-entry-subline"><span>${escapeHtml(entry.last?.body || entry.uid)}</span>${entry.unreadCount ? `<span class="social-counter">${entry.unreadCount}</span>` : ""}</span></span>
+          </button>
+          <details class="social-entry-menu"><summary aria-label="Friend actions">&#8942;</summary><div class="social-entry-popover"><button type="button" data-action="social-copy-id" data-uid="${escapeHtml(entry.uid)}">Copy ID</button><button type="button" data-action="social-remove-friend" data-uid="${escapeHtml(entry.uid)}">Unfriend</button><button type="button" data-action="social-block-user" data-uid="${escapeHtml(entry.uid)}">Block</button></div></details>
+        </div>
+      `).join("") : `<div class="social-empty">No friends yet. Send a request from the left panel to start chatting.</div>`}
+    </div>
+  `;
+}
+
+function chatMarkup(state) {
+  if (activeView === "groups") {
+    const selectedGroupId = cleanId(state.selectedGroupChatId);
+    const group = (state.groupChats || []).find((entry) => entry.id === selectedGroupId) || null;
+    const messages = selectedGroupId ? sortOldestFirst(getGroupChatMessages(selectedGroupId)) : [];
+    return selectedGroupId ? `
+      <div class="social-chat-head"><div><h3>${escapeHtml(group?.emoji || "#")} ${escapeHtml(group?.name || "Group chat")}</h3><p>${escapeHtml(String((group?.members || []).length || 0))} members</p></div><button type="button" class="button-ghost small" data-action="social-copy-group-id" data-id="${escapeHtml(selectedGroupId)}">Copy ID</button></div>
+      <div id="social-message-stream" class="social-message-stream">${messages.length ? messages.map((message) => messageBubble(message, true)).join("") : `<div class="social-empty">No group messages yet.</div>`}</div>
+      <button id="jump-to-latest" type="button" class="jump-to-latest" data-action="social-jump-latest">Jump to newest</button>
+      <div class="social-composer"><input id="group-message-input" type="text" placeholder="Message ${escapeHtml(group?.name || "group")}" value="${escapeHtml(groupDrafts[selectedGroupId] || "")}" /><button type="button" data-action="social-send-group" data-id="${escapeHtml(selectedGroupId)}">Send</button></div>
+    ` : `<div class="social-chat-empty"><h3>Pick a group</h3><p>Your group chat will appear here.</p></div>`;
+  }
+
+  if (activeView !== "direct") {
+    return `<div class="social-chat-empty"><h3>${activeView === "requests" ? "Requests live here" : "Social overview"}</h3><p>${activeView === "requests" ? "Accept, ignore, or decline requests from the list on the left." : "Open a direct chat or a group to start messaging."}</p></div>`;
+  }
+
+  const selectedUid = cleanId(state.selectedConversationId);
+  const messages = selectedUid ? sortOldestFirst(getConversationMessages(selectedUid)) : [];
+  return selectedUid ? `
+    <div class="social-chat-head"><div><h3>${escapeHtml(friendName(selectedUid))}</h3><p>${escapeHtml(friendProfile(selectedUid)?.currentRank || "Friend")} profile</p></div><button type="button" class="button-ghost small" data-action="social-copy-id" data-uid="${escapeHtml(selectedUid)}">Copy ID</button></div>
+    <div id="social-message-stream" class="social-message-stream">${messages.length ? messages.map((message) => messageBubble(message)).join("") : `<div class="social-empty">No messages yet. Say hi.</div>`}</div>
+    <button id="jump-to-latest" type="button" class="jump-to-latest" data-action="social-jump-latest">Jump to newest</button>
+    <div class="social-composer"><input id="direct-message-input" type="text" placeholder="Message ${escapeHtml(friendName(selectedUid))}" value="${escapeHtml(directDrafts[selectedUid] || "")}" /><button type="button" data-action="social-send-direct" data-uid="${escapeHtml(selectedUid)}">Send</button></div>
+  ` : `<div class="social-chat-empty"><h3>Pick a friend</h3><p>Your direct messages will show up here.</p></div>`;
+}
+
+function detailsMarkup(state) {
+  if (activeView === "groups") {
+    const selectedGroupId = cleanId(state.selectedGroupChatId);
+    const group = (state.groupChats || []).find((entry) => entry.id === selectedGroupId) || null;
+    return `
+      <div class="social-detail-card">
+        <h3>Group tools</h3>
+        <div class="social-form-stack"><input id="group-create-name" type="text" placeholder="New group name" /><input id="group-create-emoji" type="text" maxlength="4" placeholder="Emoji or symbol" /><input id="group-create-members" type="text" placeholder="Invite IDs (comma separated)" /><button type="button" data-action="social-create-group">Create group</button></div>
+        <div class="social-form-stack"><input id="group-join-id" type="text" placeholder="Join with group ID" /><button type="button" data-action="social-join-group">Join group</button></div>
+        ${group ? `<div class="social-form-stack"><input id="group-rename-input" type="text" placeholder="Rename group" value="${escapeHtml(group.name || "")}" /><input id="group-emoji-input" type="text" maxlength="4" placeholder="Emoji or symbol" value="${escapeHtml(group.emoji || "#")}" /><button type="button" data-action="social-save-group" data-id="${escapeHtml(selectedGroupId)}">Save group info</button></div><div class="social-form-stack"><input id="group-add-member-input" type="text" placeholder="Invite member by ID" /><button type="button" data-action="social-invite-group-member" data-id="${escapeHtml(selectedGroupId)}">Invite member</button></div><div class="button-row split"><button type="button" data-action="social-leave-group" data-id="${escapeHtml(selectedGroupId)}">Leave</button><button type="button" class="danger" data-action="social-delete-group" data-id="${escapeHtml(selectedGroupId)}">Delete</button></div>` : `<div class="social-empty inline">Select a group to edit it.</div>`}
+      </div>
+    `;
+  }
+
+  if (activeView === "requests" || activeView === "blocked") {
+    return `<div class="social-detail-card"><h3>Profile details</h3>${profileFacts(state.selectedProfile)}</div>`;
+  }
+
+  const selectedUid = cleanId(state.selectedConversationId);
+  const profile = selectedUid ? (state.friendProfiles?.[selectedUid] || state.selectedProfile) : null;
+  return `<div class="social-detail-card"><h3>Friend profile</h3>${profileFacts(profile)}${selectedUid ? `<div class="button-row split" style="margin-top:14px;"><button type="button" data-action="social-copy-id" data-uid="${escapeHtml(selectedUid)}">Copy ID</button><button type="button" data-action="social-remove-friend" data-uid="${escapeHtml(selectedUid)}">Unfriend</button><button type="button" class="danger" data-action="social-block-user" data-uid="${escapeHtml(selectedUid)}">Block</button></div>` : ""}</div>`;
 }
 
 function render(state) {
   const root = $("messages-root");
   if (!root) return;
-
   const uiState = captureUiState();
-  const selectedConversationId = cleanId(state.selectedConversationId);
-  const selectedGroupId = cleanId(state.selectedGroupChatId);
 
   if (!state.user) {
-    root.innerHTML = `
-      <div class="msg-empty">
-        Log in to open your inbox, direct chats, and group messages.
-      </div>
-    `;
-    lastSelectedConversationId = null;
-    lastSelectedGroupId = null;
+    root.innerHTML = `<div class="msg-empty">Log in to open your friends, direct chats, groups, and requests.</div>`;
+    lastThreadKey = "";
     return;
   }
 
-  root.innerHTML = `
-    <div class="messages-wrap">
-      <div class="messages-head">
-        <div>
-          <h2>Messages</h2>
-          <p>${state.unreadCount || 0} unread across your inbox</p>
-        </div>
-        <div class="messages-toolbar">
-          <div class="filter-group" aria-label="Read filter">
-            <button class="tab-chip ${activeReadFilter === "all" ? "active" : ""}" type="button" data-filter-read="all">All</button>
-            <button class="tab-chip ${activeReadFilter === "unread" ? "active" : ""}" type="button" data-filter-read="unread">Unread</button>
-            <button class="tab-chip ${activeReadFilter === "read" ? "active" : ""}" type="button" data-filter-read="read">Read</button>
-          </div>
-          <div class="filter-group" aria-label="Type filter">
-            <button class="tab-chip ${activeTypeFilter === "all" ? "active" : ""}" type="button" data-filter-type="all">All</button>
-            <button class="tab-chip ${activeTypeFilter === "system" ? "active" : ""}" type="button" data-filter-type="system">System</button>
-            <button class="tab-chip ${activeTypeFilter === "chat" ? "active" : ""}" type="button" data-filter-type="chat">Chat</button>
-          </div>
-          <button type="button" id="msg-read-all">Read all</button>
-          <button type="button" id="msg-unread-all">Unread all</button>
-        </div>
-      </div>
+  if (activeView === "direct") {
+    const entries = conversationEntries(state);
+    const nextUid = entries.some((entry) => entry.uid === cleanId(state.selectedConversationId)) ? cleanId(state.selectedConversationId) : (entries[0]?.uid || null);
+    if (nextUid !== cleanId(state.selectedConversationId)) {
+      setSelectedConversation(nextUid);
+    }
+  }
 
-      <div class="messages-summary" id="messages-view-summary"></div>
+  if (activeView === "groups") {
+    const groups = groupEntries(state);
+    const nextGroupId = groups.some((entry) => entry.id === cleanId(state.selectedGroupChatId)) ? cleanId(state.selectedGroupChatId) : (groups[0]?.id || null);
+    if (nextGroupId !== cleanId(state.selectedGroupChatId)) {
+      setSelectedGroupChatId(nextGroupId);
+    }
+  }
 
-      <div class="messages-panel ${activeTypeFilter !== "chat" ? "active" : ""}" data-panel="system">
-        <div class="system-panel">
-          <div id="system-message-list" class="message-stream"></div>
-        </div>
-      </div>
+  root.innerHTML = `<div class="social-layout"><aside class="social-rail">${railMarkup(state)}</aside><section class="social-panel social-panel-list">${listMarkup(state)}</section><section class="social-panel social-panel-chat">${chatMarkup(state)}</section><aside class="social-panel social-panel-detail">${detailsMarkup(state)}</aside></div>`;
 
-      <div class="messages-panel ${activeTypeFilter === "chat" ? "active" : ""}" data-panel="chat">
-        <div class="messages-tabs">
-          <button class="tab-chip ${chatMode === "direct" ? "active" : ""}" type="button" data-chatmode="direct">Direct</button>
-          <button class="tab-chip ${chatMode === "groups" ? "active" : ""}" type="button" data-chatmode="groups">Groups</button>
-        </div>
+  const currentThreadKey = activeThreadKey(socialState);
+  restoreUiState(uiState, { forceBottom: pendingForceBottomKey === currentThreadKey || currentThreadKey !== lastThreadKey });
+  lastThreadKey = currentThreadKey;
+  pendingForceBottomKey = "";
 
-        <div class="discord-layout" style="${chatMode === "direct" ? "" : "display:none;"}">
-          <aside class="discord-side">
-            <input id="messages-friend-search" type="text" placeholder="Search friends" value="${escapeHtml(directSearchValue)}" />
-            <div id="messages-friend-list" class="stack"></div>
-          </aside>
+  if (activeView === "direct" && cleanId(socialState.selectedConversationId)) {
+    markConversationRead(socialState.selectedConversationId);
+  }
 
-          <main class="discord-main">
-            <div class="channel-bar">
-              <div id="direct-composer-target">Pick a friend to start chatting</div>
-            </div>
-            <div id="messages-conversation" class="message-stream"></div>
-            <div class="composer-row">
-              <input id="direct-message-input" type="text" placeholder="Message your friend..." />
-              <button id="messages-send-btn" type="button">Send</button>
-            </div>
-          </main>
-        </div>
-
-        <div class="discord-layout" style="${chatMode === "groups" ? "margin-top:14px;" : "display:none; margin-top:14px;"}">
-          <aside class="discord-side">
-            <div class="side-block">
-              <div class="side-title">Your groups</div>
-              <input id="groups-search" type="text" placeholder="Search groups" value="${escapeHtml(groupSearchValue)}" />
-              <div id="groups-list" class="stack"></div>
-            </div>
-
-            <div class="side-block">
-              <div class="side-title">Create group</div>
-              <input id="new-group-name" type="text" placeholder="Group name" />
-              <input id="new-group-emoji" type="text" placeholder="Emoji" value="#" />
-              <input id="new-group-members" type="text" placeholder="Member IDs, comma separated" />
-              <button id="create-group-btn" type="button">Create</button>
-            </div>
-
-            <div class="side-block">
-              <div class="side-title">Join existing chat</div>
-              <input id="join-group-input" type="text" placeholder="Chat ID" />
-              <button id="join-group-btn" type="button">Join chat</button>
-            </div>
-          </aside>
-
-          <main class="discord-main">
-            <div id="groups-view" class="message-stream"></div>
-          </main>
-        </div>
-
-        <div class="card" style="margin-top:14px;">
-          <h3>Group invites</h3>
-          <div id="groups-invite-list"></div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  renderSystem(state);
-  renderChat(state);
-
-  restoreUiState(uiState, {
-    forceConversationBottom: selectedConversationId !== lastSelectedConversationId,
-    forceGroupBottom: selectedGroupId !== lastSelectedGroupId
-  });
-
-  lastSelectedConversationId = selectedConversationId;
-  lastSelectedGroupId = selectedGroupId;
+  $("social-message-stream")?.addEventListener("scroll", updateJumpButton);
+  updateJumpButton();
 }
 
-async function sendDirectMessageFromComposer(input) {
-  const target = cleanId(socialState.selectedConversationId);
-  const body = String(input?.value || "").trim();
-  if (!target || !body) return;
-
-  await sendChatMessage(target, body);
-  directDrafts[target] = "";
-  if (input) input.value = "";
+function updateJumpButton() {
+  const stream = $("social-message-stream");
+  const button = $("jump-to-latest");
+  if (!stream || !button) return;
+  const offsetFromBottom = Math.max(0, stream.scrollHeight - stream.clientHeight - stream.scrollTop);
+  button.classList.toggle("visible", offsetFromBottom > 120);
 }
 
-async function sendGroupMessageFromComposer(input, chatId = socialState.selectedGroupChatId) {
-  const targetChatId = cleanId(chatId);
-  const body = String(input?.value || "").trim();
-  if (!targetChatId || !body) return;
-
-  await sendGroupMessage(targetChatId, body);
-  groupDrafts[targetChatId] = "";
-  if (input) input.value = "";
+function openMessagesView(sub = "direct", targetId = null) {
+  const next = String(sub || "direct").trim().toLowerCase();
+  activeView = new Set(["direct", "groups", "requests", "blocked", "chat"]).has(next) ? (next === "chat" ? "direct" : next) : "direct";
+  if (activeView === "direct" && targetId) {
+    setSelectedConversation(targetId);
+    viewProfileById(targetId).catch((error) => console.error(error));
+    pendingForceBottomKey = `direct:${cleanId(targetId)}`;
+  }
+  if (activeView === "groups" && targetId) {
+    setSelectedGroupChatId(targetId);
+    pendingForceBottomKey = `group:${cleanId(targetId)}`;
+  }
+  if ((activeView === "requests" || activeView === "blocked") && targetId) {
+    viewProfileById(targetId).catch((error) => console.error(error));
+  }
+  render(socialState);
 }
 
-function bind(root) {
+function bindRoot(root) {
   document.addEventListener("click", (event) => {
-    if (!event.target.closest(".message-entry-menu")) {
-      root.querySelectorAll(".message-entry-menu[open]").forEach((menu) => menu.removeAttribute("open"));
-    }
-  });
-
-  root.addEventListener("click", async (event) => {
-    const button = event.target.closest("[data-action], [data-chatmode], [data-filter-read], [data-filter-type]");
-    if (!button) return;
-
-    const action = button.dataset.action;
-    const uid = button.dataset.uid || "";
-    const id = button.dataset.id || "";
-
-    try {
-      if (button.dataset.filterRead) {
-        activeReadFilter = ["all", "read", "unread"].includes(button.dataset.filterRead) ? button.dataset.filterRead : "unread";
-        render(socialState);
-        return;
-      }
-
-      if (button.dataset.filterType) {
-        activeTypeFilter = ["all", "chat", "system"].includes(button.dataset.filterType) ? button.dataset.filterType : "system";
-        render(socialState);
-        return;
-      }
-
-      if (button.dataset.chatmode) {
-        chatMode = button.dataset.chatmode === "groups" ? "groups" : "direct";
-        render(socialState);
-        return;
-      }
-
-      if (action === "pick-friend") {
-        setSelectedConversation(uid);
-        render(socialState);
-        return;
-      }
-
-      if (action === "pick-group") {
-        setSelectedGroupChatId(id);
-        render(socialState);
-        return;
-      }
-
-      if (action === "copy-group-id") {
-        await navigator.clipboard.writeText(id || "");
-        button.textContent = "Copied";
-        setTimeout(() => {
-          if (button.isConnected) button.textContent = "Copy ID";
-        }, 900);
-        return;
-      }
-
-      if (action === "open-target") {
-        const message = (socialState.messages || []).find((item) => item.id === id);
-        if (message) {
-          await showTarget(message);
-        }
-        return;
-      }
-
-      if (action === "mark-read") {
-        await markMessageRead(id, true);
-        return;
-      }
-
-      if (action === "mark-unread") {
-        await markMessageRead(id, false);
-        return;
-      }
-
-      if (action === "delete-message") {
-        await deleteMessageForCurrentUser(id);
-        return;
-      }
-
-      if (action === "accept-friend-request") {
-        await respondToFriendRequest(id, "accept");
-        if (typeof window.openAccountArea === "function") {
-          window.openAccountArea("info", "friends", uid);
-        }
-        return;
-      }
-
-      if (action === "ignore-friend-request") {
-        await respondToFriendRequest(id, "ignore");
-        return;
-      }
-
-      if (action === "decline-friend-request") {
-        await respondToFriendRequest(id, "decline");
-        return;
-      }
-
-      if (action === "accept-group-invite") {
-        await respondToGroupInvite(id, "accept");
-        return;
-      }
-
-      if (action === "decline-group-invite") {
-        await respondToGroupInvite(id, "decline");
-        return;
-      }
-
-      if (action === "open-group-invite") {
-        openMessagesView("groups", id);
-        return;
-      }
-
-      if (action === "leave-group") {
-        await leaveGroupChat(id);
-        return;
-      }
-
-      if (action === "delete-group") {
-        await deleteGroupChat(id);
-        return;
-      }
-    } catch (error) {
-      alert(error.message || "Action failed.");
-    }
-  });
-
-  root.addEventListener("click", async (event) => {
-    const button = event.target.closest("#msg-read-all, #msg-unread-all, #messages-send-btn, #send-group-message-btn, #create-group-btn, #group-save-btn, #group-add-member-btn, #join-group-btn");
-    if (!button) return;
-
-    try {
-      if (button.id === "msg-read-all" || button.id === "msg-unread-all") {
-        const targetIds = (socialState.messages || [])
-          .filter((message) => isIncoming(message))
-          .map((message) => message.id);
-        await setMessagesReadState(targetIds, button.id === "msg-read-all");
-      }
-
-      if (button.id === "messages-send-btn") {
-        await sendDirectMessageFromComposer($("direct-message-input"));
-      }
-
-      if (button.id === "send-group-message-btn") {
-        await sendGroupMessageFromComposer($("group-message-input"), button.dataset.groupId || socialState.selectedGroupChatId);
-      }
-
-      if (button.id === "create-group-btn") {
-        const name = $("new-group-name")?.value || "";
-        const emoji = $("new-group-emoji")?.value || "#";
-        const members = String($("new-group-members")?.value || "").split(",").map((value) => value.trim()).filter(Boolean);
-        const chatId = await createGroupChat(name, emoji, members);
-        setSelectedGroupChatId(chatId);
-        activeTypeFilter = "chat";
-        chatMode = "groups";
-        render(socialState);
-      }
-
-      if (button.id === "group-save-btn") {
-        const chatId = button.dataset.groupId || socialState.selectedGroupChatId;
-        await updateGroupChatInfo(chatId, {
-          name: $("group-rename-input")?.value || "",
-          emoji: $("group-emoji-input")?.value || "#"
-        });
-      }
-
-      if (button.id === "group-add-member-btn") {
-        const chatId = button.dataset.groupId || socialState.selectedGroupChatId;
-        const uid = $("group-add-member-input")?.value || "";
-        if (chatId && uid) await addMembersToGroupChat(chatId, [uid]);
-        if ($("group-add-member-input")) $("group-add-member-input").value = "";
-      }
-
-      if (button.id === "join-group-btn") {
-        const chatId = $("join-group-input")?.value || "";
-        await joinGroupChatById(chatId);
-        if ($("join-group-input")) $("join-group-input").value = "";
-      }
-    } catch (error) {
-      alert(error.message || "Action failed.");
-    }
-  });
-
-  root.addEventListener("keydown", async (event) => {
-    if (event.target?.id === "direct-message-input" && event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      try {
-        await sendDirectMessageFromComposer(event.target);
-      } catch (error) {
-        alert(error.message || "Could not send message.");
-      }
-    }
-
-    if (event.target?.id === "group-message-input" && event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      try {
-        await sendGroupMessageFromComposer(event.target, socialState.selectedGroupChatId);
-      } catch (error) {
-        alert(error.message || "Could not send message.");
-      }
+    if (!event.target.closest(".social-entry-menu")) {
+      root.querySelectorAll(".social-entry-menu[open]").forEach((menu) => menu.removeAttribute("open"));
     }
   });
 
   root.addEventListener("input", (event) => {
-    if (event.target?.id === "messages-friend-search") {
+    if (event.target?.id === "social-direct-search") {
       directSearchValue = event.target.value;
       render(socialState);
-      return;
     }
-
-    if (event.target?.id === "groups-search") {
+    if (event.target?.id === "social-group-search") {
       groupSearchValue = event.target.value;
       render(socialState);
-      return;
     }
-
     if (event.target?.id === "direct-message-input") {
-      const target = cleanId(socialState.selectedConversationId);
-      if (target) directDrafts[target] = event.target.value;
-      return;
+      const uid = cleanId(socialState.selectedConversationId);
+      if (uid) directDrafts[uid] = event.target.value;
     }
-
     if (event.target?.id === "group-message-input") {
-      const chatId = cleanId(socialState.selectedGroupChatId);
-      if (chatId) groupDrafts[chatId] = event.target.value;
+      const groupId = cleanId(socialState.selectedGroupChatId);
+      if (groupId) groupDrafts[groupId] = event.target.value;
+    }
+  });
+
+  root.addEventListener("keydown", async (event) => {
+    try {
+      if (event.target?.id === "direct-message-input" && event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        const uid = cleanId(socialState.selectedConversationId);
+        const body = directDrafts[uid] || event.target.value || "";
+        if (!uid || !body.trim()) return;
+        await sendChatMessage(uid, body);
+        directDrafts[uid] = "";
+        pendingForceBottomKey = `direct:${uid}`;
+        render(socialState);
+      }
+      if (event.target?.id === "group-message-input" && event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        const groupId = cleanId(socialState.selectedGroupChatId);
+        const body = groupDrafts[groupId] || event.target.value || "";
+        if (!groupId || !body.trim()) return;
+        await sendGroupMessage(groupId, body);
+        groupDrafts[groupId] = "";
+        pendingForceBottomKey = `group:${groupId}`;
+        render(socialState);
+      }
+    } catch (error) {
+      console.error(error);
+      window.alert(error?.message || "Action failed.");
+    }
+  });
+
+  root.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-action], [data-social-view]");
+    if (!button) return;
+
+    const action = button.dataset.action || "";
+    const uid = button.dataset.uid || "";
+    const id = button.dataset.id || "";
+
+    try {
+      if (button.dataset.socialView) {
+        activeView = button.dataset.socialView;
+        render(socialState);
+        return;
+      }
+      if (action === "social-pick-direct") {
+        setSelectedConversation(uid);
+        viewProfileById(uid).catch((error) => console.error(error));
+        pendingForceBottomKey = `direct:${cleanId(uid)}`;
+      } else if (action === "social-pick-group") {
+        setSelectedGroupChatId(id);
+        pendingForceBottomKey = `group:${cleanId(id)}`;
+      } else if (action === "social-send-request") {
+        await sendFriendRequestById($("quick-friend-id")?.value || "", $("quick-friend-note")?.value || "");
+        if ($("quick-friend-id")) $("quick-friend-id").value = "";
+        if ($("quick-friend-note")) $("quick-friend-note").value = "";
+        activeView = "requests";
+      } else if (action === "social-quick-block") {
+        await blockUser($("quick-friend-id")?.value || "");
+        if ($("quick-friend-id")) $("quick-friend-id").value = "";
+        if ($("quick-friend-note")) $("quick-friend-note").value = "";
+        activeView = "blocked";
+      } else if (action === "social-copy-id") {
+        await copyText(uid);
+        return;
+      } else if (action === "social-remove-friend") {
+        await removeFriend(uid);
+      } else if (action === "social-block-user") {
+        await blockUser(uid);
+      } else if (action === "social-view-profile") {
+        await viewProfileById(uid);
+      } else if (action === "social-accept-request") {
+        await respondToFriendRequest(id, "accept");
+        if (uid) {
+          setSelectedConversation(uid);
+          await viewProfileById(uid);
+          activeView = "direct";
+          pendingForceBottomKey = `direct:${cleanId(uid)}`;
+        }
+      } else if (action === "social-ignore-request") {
+        await respondToFriendRequest(id, "ignore");
+      } else if (action === "social-decline-request") {
+        await respondToFriendRequest(id, "decline");
+      } else if (action === "social-send-direct") {
+        await sendChatMessage(uid, directDrafts[uid] || $("direct-message-input")?.value || "");
+        directDrafts[uid] = "";
+        pendingForceBottomKey = `direct:${cleanId(uid)}`;
+      } else if (action === "social-send-group") {
+        await sendGroupMessage(id, groupDrafts[id] || $("group-message-input")?.value || "");
+        groupDrafts[id] = "";
+        pendingForceBottomKey = `group:${cleanId(id)}`;
+      } else if (action === "social-create-group") {
+        const groupId = await createGroupChat($("group-create-name")?.value || "", $("group-create-emoji")?.value || "#", String($("group-create-members")?.value || "").split(",").map((value) => value.trim()).filter(Boolean));
+        activeView = "groups";
+        setSelectedGroupChatId(groupId);
+        pendingForceBottomKey = `group:${cleanId(groupId)}`;
+      } else if (action === "social-join-group") {
+        const groupId = $("group-join-id")?.value || "";
+        await joinGroupChatById(groupId);
+        activeView = "groups";
+        setSelectedGroupChatId(groupId);
+        pendingForceBottomKey = `group:${cleanId(groupId)}`;
+      } else if (action === "social-save-group") {
+        await updateGroupChatInfo(id, { name: $("group-rename-input")?.value || "", emoji: $("group-emoji-input")?.value || "" });
+      } else if (action === "social-invite-group-member") {
+        await addMembersToGroupChat(id, [$("group-add-member-input")?.value || ""]);
+        if ($("group-add-member-input")) $("group-add-member-input").value = "";
+      } else if (action === "social-copy-group-id") {
+        await copyText(id);
+        return;
+      } else if (action === "social-leave-group") {
+        await leaveGroupChat(id);
+      } else if (action === "social-delete-group") {
+        await deleteGroupChat(id);
+      } else if (action === "social-accept-group-invite") {
+        await respondToGroupInvite(id, "accept");
+        activeView = "groups";
+      } else if (action === "social-decline-group-invite") {
+        await respondToGroupInvite(id, "decline");
+      } else if (action === "social-open-group-invite") {
+        activeView = "groups";
+        setSelectedGroupChatId(id);
+        pendingForceBottomKey = `group:${cleanId(id)}`;
+      } else if (action === "social-jump-latest") {
+        const stream = $("social-message-stream");
+        if (stream) stream.scrollTop = Math.max(0, stream.scrollHeight - stream.clientHeight);
+        updateJumpButton();
+        return;
+      }
+
+      render(socialState);
+    } catch (error) {
+      console.error(error);
+      window.alert(error?.message || "Action failed.");
     }
   });
 }
@@ -1009,8 +658,8 @@ function bind(root) {
 function start() {
   const root = $("messages-root");
   if (!root) return;
+  bindRoot(root);
   render(socialState);
-  bind(root);
   subscribeSocial(render);
 }
 
@@ -1023,4 +672,4 @@ if (document.readyState === "loading") {
 window.PanategwaMessagesRender = () => render(socialState);
 window.PanategwaMessagesOpen = openMessagesView;
 
-export { render, resolveMessageTarget, openMessagesView };
+export { render, openMessagesView };

@@ -21,13 +21,13 @@
     (function () {
       function normalizeSection(section) {
         var next = String(section || "info").toLowerCase();
-        return next === "friends" ? "info" : next;
+        return next === "friends" ? "messages" : next;
       }
 
       function isFriendsView(section, sub) {
         var next = String(section || "info").toLowerCase();
         var nextSub = String(sub || "").toLowerCase();
-        return next === "friends" || nextSub === "friends" || nextSub === "requests" || nextSub === "blocked";
+        return next === "messages" || next === "friends" || nextSub === "direct" || nextSub === "chat" || nextSub === "groups" || nextSub === "requests" || nextSub === "blocked";
       }
 
       function isSettingsView(section, sub) {
@@ -71,7 +71,7 @@
       window.openAccountArea = function (section, sub, targetId) {
         var requestedSection = String(section || "info").toLowerCase();
         var nextSection = normalizeSection(requestedSection);
-        var nextSub = isFriendsView(requestedSection, sub) ? (sub || "friends") : sub;
+        var nextSub = isFriendsView(requestedSection, sub) ? (sub || "direct") : sub;
 
         document.querySelectorAll(".account-section").forEach(function (panel) {
           panel.classList.toggle("active", panel.dataset.section === nextSection);
@@ -80,10 +80,6 @@
         document.querySelectorAll(".tab-button").forEach(function (button) {
           button.classList.toggle("active", button.dataset.target === nextSection);
         });
-
-        if (isFriendsView(requestedSection, sub)) {
-          baseShowFriendsSubsection(nextSub);
-        }
 
         if (isSettingsView(requestedSection, sub)) {
           baseShowSettingsSubsection(nextSub || "account");
@@ -310,6 +306,11 @@
       cursor: not-allowed;
       transform: none;
       box-shadow: none;
+    }
+
+    .account-wrap button.small {
+      padding: 0.56em 0.92em;
+      font-size: 0.92rem;
     }
 
     .button-ghost,
@@ -684,8 +685,8 @@
 
     .settings-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 10px;
     }
 
     .settings-subtabs {
@@ -705,9 +706,10 @@
     }
 
     .setting-card {
-      padding: 14px;
+      padding: 12px;
       display: grid;
       gap: 10px;
+      grid-column: span 4;
     }
 
     .setting-title {
@@ -722,8 +724,22 @@
 
     .avatar-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 10px;
+    }
+
+    .settings-panel[data-settings-subpanel="account"] .setting-card:nth-child(2) {
+      grid-column: span 8;
+    }
+
+    .settings-panel[data-settings-subpanel="privacy"] .setting-card {
+      grid-column: span 6;
+    }
+
+    .danger-zone-card {
+      grid-column: span 12;
+      border-color: rgba(248, 113, 113, 0.28);
+      background: linear-gradient(180deg, rgba(127, 29, 29, 0.36), rgba(69, 10, 10, 0.18));
     }
 
     .avatar-choice {
@@ -1404,6 +1420,358 @@
       gap: 8px;
     }
 
+    .social-layout {
+      display: grid;
+      grid-template-columns: 220px 320px minmax(0, 1fr) 320px;
+      gap: 14px;
+      min-height: 640px;
+    }
+
+    .social-panel,
+    .social-rail-card,
+    .social-quick-card,
+    .social-detail-card {
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(15, 23, 42, 0.34);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 16px 32px rgba(8, 15, 31, 0.18);
+      padding: 14px;
+    }
+
+    .social-rail {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .social-switch {
+      width: 100%;
+      margin: 0 0 8px;
+      display: inline-flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .social-switch:last-child {
+      margin-bottom: 0;
+    }
+
+    .social-form-stack {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .social-list-head,
+    .social-chat-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .social-list-head h3,
+    .social-chat-head h3,
+    .social-quick-card h3,
+    .social-detail-card h3 {
+      margin: 0;
+      border: 0;
+      padding: 0;
+      font-size: 1.08rem;
+    }
+
+    .social-list-head p,
+    .social-chat-head p {
+      margin: 2px 0 0;
+      opacity: 0.78;
+      font-size: 0.92rem;
+    }
+
+    .social-list-scroll {
+      max-height: 560px;
+      overflow: auto;
+      display: grid;
+      gap: 10px;
+      padding-right: 4px;
+    }
+
+    .social-entry,
+    .social-entry-buttononly {
+      margin: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: start;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      padding: 10px;
+      box-shadow: none;
+    }
+
+    .social-entry-buttononly {
+      grid-template-columns: 1fr;
+    }
+
+    .social-entry.active,
+    .social-entry-buttononly.active {
+      background: rgba(59,130,246,0.18);
+      border-color: rgba(125,211,252,0.26);
+    }
+
+    .social-entry-main {
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: center;
+      text-align: left;
+    }
+
+    .social-entry-copy {
+      min-width: 0;
+      display: grid;
+      gap: 6px;
+    }
+
+    .social-entry-topline,
+    .social-entry-subline {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .social-entry-topline strong,
+    .social-entry-subline span:first-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .social-entry-topline small {
+      opacity: 0.72;
+      white-space: nowrap;
+    }
+
+    .social-avatar,
+    .social-avatar.detail {
+      width: 48px;
+      height: 48px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background: linear-gradient(135deg, rgba(59,130,246,0.28), rgba(15,23,42,0.8));
+      border: 1px solid rgba(255,255,255,0.12);
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+
+    .social-avatar.detail {
+      width: 64px;
+      height: 64px;
+      border-radius: 22px;
+    }
+
+    .social-avatar.group {
+      font-size: 1.25rem;
+    }
+
+    .social-avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: inherit;
+    }
+
+    .social-counter {
+      display: inline-grid;
+      place-items: center;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: #ef4444;
+      color: white;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .social-entry-menu {
+      position: relative;
+    }
+
+    .social-entry-menu summary {
+      list-style: none;
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+
+    .social-entry-menu summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .social-entry-popover {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      min-width: 180px;
+      padding: 8px;
+      display: grid;
+      gap: 8px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(15,23,42,0.92);
+      z-index: 30;
+      box-shadow: 0 18px 36px rgba(0,0,0,0.24);
+    }
+
+    .social-entry-popover button {
+      width: 100%;
+      margin: 0;
+      text-align: left;
+      justify-content: flex-start;
+      border-radius: 12px;
+    }
+
+    .social-message-stream {
+      min-height: 420px;
+      max-height: 420px;
+      overflow: auto;
+      display: grid;
+      gap: 10px;
+      padding: 10px 4px 10px 0;
+      align-content: start;
+    }
+
+    .chat-message {
+      display: flex;
+    }
+
+    .chat-message.mine {
+      justify-content: flex-end;
+    }
+
+    .chat-bubble-shell {
+      max-width: min(78%, 560px);
+      display: grid;
+      gap: 6px;
+    }
+
+    .chat-author {
+      font-size: 0.84rem;
+      font-weight: 700;
+      opacity: 0.82;
+      padding-left: 6px;
+    }
+
+    .chat-bubble {
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.94);
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .chat-message.mine .chat-bubble {
+      background: linear-gradient(135deg, rgba(59,130,246,0.92), rgba(37,99,235,0.82));
+      border-color: rgba(125,211,252,0.2);
+    }
+
+    .chat-meta {
+      font-size: 0.8rem;
+      opacity: 0.72;
+      padding: 0 6px;
+    }
+
+    .social-composer {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      margin-top: 12px;
+      align-items: center;
+    }
+
+    .jump-to-latest {
+      margin: 0 auto 10px 0;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .jump-to-latest.visible {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .social-chat-empty,
+    .social-empty {
+      border-radius: 18px;
+      border: 1px dashed rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.03);
+      padding: 18px;
+      opacity: 0.86;
+    }
+
+    .social-empty.inline {
+      padding: 12px;
+    }
+
+    .social-detail-hero {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .social-detail-name {
+      font-weight: 700;
+      font-size: 1.02rem;
+    }
+
+    .social-detail-id {
+      font-size: 0.9rem;
+      opacity: 0.76;
+      word-break: break-all;
+    }
+
+    .request-tight,
+    .invite-card.compact {
+      margin: 0;
+    }
+
+    .button-row.split {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .button-row.split > * {
+      margin: 0;
+      flex: 1 1 0;
+    }
+
     @media (max-width: 959px) {
       .auth-layout,
       .settings-grid,
@@ -1413,7 +1781,8 @@
       }
 
       .friends-grid,
-      .discord-layout {
+      .discord-layout,
+      .social-layout {
         grid-template-columns: 1fr;
       }
     }
@@ -1450,6 +1819,20 @@
         left: 0;
         right: auto;
       }
+
+      .social-entry,
+      .social-entry-buttononly {
+        grid-template-columns: 1fr;
+      }
+
+      .social-entry-menu {
+        justify-self: start;
+      }
+
+      .social-entry-popover {
+        left: 0;
+        right: auto;
+      }
     }
 
     @keyframes fadeUp {
@@ -1474,7 +1857,7 @@
       <button type="button" class="tab-button active" id="tab-info" data-target="info" onclick="window.openAccountArea('info')">Profile</button>
       <button type="button" class="tab-button" id="tab-settings" data-target="settings" onclick="window.openAccountArea('settings')">Account settings</button>
       <button type="button" class="tab-button" id="tab-progress" data-target="progress" onclick="window.openAccountArea('progress')">Progress</button>
-      <button type="button" class="tab-button" id="tab-messages" data-target="messages" onclick="window.openAccountArea('messages', 'system')">Messages</button>
+      <button type="button" class="tab-button" id="tab-messages" data-target="messages" onclick="window.openAccountArea('messages', 'direct')">Friends</button>
     </div>
 
     <section class="account-section active" data-section="info">
@@ -1630,26 +2013,46 @@
 
               <div class="setting-card">
                 <div class="setting-title">Profile picture</div>
-                <p id="security-note" class="setting-desc">Pick a preset, use a letter, or reset to default. Two presets unlock at Explorer, one at Adventurer, and one at Veteran.</p>
+                <p id="security-note" class="setting-desc">Pick a preset that matches your rank. Presets 1-2 unlock at Adventurer, 3-4 at Explorer, 5-6 at Expert, and 7-8 at Veteran.</p>
                 <div class="avatar-grid">
                   <button id="avatar-preset-1-btn" type="button" class="avatar-choice">
                     <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%230984e3"/%3E%3Cpath d="M64 30l10 20 22 3-16 16 4 22-20-10-20 10 4-22-16-16 22-3z" fill="white"/%3E%3C/svg%3E'>
                     <span data-avatar-name>Preset 1</span>
-                    <small data-avatar-rank-note>Explorer rank</small>
-                  </button>
-                  <button id="avatar-preset-2-btn" type="button" class="avatar-choice">
-                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%236c5ce7"/%3E%3Ccircle cx="64" cy="66" r="26" fill="rgba(255,255,255,0.15)"/%3E%3Ccircle cx="50" cy="58" r="5" fill="white"/%3E%3Ccircle cx="78" cy="58" r="5" fill="white"/%3E%3C/svg%3E'>
-                    <span data-avatar-name>Preset 2</span>
-                    <small data-avatar-rank-note>Explorer rank</small>
-                  </button>
-                  <button id="avatar-preset-3-btn" type="button" class="avatar-choice">
-                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%2300b894"/%3E%3Ccircle cx="64" cy="64" r="22" fill="none" stroke="white" stroke-width="6"/%3E%3Ccircle cx="64" cy="64" r="8" fill="white"/%3E%3C/svg%3E'>
-                    <span data-avatar-name>Preset 3</span>
                     <small data-avatar-rank-note>Adventurer rank</small>
                   </button>
+                  <button id="avatar-preset-2-btn" type="button" class="avatar-choice">
+                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%23ef4444"/%3E%3Cpath d="M64 18 84 42l26 6-17 22 1 28-30-11-30 11 1-28-17-22 26-6z" fill="white"/%3E%3C/svg%3E'>
+                    <span data-avatar-name>Preset 2</span>
+                    <small data-avatar-rank-note>Adventurer rank</small>
+                  </button>
+                  <button id="avatar-preset-3-btn" type="button" class="avatar-choice">
+                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%230f766e"/%3E%3Cpath d="M64 28 76 53h28L81 72l9 28-26-17-26 17 9-28-23-19h28z" fill="white"/%3E%3C/svg%3E'>
+                    <span data-avatar-name>Preset 3</span>
+                    <small data-avatar-rank-note>Explorer rank</small>
+                  </button>
                   <button id="avatar-preset-4-btn" type="button" class="avatar-choice">
-                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%23d35400"/%3E%3Cpath d="M64 22l13 26 29 4-21 20 5 29-26-13-26 13 5-29-21-20 29-4z" fill="white"/%3E%3Ccircle cx="64" cy="61" r="12" fill="%23d35400"/%3E%3C/svg%3E'>
+                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%232563eb"/%3E%3Cpath d="M64 24c15 10 26 24 26 39 0 19-14 31-26 41-12-10-26-22-26-41 0-15 11-29 26-39z" fill="white"/%3E%3C/svg%3E'>
                     <span data-avatar-name>Preset 4</span>
+                    <small data-avatar-rank-note>Explorer rank</small>
+                  </button>
+                  <button id="avatar-preset-5-btn" type="button" class="avatar-choice">
+                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%230f172a"/%3E%3Cpath d="M64 20 84 36l24 2-15 19 5 23-22-8-12 20-12-20-22 8 5-23-15-19 24-2z" fill="white"/%3E%3C/svg%3E'>
+                    <span data-avatar-name>Preset 5</span>
+                    <small data-avatar-rank-note>Expert rank</small>
+                  </button>
+                  <button id="avatar-preset-6-btn" type="button" class="avatar-choice">
+                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%236365f1"/%3E%3Cpath d="M64 18 86 34l24 16-8 31-24 17H48L24 81l-8-31 24-16z" fill="white"/%3E%3C/svg%3E'>
+                    <span data-avatar-name>Preset 6</span>
+                    <small data-avatar-rank-note>Expert rank</small>
+                  </button>
+                  <button id="avatar-preset-7-btn" type="button" class="avatar-choice">
+                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%237c2d12"/%3E%3Cpath d="M64 16 88 32l24 16-8 31-24 17H48L24 79l-8-31 24-16z" fill="white"/%3E%3C/svg%3E'>
+                    <span data-avatar-name>Preset 7</span>
+                    <small data-avatar-rank-note>Veteran rank</small>
+                  </button>
+                  <button id="avatar-preset-8-btn" type="button" class="avatar-choice">
+                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%23f59e0b"/%3E%3Cpath d="M64 18 86 44l28 4-20 21 5 29-35-16-35 16 5-29-20-21 28-4z" fill="white"/%3E%3C/svg%3E'>
+                    <span data-avatar-name>Preset 8</span>
                     <small data-avatar-rank-note>Veteran rank</small>
                   </button>
                 </div>
@@ -1697,8 +2100,17 @@
                 </div>
               </div>
 
-              <div class="setting-card">
+              <div class="setting-card danger-zone-card">
                 <div class="setting-title">Danger zone</div>
+                <p class="setting-desc">Reset selected parts of your account without deleting the login itself.</p>
+                <div class="field-row">
+                  <select id="reset-data-select">
+                    <option value="progress">Delete progress</option>
+                    <option value="friends">Delete friends</option>
+                    <option value="all">Delete all social + progress data</option>
+                  </select>
+                  <button id="reset-data-btn" class="danger" type="button">Reset selected data</button>
+                </div>
                 <div class="field-row">
                   <input id="delete-password" type="password" placeholder="Current password for delete" autocomplete="current-password" />
                 </div>
@@ -1787,7 +2199,7 @@
       </div>
     </section>
 
-    <section class="account-section" data-section="info">
+    <section class="account-section section-hidden" data-section="legacy-social" aria-hidden="true">
       <div class="card">
         <div class="subsection-head">
           <div>
@@ -1861,14 +2273,14 @@
       <div class="card">
         <div class="subsection-head">
           <div>
-            <h2>Messages</h2>
-            <p class="section-note">System updates, friend requests, direct chats, and groups live here.</p>
+            <h2>Friends</h2>
+            <p class="section-note">Direct chats, groups, requests, and your friends list now live together here.</p>
           </div>
         </div>
 
         <div id="messages-locked" class="locked-state">
-          <h3>Log in to use messages</h3>
-          <p>Your inbox, chats, and group messages only load after you sign in.</p>
+          <h3>Log in to use the friends system</h3>
+          <p>Your friends, chats, group messages, and requests only load after you sign in.</p>
           <div class="button-row">
             <button type="button" class="tab-chip" data-open-section="info" onclick="window.openAccountArea('info')">Go to login</button>
           </div>

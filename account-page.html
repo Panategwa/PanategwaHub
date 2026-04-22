@@ -30,6 +30,12 @@
         return next === "friends" || nextSub === "friends" || nextSub === "requests" || nextSub === "blocked";
       }
 
+      function isSettingsView(section, sub) {
+        var next = String(section || "info").toLowerCase();
+        var nextSub = String(sub || "").toLowerCase();
+        return next === "settings" || nextSub === "account" || nextSub === "privacy";
+      }
+
       function syncAccountUrl(section, sub, targetId) {
         var url = new URL(window.location.href);
         url.searchParams.set("tab", normalizeSection(section || "info"));
@@ -50,6 +56,18 @@
         });
       }
 
+      function baseShowSettingsSubsection(name) {
+        var next = name === "privacy" ? "privacy" : "account";
+
+        document.querySelectorAll("[data-settings-subpanel]").forEach(function (panel) {
+          panel.classList.toggle("active", panel.dataset.settingsSubpanel === next);
+        });
+
+        document.querySelectorAll("[data-settings-subtab]").forEach(function (button) {
+          button.classList.toggle("active", button.dataset.settingsSubtab === next);
+        });
+      }
+
       window.openAccountArea = function (section, sub, targetId) {
         var requestedSection = String(section || "info").toLowerCase();
         var nextSection = normalizeSection(requestedSection);
@@ -65,6 +83,10 @@
 
         if (isFriendsView(requestedSection, sub)) {
           baseShowFriendsSubsection(nextSub);
+        }
+
+        if (isSettingsView(requestedSection, sub)) {
+          baseShowSettingsSubsection(nextSub || "account");
         }
 
         syncAccountUrl(nextSection, nextSub || null, targetId || null);
@@ -235,10 +257,12 @@
       box-sizing: border-box;
       padding: 12px 14px;
       border-radius: 14px;
-      border: 1px solid rgba(0,0,0,0.26);
+      border: 1px solid rgba(148, 163, 184, 0.32);
       font: inherit;
-      background: rgba(255,255,255,0.94);
+      color: #0f172a;
+      background: rgba(255,255,255,0.82);
       outline: none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.24);
     }
 
     .input-group {
@@ -664,6 +688,22 @@
       gap: 12px;
     }
 
+    .settings-subtabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .settings-panel {
+      display: none;
+    }
+
+    .settings-panel.active {
+      display: block;
+      animation: fadeUp 180ms ease-out;
+    }
+
     .setting-card {
       padding: 14px;
       display: grid;
@@ -709,8 +749,72 @@
 
     .avatar-choice[disabled] {
       cursor: not-allowed;
-      opacity: 0.58;
-      filter: saturate(0.75);
+      opacity: 0.72;
+      filter: grayscale(1) saturate(0.15) contrast(0.9);
+      background: rgba(148, 163, 184, 0.08);
+      border-color: rgba(148, 163, 184, 0.22);
+      box-shadow: none;
+    }
+
+    .avatar-choice[disabled] img {
+      filter: grayscale(1) opacity(0.72);
+    }
+
+    .avatar-choice[disabled] [data-avatar-name],
+    .avatar-choice[disabled] [data-avatar-rank-note] {
+      color: rgba(226, 232, 240, 0.84);
+    }
+
+    .privacy-note-card {
+      display: grid;
+      gap: 6px;
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(125, 211, 252, 0.18);
+      background: rgba(59, 130, 246, 0.1);
+    }
+
+    .privacy-note-card strong {
+      font-size: 0.98rem;
+    }
+
+    .privacy-note-card span {
+      opacity: 0.84;
+      line-height: 1.45;
+    }
+
+    .privacy-toggle-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .privacy-toggle {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px 12px;
+      align-items: start;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .privacy-toggle input {
+      margin-top: 3px;
+      width: 18px;
+      height: 18px;
+      accent-color: #38bdf8;
+    }
+
+    .privacy-toggle strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .privacy-toggle small {
+      display: block;
+      opacity: 0.78;
+      line-height: 1.4;
     }
 
     .messages-wrap {
@@ -859,9 +963,10 @@
       box-sizing: border-box;
       padding: 12px 14px;
       border-radius: 14px;
-      border: 1px solid rgba(0,0,0,0.26);
+      border: 1px solid rgba(148, 163, 184, 0.32);
       font: inherit;
-      background: rgba(255,255,255,0.94);
+      color: #0f172a;
+      background: rgba(255,255,255,0.82);
     }
 
     .msg-empty {
@@ -1020,7 +1125,7 @@
 
     .profile-meta {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
     }
 
@@ -1237,6 +1342,13 @@
       margin: 0;
       text-align: left;
       border-radius: 12px;
+      justify-content: flex-start;
+    }
+
+    .message-entry-popover button {
+      width: 100%;
+      margin: 0;
+      text-align: left;
       justify-content: flex-start;
     }
 
@@ -1498,93 +1610,144 @@
           </div>
         </div>
 
-        <div id="settings-content" class="settings-grid">
-          <div class="setting-card">
-            <div class="setting-title">Profile</div>
-            <div class="field-row">
-              <input id="profile-username" type="text" maxlength="20" placeholder="Username (max 20 chars)" />
-            </div>
-            <div class="button-row">
-              <button id="save-username-btn" type="button">Save name</button>
+        <div id="settings-content">
+          <div class="settings-subtabs">
+            <button type="button" class="tab-chip active" data-settings-subtab="account" onclick="window.openAccountArea('settings', 'account')">Account</button>
+            <button type="button" class="tab-chip" data-settings-subtab="privacy" onclick="window.openAccountArea('settings', 'privacy')">Privacy</button>
+          </div>
+
+          <div class="settings-panel active" data-settings-subpanel="account">
+            <div class="settings-grid">
+              <div class="setting-card">
+                <div class="setting-title">Profile</div>
+                <div class="field-row">
+                  <input id="profile-username" type="text" maxlength="20" placeholder="Username (max 20 chars)" />
+                </div>
+                <div class="button-row">
+                  <button id="save-username-btn" type="button">Save name</button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">Profile picture</div>
+                <p id="security-note" class="setting-desc">Pick a preset, use a letter, or reset to default. Two presets unlock at Explorer, one at Adventurer, and one at Veteran.</p>
+                <div class="avatar-grid">
+                  <button id="avatar-preset-1-btn" type="button" class="avatar-choice">
+                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%230984e3"/%3E%3Cpath d="M64 30l10 20 22 3-16 16 4 22-20-10-20 10 4-22-16-16 22-3z" fill="white"/%3E%3C/svg%3E'>
+                    <span data-avatar-name>Preset 1</span>
+                    <small data-avatar-rank-note>Explorer rank</small>
+                  </button>
+                  <button id="avatar-preset-2-btn" type="button" class="avatar-choice">
+                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%236c5ce7"/%3E%3Ccircle cx="64" cy="66" r="26" fill="rgba(255,255,255,0.15)"/%3E%3Ccircle cx="50" cy="58" r="5" fill="white"/%3E%3Ccircle cx="78" cy="58" r="5" fill="white"/%3E%3C/svg%3E'>
+                    <span data-avatar-name>Preset 2</span>
+                    <small data-avatar-rank-note>Explorer rank</small>
+                  </button>
+                  <button id="avatar-preset-3-btn" type="button" class="avatar-choice">
+                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%2300b894"/%3E%3Ccircle cx="64" cy="64" r="22" fill="none" stroke="white" stroke-width="6"/%3E%3Ccircle cx="64" cy="64" r="8" fill="white"/%3E%3C/svg%3E'>
+                    <span data-avatar-name>Preset 3</span>
+                    <small data-avatar-rank-note>Adventurer rank</small>
+                  </button>
+                  <button id="avatar-preset-4-btn" type="button" class="avatar-choice">
+                    <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%23d35400"/%3E%3Cpath d="M64 22l13 26 29 4-21 20 5 29-26-13-26 13 5-29-21-20 29-4z" fill="white"/%3E%3Ccircle cx="64" cy="61" r="12" fill="%23d35400"/%3E%3C/svg%3E'>
+                    <span data-avatar-name>Preset 4</span>
+                    <small data-avatar-rank-note>Veteran rank</small>
+                  </button>
+                </div>
+                <div class="button-row" style="margin-top:10px;">
+                  <button id="avatar-default-btn" type="button">Default</button>
+                </div>
+                <div class="field-row" style="margin-top:10px;">
+                  <input id="avatar-letter-input" type="text" maxlength="1" placeholder="Letter avatar" />
+                </div>
+                <div class="button-row">
+                  <button id="avatar-letter-btn" type="button">Use letter avatar</button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">Email</div>
+                <p id="settings-provider-note" class="setting-desc">Email and password changes work for email/password accounts.</p>
+                <div class="field-row">
+                  <input id="change-email-input" type="email" placeholder="New email" />
+                  <input id="change-email-password" type="password" placeholder="Current password" />
+                </div>
+                <div class="button-row">
+                  <button id="change-email-btn" type="button">Change email</button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">Password</div>
+                <div class="field-row">
+                  <input id="current-password" type="password" placeholder="Current password" />
+                  <input id="new-password" type="password" placeholder="New password" />
+                  <input id="confirm-password" type="password" placeholder="Confirm new password" />
+                </div>
+                <div class="button-row">
+                  <button id="change-password-btn" type="button">Change password</button>
+                  <button id="send-reset-email-btn" type="button">Send reset email</button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">Account actions</div>
+                <div class="button-row">
+                  <button id="resend-verification-btn" type="button">Resend verification email</button>
+                  <button id="logout-btn" type="button">Logout</button>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">Danger zone</div>
+                <div class="field-row">
+                  <input id="delete-password" type="password" placeholder="Current password for delete" autocomplete="current-password" />
+                </div>
+                <div class="button-row">
+                  <button id="delete-account-btn" class="danger" type="button">Delete account</button>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="setting-card">
-            <div class="setting-title">Profile picture</div>
-            <p id="security-note" class="setting-desc">Pick a preset, use a letter, or reset to default. Two presets unlock at Explorer, one at Adventurer, and one at Veteran.</p>
-            <div class="avatar-grid">
-              <button id="avatar-preset-1-btn" type="button" class="avatar-choice">
-                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%230984e3"/%3E%3Cpath d="M64 30l10 20 22 3-16 16 4 22-20-10-20 10 4-22-16-16 22-3z" fill="white"/%3E%3C/svg%3E'>
-                <span data-avatar-name>Preset 1</span>
-                <small data-avatar-rank-note>Explorer rank</small>
-              </button>
-              <button id="avatar-preset-2-btn" type="button" class="avatar-choice">
-                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%236c5ce7"/%3E%3Ccircle cx="64" cy="66" r="26" fill="rgba(255,255,255,0.15)"/%3E%3Ccircle cx="50" cy="58" r="5" fill="white"/%3E%3Ccircle cx="78" cy="58" r="5" fill="white"/%3E%3C/svg%3E'>
-                <span data-avatar-name>Preset 2</span>
-                <small data-avatar-rank-note>Explorer rank</small>
-              </button>
-              <button id="avatar-preset-3-btn" type="button" class="avatar-choice">
-                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%2300b894"/%3E%3Ccircle cx="64" cy="64" r="22" fill="none" stroke="white" stroke-width="6"/%3E%3Ccircle cx="64" cy="64" r="8" fill="white"/%3E%3C/svg%3E'>
-                <span data-avatar-name>Preset 3</span>
-                <small data-avatar-rank-note>Adventurer rank</small>
-              </button>
-              <button id="avatar-preset-4-btn" type="button" class="avatar-choice">
-                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%23d35400"/%3E%3Cpath d="M64 22l13 26 29 4-21 20 5 29-26-13-26 13 5-29-21-20 29-4z" fill="white"/%3E%3Ccircle cx="64" cy="61" r="12" fill="%23d35400"/%3E%3C/svg%3E'>
-                <span data-avatar-name>Preset 4</span>
-                <small data-avatar-rank-note>Veteran rank</small>
-              </button>
-            </div>
-            <div class="button-row" style="margin-top:10px;">
-              <button id="avatar-default-btn" type="button">Default</button>
-            </div>
-            <div class="field-row" style="margin-top:10px;">
-              <input id="avatar-letter-input" type="text" maxlength="1" placeholder="Letter avatar" />
-            </div>
-            <div class="button-row">
-              <button id="avatar-letter-btn" type="button">Use letter avatar</button>
-            </div>
-          </div>
+          <div class="settings-panel" data-settings-subpanel="privacy">
+            <div class="settings-grid">
+              <div class="setting-card">
+                <div class="setting-title">Profile access</div>
+                <p class="setting-desc">Only friends are able to view your account. This stays on for everyone.</p>
+                <div class="privacy-note-card">
+                  <strong>Friends only</strong>
+                  <span>People need to be in your friends list before they can open your profile details, rank, streaks, and account info.</span>
+                </div>
+              </div>
 
-          <div class="setting-card">
-            <div class="setting-title">Email</div>
-            <p id="settings-provider-note" class="setting-desc">Email and password changes work for email/password accounts.</p>
-            <div class="field-row">
-              <input id="change-email-input" type="email" placeholder="New email" />
-              <input id="change-email-password" type="password" placeholder="Current password" />
-            </div>
-            <div class="button-row">
-              <button id="change-email-btn" type="button">Change email</button>
-            </div>
-          </div>
+              <div class="setting-card">
+                <div class="setting-title">Visible to friends</div>
+                <div class="privacy-toggle-list">
+                  <label class="privacy-toggle">
+                    <input id="privacy-show-rank" type="checkbox" />
+                    <span>
+                      <strong>Show my rank</strong>
+                      <small>Friends can see your rank and XP progress on your profile.</small>
+                    </span>
+                  </label>
 
-          <div class="setting-card">
-            <div class="setting-title">Password</div>
-            <div class="field-row">
-              <input id="current-password" type="password" placeholder="Current password" />
-              <input id="new-password" type="password" placeholder="New password" />
-              <input id="confirm-password" type="password" placeholder="Confirm new password" />
-            </div>
-            <div class="button-row">
-              <button id="change-password-btn" type="button">Change password</button>
-              <button id="send-reset-email-btn" type="button">Send reset email</button>
-            </div>
-          </div>
+                  <label class="privacy-toggle">
+                    <input id="privacy-show-joined" type="checkbox" />
+                    <span>
+                      <strong>Show when I joined</strong>
+                      <small>Friends can see your account join date.</small>
+                    </span>
+                  </label>
 
-          <div class="setting-card">
-            <div class="setting-title">Account actions</div>
-            <div class="button-row">
-              <button id="resend-verification-btn" type="button">Resend verification email</button>
-              <button id="logout-btn" type="button">Logout</button>
-            </div>
-          </div>
-
-          <div class="setting-card">
-            <div class="setting-title">Danger zone</div>
-            <div class="field-row">
-              <input id="delete-password" type="password" placeholder="Current password for delete" autocomplete="current-password" />
-            </div>
-            <div class="button-row">
-              <button id="delete-account-btn" class="danger" type="button">Delete account</button>
+                  <label class="privacy-toggle">
+                    <input id="privacy-show-streaks" type="checkbox" />
+                    <span>
+                      <strong>Show my streaks</strong>
+                      <small>Friends can see your current and longest streak.</small>
+                    </span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>

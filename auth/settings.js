@@ -8,6 +8,7 @@ import {
   getRankFromXp,
   setAvatarLetter,
   useDefaultProfilePicture,
+  updatePrivacySettings,
   resendVerificationEmail,
   deleteAccount,
   watchAuth,
@@ -31,6 +32,9 @@ function syncForm(profile, user) {
   const emailInput = $("change-email-input");
   const letterInput = $("avatar-letter-input");
   const note = $("settings-provider-note");
+  const showRank = $("privacy-show-rank");
+  const showJoined = $("privacy-show-joined");
+  const showStreaks = $("privacy-show-streaks");
 
   if (usernameInput && document.activeElement !== usernameInput) {
     usernameInput.value = profile?.username || user.displayName || "";
@@ -50,6 +54,10 @@ function syncForm(profile, user) {
       ? "Email and password changes work for email/password accounts."
       : "This account uses Google sign-in, so email/password changes are not available here.";
   }
+
+  if (showRank) showRank.checked = profile?.privacySettings?.showRank !== false;
+  if (showJoined) showJoined.checked = profile?.privacySettings?.showJoined !== false;
+  if (showStreaks) showStreaks.checked = profile?.privacySettings?.showStreaks !== false;
 }
 
 function syncAvatarPresetLocks(profile) {
@@ -126,6 +134,16 @@ async function applyDefaultAvatar() {
   } catch (error) {
     console.error(error);
     setStatus(error.message || "Could not reset profile picture.", "error");
+  }
+}
+
+async function applyPrivacySetting(key, value) {
+  try {
+    await updatePrivacySettings({ [key]: !!value });
+    setStatus("Privacy settings updated.", "success");
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message || "Could not update privacy settings.", "error");
   }
 }
 
@@ -217,6 +235,18 @@ function bindButtons() {
       console.error(error);
       setStatus(error.message || "Could not delete account.", "error");
     }
+  });
+
+  $("privacy-show-rank")?.addEventListener("change", (event) => {
+    applyPrivacySetting("showRank", event.target.checked);
+  });
+
+  $("privacy-show-joined")?.addEventListener("change", (event) => {
+    applyPrivacySetting("showJoined", event.target.checked);
+  });
+
+  $("privacy-show-streaks")?.addEventListener("change", (event) => {
+    applyPrivacySetting("showStreaks", event.target.checked);
   });
 }
 

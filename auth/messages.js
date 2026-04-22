@@ -31,6 +31,16 @@ let groupSearchValue = "";
 
 const directDrafts = {};
 const groupDrafts = {};
+let lastSelectedConversationId = null;
+let lastSelectedGroupId = null;
+
+const SCROLL_SELECTORS = [
+  "#system-message-list",
+  "#messages-friend-list",
+  "#messages-conversation",
+  "#groups-list",
+  "#groups-view .message-stream"
+];
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -56,6 +66,10 @@ function toMs(value) {
   return 0;
 }
 
+function sortOldestFirst(list) {
+  return [...list].sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt));
+}
+
 function formatTimestamp(value) {
   const ms = toMs(value);
   if (!ms) return "";
@@ -70,6 +84,108 @@ function formatTimestamp(value) {
   } catch {
     return "";
   }
+}
+
+function formatRelativeTime(value) {
+  const ms = toMs(value);
+  if (!ms) return "";
+
+  const diff = Math.max(0, Date.now() - ms);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const week = 7 * day;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  if (diff < minute) return "Just now";
+  if (diff < hour) {
+    const amount = Math.floor(diff / minute);
+    return `${amount} min${amount === 1 ? "" : "s"} ago`;
+  }
+  if (diff < day) {
+    const amount = Math.floor(diff / hour);
+    return `${amount} hour${amount === 1 ? "" : "s"} ago`;
+  }
+  if (diff < week) {
+    const amount = Math.floor(diff / day);
+    return `${amount} day${amount === 1 ? "" : "s"} ago`;
+  }
+  if (diff < month) {
+    const amount = Math.floor(diff / week);
+    return `${amount} week${amount === 1 ? "" : "s"} ago`;
+  }
+  if (diff < year) {
+    const amount = Math.floor(diff / month);
+    return `${amount} month${amount === 1 ? "" : "s"} ago`;
+  }
+
+  const amount = Math.floor(diff / year);
+  return `${amount} year${amount === 1 ? "" : "s"} ago`;
+}
+
+function captureUiState() {
+  const scrollState = {};
+
+  for (const selector of SCROLL_SELECTORS) {
+    const element = document.querySelector(selector);
+    if (!element) continue;
+
+    const offsetFromBottom = Math.max(0, element.scrollHeight - element.clientHeight - element.scrollTop);
+    scrollState[selector] = {
+      top: element.scrollTop,
+      atBottom: offsetFromBottom < 28
+    };
+  }
+
+  const activeElement = document.activeElement;
+  const focusedInput = activeElement && (activeElement.id === "direct-message-input" || activeElement.id === "group-message-input")
+    ? {
+        id: activeElement.id,
+        start: activeElement.selectionStart ?? null,
+        end: activeElement.selectionEnd ?? null
+      }
+    : null;
+
+  return { scrollState, focusedInput };
+}
+
+function restoreUiState(state = {}, options = {}) {
+  requestAnimationFrame(() => {
+    const scrollState = state.scrollState || {};
+
+    for (const selector of SCROLL_SELECTORS) {
+      const memory = scrollState[selector];
+      const element = document.querySelector(selector);
+      if (!memory || !element) continue;
+
+      if (memory.atBottom) {
+        element.scrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+      } else {
+        element.scrollTop = Math.min(memory.top, Math.max(0, element.scrollHeight - element.clientHeight));
+      }
+    }
+
+    if (options.forceConversationBottom) {
+      const conversation = $("#messages-conversation");
+      if (conversation) conversation.scrollTop = Math.max(0, conversation.scrollHeight - conversation.clientHeight);
+    }
+
+    if (options.forceGroupBottom) {
+      const stream = document.querySelector("#groups-view .message-stream");
+      if (stream) stream.scrollTop = Math.max(0, stream.scrollHeight - stream.clientHeight);
+    }
+
+    if (state.focusedInput) {
+      const input = document.getElementById(state.focusedInput.id);
+      if (input) {
+        input.focus();
+        if (typeof state.focusedInput.start === "number" && typeof state.focusedInput.end === "number") {
+          input.setSelectionRange(state.focusedInput.start, state.focusedInput.end);
+        }
+      }
+    }
+  });
 }
 
 function isIncoming(msg) {
@@ -164,6 +280,10 @@ async function showTarget(msg) {
 }
 
 function matchesReadFilter(msg) {
+  if (activeReadFilter === "all") {
+    return true;
+  }
+
   if (activeReadFilter === "unread") {
     return isUnread(msg);
   }
@@ -184,7 +304,9 @@ function directChatMessages(state) {
 }
 
 function visibleInboxMessages(state) {
-  const source = activeTypeFilter === "chat" ? directChatMessages(state) : systemMessages(state);
+  const source = activeTypeFilter === "all"
+    ? (state.messages || [])
+    : (activeTypeFilter === "chat" ? directChatMessages(state) : systemMessages(state));
   return source.filter(matchesReadFilter);
 }
 
@@ -207,11 +329,12 @@ function openMessagesView(sub = "system", targetId = null) {
     chatMode = "direct";
     if (targetId) {
       setSelectedConversation(targetId);
-      activeReadFilter = hasUnreadChatFrom(targetId) ? "unread" : "read";
+      activeReadFilter = hasUnreadChatFrom(targetId) ? "unread" : "all";
     }
   } else if (sub === "groups") {
     activeTypeFilter = "chat";
     chatMode = "groups";
+    activeReadFilter = "all";
     if (targetId) setSelectedGroupChatId(targetId);
   } else {
     activeTypeFilter = "system";
@@ -237,7 +360,7 @@ function messageMeta(msg) {
   const sender = msg.kind === "chat"
     ? (msg.fromUid === socialState.user?.uid ? `You to ${friendName(msg.toUid)}` : friendName(msg.fromUid))
     : (msg.fromName || msg.kind || "");
-  const time = formatTimestamp(msg.createdAt);
+  const time = formatRelativeTime(msg.createdAt);
 
   if (sender) pieces.push(sender);
   if (time) pieces.push(time);
@@ -276,6 +399,7 @@ function messageMenu(msg) {
 function messageCard(msg, { showOpen = true } = {}) {
   const unread = isUnread(msg);
   const target = resolveMessageTarget(msg);
+  const exactTime = formatTimestamp(msg.createdAt);
 
   return `
     <div class="msg-card ${unread ? "unread" : "read"}" data-msg-id="${escapeHtml(msg.id)}" data-kind="${escapeHtml(msg.kind || "system")}" data-target-id="${escapeHtml(target.targetId || "")}" data-target-section="${escapeHtml(target.section)}" data-target-sub="${escapeHtml(target.sub)}">
@@ -286,7 +410,7 @@ function messageCard(msg, { showOpen = true } = {}) {
             <div class="msg-title">${escapeHtml(msg.title || msg.kind || "Message")}</div>
             <span class="msg-state-pill ${unread ? "unread" : "read"}">${unread ? "Unread" : "Read"}</span>
           </div>
-          <div class="msg-meta">${escapeHtml(messageMeta(msg))}</div>
+          <div class="msg-meta" title="${escapeHtml(exactTime)}">${escapeHtml(messageMeta(msg))}</div>
         </div>
         <div class="msg-text">${escapeHtml(msg.body || "")}</div>
         <div class="msg-kind-line">${escapeHtml(messageKindLabel(msg))}</div>
@@ -301,6 +425,7 @@ function messageCard(msg, { showOpen = true } = {}) {
 }
 
 function groupMessageCard(msg) {
+  const exactTime = formatTimestamp(msg.createdAt);
   return `
     <div class="msg-card read group-msg-card">
       <div class="msg-avatar">GR</div>
@@ -309,7 +434,7 @@ function groupMessageCard(msg) {
           <div class="msg-title-row">
             <div class="msg-title">${escapeHtml(msg.fromName || "Group member")}</div>
           </div>
-          <div class="msg-meta">${escapeHtml(formatTimestamp(msg.createdAt))}</div>
+          <div class="msg-meta" title="${escapeHtml(exactTime)}">${escapeHtml(formatRelativeTime(msg.createdAt))}</div>
         </div>
         <div class="msg-text">${escapeHtml(msg.body || "")}</div>
         <div class="msg-kind-line">Group</div>
@@ -319,9 +444,9 @@ function groupMessageCard(msg) {
 }
 
 function summaryCopy(messages) {
-  const typeLabel = activeTypeFilter === "chat" ? "chat" : "system";
-  const readLabel = activeReadFilter === "unread" ? "unread" : "read";
-  return `${messages.length} ${readLabel} ${typeLabel} message${messages.length === 1 ? "" : "s"}`;
+  const typeLabel = activeTypeFilter === "all" ? "messages" : (activeTypeFilter === "chat" ? "chat messages" : "system messages");
+  const readLabel = activeReadFilter === "all" ? "all" : activeReadFilter;
+  return `${messages.length} ${readLabel} ${typeLabel}`;
 }
 
 function renderSystem(state) {
@@ -335,13 +460,13 @@ function renderSystem(state) {
 
   list.innerHTML = messages.length
     ? messages.map((message) => messageCard(message, { showOpen: true })).join("")
-    : `<div class="msg-empty">No ${activeReadFilter} system messages right now.</div>`;
+    : `<div class="msg-empty">No ${activeReadFilter === "all" ? "" : `${activeReadFilter} `}${activeTypeFilter === "all" ? "" : "system "}messages right now.</div>`;
 }
 
 function directFriendEntries(state) {
   return (state.friends || [])
     .map((uid) => {
-      const allMessages = getConversationMessages(uid);
+      const allMessages = sortOldestFirst(getConversationMessages(uid));
       return {
         uid,
         name: friendName(uid),
@@ -401,16 +526,15 @@ function renderChat(state) {
   }
 
   if (targetLabel) {
-    targetLabel.textContent = selectedUid
-      ? `${activeReadFilter === "unread" ? "Unread" : "Read"} chat with ${friendName(selectedUid)}`
-      : "Pick a friend to start chatting";
+    const modeLabel = activeReadFilter === "all" ? "Chat" : `${activeReadFilter === "unread" ? "Unread" : "Read"} chat`;
+    targetLabel.textContent = selectedUid ? `${modeLabel} with ${friendName(selectedUid)}` : "Pick a friend to start chatting";
   }
 
   if (conversation) {
     conversation.innerHTML = selectedUid
       ? (visibleConversation.length
         ? visibleConversation.map((message) => messageCard(message, { showOpen: false })).join("")
-        : `<div class="msg-empty">No ${activeReadFilter} chat messages with ${escapeHtml(friendName(selectedUid))}.</div>`)
+        : `<div class="msg-empty">No ${activeReadFilter === "all" ? "" : `${activeReadFilter} `}chat messages with ${escapeHtml(friendName(selectedUid))}.</div>`)
       : `<div class="msg-empty">Pick a friend to open your chat.</div>`;
   }
 
@@ -448,7 +572,7 @@ function renderChat(state) {
   }
 
   if (view) {
-    const messages = selectedGroup ? getGroupChatMessages(selectedGroup) : [];
+    const messages = selectedGroup ? sortOldestFirst(getGroupChatMessages(selectedGroup)) : [];
     const current = chats.find((chat) => chat.id === selectedGroup) || null;
 
     view.innerHTML = selectedGroup ? `
@@ -517,12 +641,18 @@ function render(state) {
   const root = $("messages-root");
   if (!root) return;
 
+  const uiState = captureUiState();
+  const selectedConversationId = cleanId(state.selectedConversationId);
+  const selectedGroupId = cleanId(state.selectedGroupChatId);
+
   if (!state.user) {
     root.innerHTML = `
       <div class="msg-empty">
         Log in to open your inbox, direct chats, and group messages.
       </div>
     `;
+    lastSelectedConversationId = null;
+    lastSelectedGroupId = null;
     return;
   }
 
@@ -535,10 +665,12 @@ function render(state) {
         </div>
         <div class="messages-toolbar">
           <div class="filter-group" aria-label="Read filter">
+            <button class="tab-chip ${activeReadFilter === "all" ? "active" : ""}" type="button" data-filter-read="all">All</button>
             <button class="tab-chip ${activeReadFilter === "unread" ? "active" : ""}" type="button" data-filter-read="unread">Unread</button>
             <button class="tab-chip ${activeReadFilter === "read" ? "active" : ""}" type="button" data-filter-read="read">Read</button>
           </div>
           <div class="filter-group" aria-label="Type filter">
+            <button class="tab-chip ${activeTypeFilter === "all" ? "active" : ""}" type="button" data-filter-type="all">All</button>
             <button class="tab-chip ${activeTypeFilter === "system" ? "active" : ""}" type="button" data-filter-type="system">System</button>
             <button class="tab-chip ${activeTypeFilter === "chat" ? "active" : ""}" type="button" data-filter-type="chat">Chat</button>
           </div>
@@ -549,7 +681,7 @@ function render(state) {
 
       <div class="messages-summary" id="messages-view-summary"></div>
 
-      <div class="messages-panel ${activeTypeFilter === "system" ? "active" : ""}" data-panel="system">
+      <div class="messages-panel ${activeTypeFilter !== "chat" ? "active" : ""}" data-panel="system">
         <div class="system-panel">
           <div id="system-message-list" class="message-stream"></div>
         </div>
@@ -617,6 +749,14 @@ function render(state) {
 
   renderSystem(state);
   renderChat(state);
+
+  restoreUiState(uiState, {
+    forceConversationBottom: selectedConversationId !== lastSelectedConversationId,
+    forceGroupBottom: selectedGroupId !== lastSelectedGroupId
+  });
+
+  lastSelectedConversationId = selectedConversationId;
+  lastSelectedGroupId = selectedGroupId;
 }
 
 async function sendDirectMessageFromComposer(input) {
@@ -656,13 +796,13 @@ function bind(root) {
 
     try {
       if (button.dataset.filterRead) {
-        activeReadFilter = button.dataset.filterRead === "read" ? "read" : "unread";
+        activeReadFilter = ["all", "read", "unread"].includes(button.dataset.filterRead) ? button.dataset.filterRead : "unread";
         render(socialState);
         return;
       }
 
       if (button.dataset.filterType) {
-        activeTypeFilter = button.dataset.filterType === "chat" ? "chat" : "system";
+        activeTypeFilter = ["all", "chat", "system"].includes(button.dataset.filterType) ? button.dataset.filterType : "system";
         render(socialState);
         return;
       }
@@ -770,7 +910,7 @@ function bind(root) {
 
     try {
       if (button.id === "msg-read-all" || button.id === "msg-unread-all") {
-        const targetIds = visibleInboxMessages(socialState)
+        const targetIds = (socialState.messages || [])
           .filter((message) => isIncoming(message))
           .map((message) => message.id);
         await setMessagesReadState(targetIds, button.id === "msg-read-all");

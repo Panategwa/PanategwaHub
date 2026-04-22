@@ -40,6 +40,7 @@ const baseOpenAccountArea = typeof window.openAccountArea === "function"
   ? window.openAccountArea.bind(window)
   : null;
 const FRIENDS_SUBSECTIONS = new Set(["friends", "requests", "blocked"]);
+const SETTINGS_SUBSECTIONS = new Set(["account", "privacy"]);
 let copiedUserIdValue = null;
 let copiedUserIdUntil = 0;
 let copiedUserIdTimer = null;
@@ -103,6 +104,10 @@ function normalizeAccountSection(section = "info") {
 function isFriendsView(section = "info", sub = null) {
   const rawSection = String(section || "info").trim().toLowerCase();
   return rawSection === "friends" || FRIENDS_SUBSECTIONS.has(String(sub || "").trim().toLowerCase());
+}
+
+function isSettingsView(section = "info", sub = null) {
+  return normalizeAccountSection(section) === "settings" || SETTINGS_SUBSECTIONS.has(String(sub || "").trim().toLowerCase());
 }
 
 function isUserIdCopied(uid) {
@@ -218,6 +223,18 @@ function showFriendsSubsection(name) {
   });
 }
 
+function showSettingsSubsection(name = "account") {
+  const next = SETTINGS_SUBSECTIONS.has(String(name || "").trim().toLowerCase()) ? String(name).trim().toLowerCase() : "account";
+
+  document.querySelectorAll("[data-settings-subpanel]").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.settingsSubpanel === next);
+  });
+
+  document.querySelectorAll("[data-settings-subtab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.settingsSubtab === next);
+  });
+}
+
 function applyAuthGuards() {
   const loggedIn = !!currentState.user;
   setVisible("settings-locked", !loggedIn);
@@ -253,6 +270,7 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
     const requestedSection = String(section || "info").toLowerCase();
     const nextSection = normalizeAccountSection(requestedSection);
     const nextSub = isFriendsView(requestedSection, sub) ? (sub || "friends") : sub;
+    let finalSub = nextSub || null;
 
     document.querySelectorAll(".account-section").forEach((el) => {
       el.classList.toggle("active", el.dataset.section === nextSection);
@@ -269,7 +287,9 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
           console.error(error);
         });
       }
-      syncQuery(nextSection, nextSub, targetId);
+    } else if (nextSection === "settings") {
+      finalSub = nextSub || "account";
+      showSettingsSubsection(finalSub);
     } else if (nextSection === "messages" && currentState.user) {
       if (typeof window.PanategwaMessagesOpen === "function") {
         window.PanategwaMessagesOpen(sub || "system", targetId || null);
@@ -287,7 +307,7 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
       }, 180);
     }
 
-    syncQuery(nextSection, sub, targetId);
+    syncQuery(nextSection, finalSub, targetId);
   } catch (error) {
     console.error("Account navigation error:", error);
     if (baseOpenAccountArea) {
@@ -442,16 +462,41 @@ function renderSelectedProfile(state) {
   const profile = state.selectedProfile || state.profile || {};
   const username = profile.username || "Player";
   const isSelf = profile.uid === state.user.uid;
-  const isPrivate = !!profile.socialSettings?.profileHidden && !isSelf;
+  const canViewProfile = isSelf || profile.canViewProfile !== false;
+  const rank = profile.currentRank ?? (isSelf ? getRank(profile.xp || 0) : null);
+  const streakCurrent = profile.streakCurrent ?? (isSelf ? (state.profile?.streak?.current || 0) : null);
+  const streakLongest = profile.streakLongest ?? (isSelf ? (state.profile?.longestStreak || state.profile?.streak?.longest || streakCurrent || 0) : null);
   const avatar = profile.photoURL
     ? `<img src="${escapeHtml(profile.photoURL)}" alt="${escapeHtml(username)} avatar" class="profile-avatar-large" />`
     : `<div class="profile-avatar-large">${escapeHtml(initials(username))}</div>`;
+
+  if (!canViewProfile) {
+    container.innerHTML = `
+      <div class="friend-profile-card">
+        <div class="subsection-head">
+          <h3>${isSelf ? "Your profile" : "Profile preview"}</h3>
+          <span class="profile-badge">${isSelf ? "You" : "Friends only"}</span>
+        </div>
+
+        <div class="profile-hero">
+          ${avatar}
+          <div>
+            <div class="profile-name">${escapeHtml(username)}</div>
+            <div class="friend-entry-meta">ID: ${escapeHtml(profile.uid || "--")}</div>
+          </div>
+        </div>
+
+        <div class="msg-empty">Only friends can view this account. Accept each other first to unlock full profile info.</div>
+      </div>
+    `;
+    return;
+  }
 
   container.innerHTML = `
     <div class="friend-profile-card">
       <div class="subsection-head">
         <h3>${isSelf ? "Your profile" : "Profile preview"}</h3>
-        <span class="profile-badge">${isSelf ? "You" : (isPrivate ? "Private" : "Public")}</span>
+        <span class="profile-badge">${isSelf ? "You" : "Friend"}</span>
       </div>
 
       <div class="profile-hero">
@@ -463,19 +508,22 @@ function renderSelectedProfile(state) {
       </div>
 
       <div class="profile-meta">
-        <div><span>XP</span><strong>${escapeHtml(String(profile.xp || 0))}</strong></div>
+        <div><span>Rank</span><strong>${escapeHtml(rank || "Hidden")}</strong></div>
         <div><span>Friends</span><strong>${escapeHtml(String((profile.friends || []).length || 0))}</strong></div>
-        <div><span>Verified</span><strong>${profile.verified ? "Yes" : "No"}</strong></div>
+        <div><span>Current streak</span><strong>${streakCurrent == null ? "Hidden" : `${streakCurrent} day${streakCurrent === 1 ? "" : "s"}`}</strong></div>
+        <div><span>Longest streak</span><strong>${streakLongest == null ? "Hidden" : `${streakLongest} day${streakLongest === 1 ? "" : "s"}`}</strong></div>
       </div>
 
       <div class="info-grid">
         <div class="info-row"><span>Username</span><strong>${escapeHtml(username)}</strong></div>
-        <div class="info-row"><span>Email</span><strong>${escapeHtml(isPrivate ? "Hidden" : (profile.email || "--"))}</strong></div>
-        <div class="info-row"><span>Joined</span><strong>${escapeHtml(formatDateOnly(profile.createdAt))}</strong></div>
+        <div class="info-row"><span>Rank</span><strong>${escapeHtml(rank || "Hidden")}</strong></div>
+        <div class="info-row"><span>Joined</span><strong>${profile.createdAt ? escapeHtml(formatDateOnly(profile.createdAt)) : "Hidden"}</strong></div>
         <div class="info-row"><span>Status</span><strong>${isSelf ? "Your account" : "Friend profile"}</strong></div>
+        <div class="info-row"><span>Current streak</span><strong>${streakCurrent == null ? "Hidden" : `${streakCurrent} day${streakCurrent === 1 ? "" : "s"}`}</strong></div>
+        <div class="info-row"><span>Longest streak</span><strong>${streakLongest == null ? "Hidden" : `${streakLongest} day${streakLongest === 1 ? "" : "s"}`}</strong></div>
       </div>
 
-      <div class="profile-body-note">${escapeHtml(isPrivate ? "This account is private, so only public information is shown here." : "Public profile details are shown here.")}</div>
+      <div class="profile-body-note">${escapeHtml(isSelf ? "Only friends can view your account. Privacy controls below decide which details they can see." : "Only friends can view this account. Some details may be hidden by your friend's privacy settings.")}</div>
     </div>
   `;
 }
@@ -643,7 +691,7 @@ async function copyText(value) {
 
 function bindNavigation() {
   document.addEventListener("click", (event) => {
-    const sectionButton = event.target.closest("[data-target], [data-open-section], [data-auth-mode], [data-friends-subtab]");
+    const sectionButton = event.target.closest("[data-target], [data-open-section], [data-auth-mode], [data-friends-subtab], [data-settings-subtab]");
     if (!sectionButton) return;
 
     if (sectionButton.dataset.target) {
@@ -663,6 +711,11 @@ function bindNavigation() {
 
     if (sectionButton.dataset.friendsSubtab) {
       window.openAccountArea("info", sectionButton.dataset.friendsSubtab, currentState.selectedProfileId || null);
+      return;
+    }
+
+    if (sectionButton.dataset.settingsSubtab) {
+      window.openAccountArea("settings", sectionButton.dataset.settingsSubtab);
     }
   });
 
@@ -855,6 +908,7 @@ function start() {
   bindFriends();
   setAuthMode("login");
   showFriendsSubsection("friends");
+  showSettingsSubsection("account");
   renderAll(currentState);
   applyInitialAccountArea();
   setStatus("Checking account...", "info");

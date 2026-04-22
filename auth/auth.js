@@ -48,6 +48,14 @@ function uniqueStrings(value) {
   return [...new Set(arr.map((item) => String(item || "").trim()).filter(Boolean))];
 }
 
+function normalizePrivacySettings(settings = {}) {
+  return {
+    showRank: settings.showRank !== false,
+    showJoined: settings.showJoined !== false,
+    showStreaks: settings.showStreaks !== false
+  };
+}
+
 function defaultUsername(user) {
   return user?.displayName || user?.email?.split("@")?.[0] || "Player";
 }
@@ -167,6 +175,7 @@ function baseProfile(user) {
       friends: [],
       blocked: []
     },
+    privacySettings: normalizePrivacySettings(),
     stats: {
       pagesVisited: 0,
       planetsFound: 0,
@@ -272,6 +281,7 @@ export async function ensureUserProfile(user) {
     blocked,
     socialSettings: normalizeSocialSettings(data.socialSettings),
     socialBackup,
+    privacySettings: normalizePrivacySettings(data.privacySettings),
     stats: {
       pagesVisited: visitedPages.length,
       planetsFound: data.stats?.planetsFound || 0,
@@ -283,6 +293,24 @@ export async function ensureUserProfile(user) {
   };
 
   await setDoc(ref, merged, { merge: true });
+  return merged;
+}
+
+export async function updatePrivacySettings(patch = {}) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const current = await getProfile(user.uid);
+  const merged = normalizePrivacySettings({
+    ...(current?.privacySettings || {}),
+    ...(patch || {})
+  });
+
+  await setDoc(userRef(user.uid), {
+    privacySettings: merged,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+
   return merged;
 }
 

@@ -27,6 +27,14 @@ const DEFAULT_SETTINGS = {
   profileHidden: false
 };
 
+function normalizePrivacySettings(settings = {}) {
+  return {
+    showRank: settings.showRank !== false,
+    showJoined: settings.showJoined !== false,
+    showStreaks: settings.showStreaks !== false
+  };
+}
+
 const listeners = new Set();
 
 const socialState = {
@@ -105,13 +113,13 @@ function sortNewestFirst(list) {
   return [...list].sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
 }
 
-function toastStorageKey(uid) {
-  return `ptg_social_toasts_${uid}`;
+function toastStorageKey(uid, channel = "messages") {
+  return `ptg_social_toasts_${channel}_${uid}`;
 }
 
-function loadSeenToastIds(uid) {
+function loadSeenToastIds(uid, channel = "messages") {
   try {
-    const raw = sessionStorage.getItem(toastStorageKey(uid));
+    const raw = sessionStorage.getItem(toastStorageKey(uid, channel));
     const arr = JSON.parse(raw || "[]");
     return new Set(Array.isArray(arr) ? arr.map((value) => String(value || "").trim()).filter(Boolean) : []);
   } catch {
@@ -119,10 +127,10 @@ function loadSeenToastIds(uid) {
   }
 }
 
-function saveSeenToastIds(uid, ids) {
+function saveSeenToastIds(uid, ids, channel = "messages") {
   try {
     const next = [...ids].slice(-TOAST_STORAGE_LIMIT);
-    sessionStorage.setItem(toastStorageKey(uid), JSON.stringify(next));
+    sessionStorage.setItem(toastStorageKey(uid, channel), JSON.stringify(next));
   } catch {}
 }
 
@@ -147,39 +155,73 @@ function usernameOf(profile) {
   return profile?.username || profile?.displayName || profile?.email?.split("@")?.[0] || "Player";
 }
 
+function rankFromXp(xp) {
+  if (Number(xp || 0) < 5) return "Explorer";
+  if (Number(xp || 0) < 20) return "Adventurer";
+  return "Veteran";
+}
+
+function currentStreakOf(profile) {
+  return Number(profile?.streak?.current || 0);
+}
+
+function longestStreakOf(profile) {
+  return Number(profile?.longestStreak || profile?.streak?.longest || currentStreakOf(profile) || 0);
+}
+
 function publicProfile(profile, viewerUid) {
   if (!profile) return null;
-  const hidden = !!profile.socialSettings?.profileHidden;
   const self = profile.uid === viewerUid;
+  const friends = unique(profile.friends);
+  const blocked = unique(profile.blocked);
+  const privacy = normalizePrivacySettings(profile.privacySettings);
+  const viewerIsFriend = !!viewerUid && friends.includes(viewerUid);
+  const canViewProfile = self || viewerIsFriend;
 
-  if (self || !hidden) {
+  if (!canViewProfile) {
     return {
       uid: profile.uid,
       username: profile.username || "Player",
-      photoURL: profile.photoURL || "",
-      email: profile.email || "",
-      xp: profile.xp || 0,
-      verified: !!profile.verified,
-      createdAt: profile.createdAt || null,
-      friends: unique(profile.friends),
-      blocked: unique(profile.blocked),
-      socialSettings: { ...(profile.socialSettings || DEFAULT_SETTINGS) },
-      stats: profile.stats || {}
+      photoURL: "",
+      email: "",
+      xp: null,
+      verified: null,
+      createdAt: null,
+      friends: [],
+      blocked: [],
+      socialSettings: { ...(profile.socialSettings || DEFAULT_SETTINGS), profileHidden: true },
+      privacySettings: privacy,
+      stats: {},
+      canViewProfile: false,
+      friendsOnly: true,
+      currentRank: null,
+      streakCurrent: null,
+      streakLongest: null
     };
   }
+
+  const canShowRank = self || privacy.showRank;
+  const canShowJoined = self || privacy.showJoined;
+  const canShowStreaks = self || privacy.showStreaks;
 
   return {
     uid: profile.uid,
     username: profile.username || "Player",
-    photoURL: "",
-    email: "",
-    xp: 0,
+    photoURL: profile.photoURL || "",
+    email: self ? (profile.email || "") : "",
+    xp: canShowRank ? Number(profile.xp || 0) : null,
     verified: !!profile.verified,
-    createdAt: profile.createdAt || null,
-    friends: [],
-    blocked: [],
-    socialSettings: { ...DEFAULT_SETTINGS, profileHidden: true },
-    stats: {}
+    createdAt: canShowJoined ? (profile.createdAt || null) : null,
+    friends,
+    blocked,
+    socialSettings: { ...(profile.socialSettings || DEFAULT_SETTINGS) },
+    privacySettings: privacy,
+    stats: profile.stats || {},
+    canViewProfile: true,
+    friendsOnly: true,
+    currentRank: canShowRank ? rankFromXp(profile.xp || 0) : null,
+    streakCurrent: canShowStreaks ? currentStreakOf(profile) : null,
+    streakLongest: canShowStreaks ? longestStreakOf(profile) : null
   };
 }
 
@@ -353,7 +395,11 @@ function toastConfigForMessage(message) {
     };
   }
 
-  return null;
+  return {
+    title: message.title || "New message",
+    body: shortenToastBody(message.body || ""),
+    href: buildAccountHref(message.targetSection || "messages", message.targetSubSection || "system", message.targetId || null)
+  };
 }
 
 function maybeToastNewMessages(messages) {
@@ -363,7 +409,7 @@ function maybeToastNewMessages(messages) {
     return;
   }
 
-  const seenIds = loadSeenToastIds(currentUid);
+  const seenIds = loadSeenToastIds(currentUid, "messages");
   const freshIncoming = (messages || []).filter(message =>
     message.toUid === currentUid &&
     !seenIds.has(message.id) &&
@@ -384,7 +430,58 @@ function maybeToastNewMessages(messages) {
     });
 
   toastable.forEach(message => seenIds.add(message.id));
-  saveSeenToastIds(currentUid, seenIds);
+  saveSeenToastIds(currentUid, seenIds, "messages");
+}
+
+function maybeToastPendingGroupInvites(invites) {
+  const currentUid = socialState.user?.uid;
+  if (!currentUid || typeof window.PanategwaToast !== "function") return;
+
+  const seenIds = loadSeenToastIds(currentUid, "group-invites");
+  const fresh = (invites || []).filter((invite) => invite.status === "pending" && !seenIds.has(invite.id));
+  if (!fresh.length) return;
+
+  fresh
+    .slice()
+    .reverse()
+    .forEach((invite) => {
+      window.PanategwaToast({
+        title: "Group invite",
+        body: `${invite.fromName || invite.fromUid || "Someone"} invited you to "${invite.chatName || "Group chat"}".`,
+        href: buildAccountHref("messages", "groups", invite.chatId || null)
+      });
+      seenIds.add(invite.id);
+    });
+
+  saveSeenToastIds(currentUid, seenIds, "group-invites");
+}
+
+function maybeToastNewGroupMessages(chat, messages) {
+  const currentUid = socialState.user?.uid;
+  if (!currentUid || typeof window.PanategwaToast !== "function" || !chat?.id) return;
+
+  const seenIds = loadSeenToastIds(currentUid, "group-messages");
+  const fresh = (messages || []).filter((message) => {
+    const toastId = `${chat.id}:${message.id}`;
+    return cleanUid(message.fromUid) !== currentUid && !seenIds.has(toastId);
+  });
+
+  if (!fresh.length) return;
+
+  fresh
+    .slice()
+    .reverse()
+    .forEach((message) => {
+      const toastId = `${chat.id}:${message.id}`;
+      window.PanategwaToast({
+        title: `${message.fromName || "Someone"} in ${chat.name || "Group chat"}`,
+        body: shortenToastBody(message.body || ""),
+        href: buildAccountHref("messages", "groups", chat.id)
+      });
+      seenIds.add(toastId);
+    });
+
+  saveSeenToastIds(currentUid, seenIds, "group-messages");
 }
 
 function relationshipTargetUid(message, currentUid) {
@@ -807,6 +904,7 @@ async function createGroupChat(name, emoji = "👥", memberIds = []) {
 
   const members = unique([user.uid, ...memberIds.map(v => String(v || "").trim())]);
   if (members.length < 2) throw new Error("Add at least one other person.");
+  const fromName = usernameOf(await loadUser(user.uid));
 
   const ref = await addDoc(collection(db, "groupChats"), {
     name: cleanName,
@@ -826,6 +924,7 @@ async function createGroupChat(name, emoji = "👥", memberIds = []) {
       chatName: cleanName,
       chatEmoji: String(emoji || "👥").trim().slice(0, 4) || "👥",
       fromUid: user.uid,
+      fromName,
       toUid: uid,
       status: "pending",
       createdAt: serverTimestamp(),
@@ -884,12 +983,14 @@ async function addMembersToGroupChat(chatId, memberIds = []) {
   if (!unique(chat.members).includes(user.uid)) throw new Error("You are not in that group.");
 
   const members = unique(memberIds.map(v => String(v || "").trim())).filter(uid => uid && uid !== user.uid && !unique(chat.members).includes(uid));
+  const fromName = usernameOf(await loadUser(user.uid));
   for (const uid of members) {
     await addDoc(collection(db, "groupChatInvites"), {
       chatId,
       chatName: chat.name || "Group chat",
       chatEmoji: chat.emoji || "👥",
       fromUid: user.uid,
+      fromName,
       toUid: uid,
       status: "pending",
       createdAt: serverTimestamp(),
@@ -935,6 +1036,7 @@ async function inviteToGroupChat(chatId, targetUid) {
     chatName: chat.name || "Group chat",
     chatEmoji: chat.emoji || "👥",
     fromUid: user.uid,
+    fromName: usernameOf(await loadUser(user.uid)),
     toUid: id,
     status: "pending",
     createdAt: serverTimestamp(),
@@ -1260,7 +1362,9 @@ function startRealtime() {
           clearListenerError(`groupMessage:${chat.id}`);
           const arr = [];
           msgSnap.forEach(m => arr.push({ id: m.id, ...m.data() }));
-          socialState.groupMessagesByChat[chat.id] = sortNewestFirst(arr);
+          const sortedMessages = sortNewestFirst(arr);
+          maybeToastNewGroupMessages(chat, sortedMessages);
+          socialState.groupMessagesByChat[chat.id] = sortedMessages;
           emit();
         }, (error) => {
           setListenerError(`groupMessage:${chat.id}`, "group messages", error, () => {
@@ -1283,7 +1387,9 @@ function startRealtime() {
       clearListenerError("groupInvites");
       const invites = [];
       snap.forEach(d => invites.push({ id: d.id, ...d.data() }));
-      socialState.groupInvites = sortNewestFirst(invites.filter(i => i.status === "pending"));
+      const pendingInvites = sortNewestFirst(invites.filter(i => i.status === "pending"));
+      maybeToastPendingGroupInvites(pendingInvites);
+      socialState.groupInvites = pendingInvites;
       emit();
     }, (error) => {
       setListenerError("groupInvites", "group invites", error, () => {

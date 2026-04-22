@@ -52,6 +52,29 @@ function defaultUsername(user) {
   return user?.displayName || user?.email?.split("@")?.[0] || "Player";
 }
 
+const RANK_LEVELS = Object.freeze({
+  Explorer: 0,
+  Adventurer: 1,
+  Veteran: 2
+});
+
+export const AVATAR_PRESET_REQUIREMENTS = Object.freeze({
+  "1": "Explorer",
+  "2": "Explorer",
+  "3": "Adventurer",
+  "4": "Veteran"
+});
+
+export function getRankFromXp(xp) {
+  if (Number(xp || 0) < 5) return "Explorer";
+  if (Number(xp || 0) < 20) return "Adventurer";
+  return "Veteran";
+}
+
+export function doesRankMeetRequirement(rank, requiredRank) {
+  return (RANK_LEVELS[rank] ?? 0) >= (RANK_LEVELS[requiredRank] ?? 0);
+}
+
 function svgDataUrl(svg) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
@@ -79,6 +102,17 @@ function presetAvatarDataUrl(presetId) {
         <circle cx="64" cy="64" r="34" fill="rgba(255,255,255,0.15)"/>
         <circle cx="64" cy="64" r="22" fill="none" stroke="white" stroke-width="6"/>
         <circle cx="64" cy="64" r="8" fill="white"/>
+      </svg>
+    `);
+  }
+
+  if (id === "4") {
+    return svgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#d35400"/><stop offset="1" stop-color="#f1c40f"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <path d="M64 22l13 26 29 4-21 20 5 29-26-13-26 13 5-29-21-20 29-4z" fill="rgba(255,255,255,0.95)"/>
+        <circle cx="64" cy="61" r="12" fill="rgba(211,84,0,0.72)"/>
       </svg>
     `);
   }
@@ -373,12 +407,21 @@ export async function setAvatarPreset(presetId) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
-  const dataUrl = presetAvatarDataUrl(presetId);
+  const id = String(presetId || "1");
+  const profile = await getProfile(user.uid);
+  const requiredRank = AVATAR_PRESET_REQUIREMENTS[id] || "Explorer";
+  const currentRank = getRankFromXp(profile?.xp || 0);
+
+  if (!doesRankMeetRequirement(currentRank, requiredRank)) {
+    throw new Error(`Preset ${id} unlocks at ${requiredRank} rank.`);
+  }
+
+  const dataUrl = presetAvatarDataUrl(id);
   await updateProfile(user, { photoURL: dataUrl });
   await setDoc(userRef(user.uid), {
     photoURL: dataUrl,
     avatarType: "preset",
-    avatarPreset: String(presetId),
+    avatarPreset: id,
     updatedAt: serverTimestamp()
   }, { merge: true });
 

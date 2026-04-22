@@ -25,6 +25,7 @@ const AUTH_REQUIRED_SECTIONS = new Set(["settings", "friends", "messages"]);
 let currentState = {
   user: null,
   profile: null,
+  socialError: null,
   friends: [],
   blocked: [],
   incomingRequests: [],
@@ -38,6 +39,10 @@ let authMode = "login";
 const baseOpenAccountArea = typeof window.openAccountArea === "function"
   ? window.openAccountArea.bind(window)
   : null;
+const FRIENDS_SUBSECTIONS = new Set(["friends", "requests", "blocked"]);
+let copiedUserIdValue = null;
+let copiedUserIdUntil = 0;
+let copiedUserIdTimer = null;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -87,6 +92,47 @@ function progressPercent(xp) {
   const info = getRankInfo(xp);
   if (xp >= 20) return 100;
   return Math.max(0, Math.min(100, ((xp - info.start) / Math.max(1, info.end - info.start)) * 100));
+}
+
+function normalizeAccountSection(section = "info") {
+  const nextSection = String(section || "info").trim().toLowerCase();
+  return nextSection === "friends" ? "info" : nextSection;
+}
+
+function isFriendsView(section = "info", sub = null) {
+  const rawSection = String(section || "info").trim().toLowerCase();
+  return rawSection === "friends" || FRIENDS_SUBSECTIONS.has(String(sub || "").trim().toLowerCase());
+}
+
+function isUserIdCopied(uid) {
+  return copiedUserIdValue === uid && Date.now() < copiedUserIdUntil;
+}
+
+function scheduleCopiedUserIdReset() {
+  if (copiedUserIdTimer) {
+    window.clearTimeout(copiedUserIdTimer);
+    copiedUserIdTimer = null;
+  }
+
+  const remaining = copiedUserIdUntil - Date.now();
+  if (remaining <= 0) {
+    copiedUserIdValue = null;
+    copiedUserIdUntil = 0;
+    return;
+  }
+
+  copiedUserIdTimer = window.setTimeout(() => {
+    copiedUserIdValue = null;
+    copiedUserIdUntil = 0;
+    copiedUserIdTimer = null;
+    renderAuth(currentState);
+  }, remaining);
+}
+
+function markUserIdCopied(uid) {
+  copiedUserIdValue = uid;
+  copiedUserIdUntil = Date.now() + 5000;
+  scheduleCopiedUserIdReset();
 }
 
 function formatDateOnly(value) {
@@ -193,7 +239,9 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
   }
 
   try {
-    const nextSection = String(section || "info").toLowerCase();
+    const requestedSection = String(section || "info").toLowerCase();
+    const nextSection = normalizeAccountSection(requestedSection);
+    const nextSub = isFriendsView(requestedSection, sub) ? (sub || "friends") : sub;
 
     document.querySelectorAll(".account-section").forEach((el) => {
       el.classList.toggle("active", el.dataset.section === nextSection);
@@ -203,8 +251,7 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
       button.classList.toggle("active", button.dataset.target === nextSection);
     });
 
-    if (nextSection === "friends") {
-      const nextSub = sub || "friends";
+    if (isFriendsView(requestedSection, sub)) {
       showFriendsSubsection(nextSub);
       if (currentState.user && targetId) {
         viewProfileById(targetId).catch((error) => {
@@ -212,10 +259,7 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
         });
       }
       syncQuery(nextSection, nextSub, targetId);
-      return;
-    }
-
-    if (nextSection === "messages" && currentState.user) {
+    } else if (nextSection === "messages" && currentState.user) {
       if (typeof window.PanategwaMessagesOpen === "function") {
         window.PanategwaMessagesOpen(sub || "system", targetId || null);
       } else if (typeof window.PanategwaMessagesRender === "function") {
@@ -270,6 +314,7 @@ function renderAuth(state) {
   const avatar = user.photoURL || profile.photoURL
     ? `<img src="${escapeHtml(user.photoURL || profile.photoURL)}" alt="Avatar" class="account-avatar" />`
     : `<div class="account-avatar-placeholder">${escapeHtml(initials(username))}</div>`;
+  const copied = isUserIdCopied(user.uid);
 
   info.innerHTML = `
     <div class="account-header">
@@ -289,8 +334,8 @@ function renderAuth(state) {
         <span>Account ID</span>
         <strong style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
           <span>${escapeHtml(user.uid)}</span>
-          <button id="copy-user-id-btn" type="button" class="copy-icon-btn" aria-label="Copy account ID" title="Copy account ID">
-            ${copyIcon()}
+          <button id="copy-user-id-btn" type="button" class="copy-icon-btn" aria-label="${copied ? "Copied account ID" : "Copy account ID"}" title="${copied ? "Copied" : "Copy account ID"}">
+            ${copied ? checkIcon() : copyIcon()}
           </button>
         </strong>
       </div>
@@ -305,10 +350,8 @@ function renderAuth(state) {
   $("copy-user-id-btn")?.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(user.uid);
-      $("copy-user-id-btn").innerHTML = checkIcon();
-      setTimeout(() => {
-        if ($("copy-user-id-btn")) $("copy-user-id-btn").innerHTML = copyIcon();
-      }, 1500);
+      markUserIdCopied(user.uid);
+      renderAuth(currentState);
     } catch {
       window.prompt("Copy this ID:", user.uid);
     }
@@ -426,11 +469,16 @@ function profileAvatarMarkup(profile) {
 
 function renderFriends(state) {
   const friendsStatus = $("friends-status");
+  const friendsWarning = $("friends-warning");
   const friendsList = $("friends-list");
   const blockedList = $("blocked-list");
   const requestsList = $("requests-list");
 
   if (!state.user) {
+    if (friendsWarning) {
+      friendsWarning.textContent = "";
+      friendsWarning.classList.add("section-hidden");
+    }
     if (friendsStatus) friendsStatus.textContent = "Log in to use the friends system.";
     if (friendsList) friendsList.innerHTML = `<div class="msg-empty">Log in to see your friend list.</div>`;
     if (blockedList) blockedList.innerHTML = `<div class="msg-empty">Log in to manage blocked users.</div>`;
@@ -457,6 +505,11 @@ function renderFriends(state) {
 
   if (friendsStatus) {
     friendsStatus.textContent = `${friends.length} friends. ${incoming.length} incoming requests. ${getUnreadIncomingCount()} unread messages.`;
+  }
+
+  if (friendsWarning) {
+    friendsWarning.textContent = state.socialError || "";
+    friendsWarning.classList.toggle("section-hidden", !state.socialError);
   }
 
   if (friendsList) {
@@ -588,7 +641,7 @@ function bindNavigation() {
     }
 
     if (sectionButton.dataset.friendsSubtab) {
-      window.openAccountArea("friends", sectionButton.dataset.friendsSubtab, currentState.selectedProfileId || null);
+      window.openAccountArea("info", sectionButton.dataset.friendsSubtab, currentState.selectedProfileId || null);
     }
   });
 
@@ -685,7 +738,7 @@ function bindFriends() {
       if ($("friend-id-input")) $("friend-id-input").value = "";
       if ($("friend-note-input")) $("friend-note-input").value = "";
       setStatus("Friend request sent.", "success");
-      window.openAccountArea("friends", "requests");
+      window.openAccountArea("info", "requests");
     } catch (error) {
       setStatus(error?.message || "Could not send friend request.", "error");
       window.alert(error?.message || "Could not send friend request.");
@@ -698,7 +751,7 @@ function bindFriends() {
       if ($("friend-id-input")) $("friend-id-input").value = "";
       if ($("friend-note-input")) $("friend-note-input").value = "";
       setStatus("User blocked.", "success");
-      window.openAccountArea("friends", "blocked");
+      window.openAccountArea("info", "blocked");
     } catch (error) {
       setStatus(error?.message || "Could not block user.", "error");
       window.alert(error?.message || "Could not block user.");
@@ -716,7 +769,7 @@ function bindFriends() {
     try {
       if (action === "friend-view" || action === "request-view-profile") {
         await viewProfileById(uid);
-        window.openAccountArea("friends", "friends", uid);
+        window.openAccountArea("info", "friends", uid);
         return;
       }
 
@@ -752,21 +805,21 @@ function bindFriends() {
         await respondToFriendRequest(id, "accept");
         await viewProfileById(uid);
         setStatus("Friend request accepted.", "success");
-        window.openAccountArea("friends", "friends", uid);
+        window.openAccountArea("info", "friends", uid);
         return;
       }
 
       if (action === "request-ignore") {
         await respondToFriendRequest(id, "ignore");
         setStatus("Friend request ignored.", "info");
-        window.openAccountArea("friends", "requests");
+        window.openAccountArea("info", "requests");
         return;
       }
 
       if (action === "request-decline") {
         await respondToFriendRequest(id, "decline");
         setStatus("Friend request declined.", "info");
-        window.openAccountArea("friends", "requests");
+        window.openAccountArea("info", "requests");
       }
     } catch (error) {
       console.error(error);
@@ -786,6 +839,15 @@ function start() {
   setStatus("Checking account...", "info");
 
   watchAuth(async (user, profile) => {
+    if (!user || copiedUserIdValue !== user.uid) {
+      copiedUserIdValue = null;
+      copiedUserIdUntil = 0;
+      if (copiedUserIdTimer) {
+        window.clearTimeout(copiedUserIdTimer);
+        copiedUserIdTimer = null;
+      }
+    }
+
     currentState.user = user;
     currentState.profile = profile || (user ? await getProfile(user.uid) : null);
     renderAll(currentState);

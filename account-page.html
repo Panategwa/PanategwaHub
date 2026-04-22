@@ -19,9 +19,20 @@
 
   <script>
     (function () {
+      function normalizeSection(section) {
+        var next = String(section || "info").toLowerCase();
+        return next === "friends" ? "info" : next;
+      }
+
+      function isFriendsView(section, sub) {
+        var next = String(section || "info").toLowerCase();
+        var nextSub = String(sub || "").toLowerCase();
+        return next === "friends" || nextSub === "friends" || nextSub === "requests" || nextSub === "blocked";
+      }
+
       function syncAccountUrl(section, sub, targetId) {
         var url = new URL(window.location.href);
-        url.searchParams.set("tab", section || "info");
+        url.searchParams.set("tab", normalizeSection(section || "info"));
         if (sub) url.searchParams.set("sub", sub);
         else url.searchParams.delete("sub");
         if (targetId) url.searchParams.set("target", targetId);
@@ -40,7 +51,9 @@
       }
 
       window.openAccountArea = function (section, sub, targetId) {
-        var nextSection = String(section || "info").toLowerCase();
+        var requestedSection = String(section || "info").toLowerCase();
+        var nextSection = normalizeSection(requestedSection);
+        var nextSub = isFriendsView(requestedSection, sub) ? (sub || "friends") : sub;
 
         document.querySelectorAll(".account-section").forEach(function (panel) {
           panel.classList.toggle("active", panel.dataset.section === nextSection);
@@ -50,11 +63,11 @@
           button.classList.toggle("active", button.dataset.target === nextSection);
         });
 
-        if (nextSection === "friends") {
-          baseShowFriendsSubsection(sub || "friends");
+        if (isFriendsView(requestedSection, sub)) {
+          baseShowFriendsSubsection(nextSub);
         }
 
-        syncAccountUrl(nextSection, sub || null, targetId || null);
+        syncAccountUrl(nextSection, nextSub || null, targetId || null);
       };
 
       window.PanategwaSetAuthMode = function (mode) {
@@ -608,6 +621,39 @@
       line-height: 1.4;
     }
 
+    .avatar-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .avatar-choice {
+      display: grid;
+      gap: 6px;
+      place-items: center;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .avatar-choice img {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .avatar-choice small {
+      opacity: 0.76;
+      font-size: 0.82rem;
+      line-height: 1.25;
+    }
+
+    .avatar-choice[disabled] {
+      cursor: not-allowed;
+      opacity: 0.58;
+      filter: saturate(0.75);
+    }
+
     .messages-wrap {
       display: grid;
       gap: 14px;
@@ -826,6 +872,11 @@
       display: grid;
       gap: 14px;
       margin-bottom: 16px;
+    }
+
+    .friends-warning {
+      margin: 0;
+      color: #ffe0a3;
     }
 
     .friends-subtabs {
@@ -1113,16 +1164,15 @@
   <div class="account-wrap">
     <div class="page-head">
       <h1>Account</h1>
-      <p class="page-subtitle">Profile, progress, friends, and messages all in one place.</p>
+      <p class="page-subtitle">Profile, friends, progress, and messages all in one place.</p>
     </div>
 
     <p id="auth-status" class="status" data-kind="info">Checking account...</p>
 
     <div class="tab-bar">
-      <button type="button" class="tab-button active" id="tab-info" data-target="info" onclick="window.openAccountArea('info')">Info</button>
+      <button type="button" class="tab-button active" id="tab-info" data-target="info" onclick="window.openAccountArea('info')">Profile</button>
       <button type="button" class="tab-button" id="tab-settings" data-target="settings" onclick="window.openAccountArea('settings')">Account settings</button>
       <button type="button" class="tab-button" id="tab-progress" data-target="progress" onclick="window.openAccountArea('progress')">Progress</button>
-      <button type="button" class="tab-button" id="tab-friends" data-target="friends" onclick="window.openAccountArea('friends', 'friends')">Friends</button>
       <button type="button" class="tab-button" id="tab-messages" data-target="messages" onclick="window.openAccountArea('messages', 'system')">Messages</button>
     </div>
 
@@ -1235,7 +1285,7 @@
 
       <section class="card" id="account-card" style="display:none; margin-top: 16px;">
         <div class="subsection-head">
-          <h2>Your info</h2>
+          <h2>Your profile</h2>
           <span class="profile-badge">Signed in</span>
         </div>
         <div id="user-info"></div>
@@ -1272,20 +1322,30 @@
 
           <div class="setting-card">
             <div class="setting-title">Profile picture</div>
-            <p id="security-note" class="setting-desc">Pick a preset, use a letter, or reset to default.</p>
-            <div class="button-row">
-              <button id="avatar-preset-1-btn" type="button" style="display:grid; gap:6px; place-items:center;">
-                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%230984e3"/%3E%3Cpath d="M64 30l10 20 22 3-16 16 4 22-20-10-20 10 4-22-16-16 22-3z" fill="white"/%3E%3C/svg%3E' style="width:34px;height:34px;border-radius:50%;object-fit:cover;">
-                <span>Preset 1</span>
+            <p id="security-note" class="setting-desc">Pick a preset, use a letter, or reset to default. Two presets unlock at Explorer, one at Adventurer, and one at Veteran.</p>
+            <div class="avatar-grid">
+              <button id="avatar-preset-1-btn" type="button" class="avatar-choice">
+                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%230984e3"/%3E%3Cpath d="M64 30l10 20 22 3-16 16 4 22-20-10-20 10 4-22-16-16 22-3z" fill="white"/%3E%3C/svg%3E'>
+                <span data-avatar-name>Preset 1</span>
+                <small data-avatar-rank-note>Explorer rank</small>
               </button>
-              <button id="avatar-preset-2-btn" type="button" style="display:grid; gap:6px; place-items:center;">
-                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%236c5ce7"/%3E%3Ccircle cx="64" cy="66" r="26" fill="rgba(255,255,255,0.15)"/%3E%3Ccircle cx="50" cy="58" r="5" fill="white"/%3E%3Ccircle cx="78" cy="58" r="5" fill="white"/%3E%3C/svg%3E' style="width:34px;height:34px;border-radius:50%;object-fit:cover;">
-                <span>Preset 2</span>
+              <button id="avatar-preset-2-btn" type="button" class="avatar-choice">
+                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%236c5ce7"/%3E%3Ccircle cx="64" cy="66" r="26" fill="rgba(255,255,255,0.15)"/%3E%3Ccircle cx="50" cy="58" r="5" fill="white"/%3E%3Ccircle cx="78" cy="58" r="5" fill="white"/%3E%3C/svg%3E'>
+                <span data-avatar-name>Preset 2</span>
+                <small data-avatar-rank-note>Explorer rank</small>
               </button>
-              <button id="avatar-preset-3-btn" type="button" style="display:grid; gap:6px; place-items:center;">
-                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%2300b894"/%3E%3Ccircle cx="64" cy="64" r="22" fill="none" stroke="white" stroke-width="6"/%3E%3Ccircle cx="64" cy="64" r="8" fill="white"/%3E%3C/svg%3E' style="width:34px;height:34px;border-radius:50%;object-fit:cover;">
-                <span>Preset 3</span>
+              <button id="avatar-preset-3-btn" type="button" class="avatar-choice">
+                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%2300b894"/%3E%3Ccircle cx="64" cy="64" r="22" fill="none" stroke="white" stroke-width="6"/%3E%3Ccircle cx="64" cy="64" r="8" fill="white"/%3E%3C/svg%3E'>
+                <span data-avatar-name>Preset 3</span>
+                <small data-avatar-rank-note>Adventurer rank</small>
               </button>
+              <button id="avatar-preset-4-btn" type="button" class="avatar-choice">
+                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%23d35400"/%3E%3Cpath d="M64 22l13 26 29 4-21 20 5 29-26-13-26 13 5-29-21-20 29-4z" fill="white"/%3E%3Ccircle cx="64" cy="61" r="12" fill="%23d35400"/%3E%3C/svg%3E'>
+                <span data-avatar-name>Preset 4</span>
+                <small data-avatar-rank-note>Veteran rank</small>
+              </button>
+            </div>
+            <div class="button-row" style="margin-top:10px;">
               <button id="avatar-default-btn" type="button">Default</button>
             </div>
             <div class="field-row" style="margin-top:10px;">
@@ -1298,6 +1358,7 @@
 
           <div class="setting-card">
             <div class="setting-title">Email</div>
+            <p id="settings-provider-note" class="setting-desc">Email and password changes work for email/password accounts.</p>
             <div class="field-row">
               <input id="change-email-input" type="email" placeholder="New email" />
               <input id="change-email-password" type="password" placeholder="Current password" />
@@ -1374,12 +1435,12 @@
       </div>
     </section>
 
-    <section class="account-section" data-section="friends">
+    <section class="account-section" data-section="info">
       <div class="card">
         <div class="subsection-head">
           <div>
-            <h2>Friends</h2>
-            <p class="section-note">Send requests, accept them from your inbox, and manage your friend list.</p>
+            <h2>Friends and requests</h2>
+            <p class="section-note">Your profile, friend list, requests, and profile previews now live in the same tab.</p>
           </div>
         </div>
 
@@ -1395,6 +1456,7 @@
         <div class="friends-toolbar">
           <div>
             <p id="friends-status">Loading friends...</p>
+            <p id="friends-warning" class="section-note friends-warning section-hidden"></p>
           </div>
 
           <div class="field-row">
@@ -1408,9 +1470,9 @@
           </div>
 
           <div class="friends-subtabs">
-            <button type="button" class="tab-chip active" data-friends-subtab="friends" onclick="window.openAccountArea('friends', 'friends')">Friends</button>
-            <button type="button" class="tab-chip" data-friends-subtab="requests" onclick="window.openAccountArea('friends', 'requests')">Requests</button>
-            <button type="button" class="tab-chip" data-friends-subtab="blocked" onclick="window.openAccountArea('friends', 'blocked')">Blocked</button>
+            <button type="button" class="tab-chip active" data-friends-subtab="friends" onclick="window.openAccountArea('info', 'friends')">Friends</button>
+            <button type="button" class="tab-chip" data-friends-subtab="requests" onclick="window.openAccountArea('info', 'requests')">Requests</button>
+            <button type="button" class="tab-chip" data-friends-subtab="blocked" onclick="window.openAccountArea('info', 'blocked')">Blocked</button>
           </div>
         </div>
 

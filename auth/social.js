@@ -33,6 +33,7 @@ const socialState = {
   user: null,
   profile: null,
   settings: { ...DEFAULT_SETTINGS },
+  socialError: null,
   friends: [],
   blocked: [],
   incomingRequests: [],
@@ -56,6 +57,7 @@ let unsubGroupInvites = null;
 const groupMessageUnsubs = new Map();
 let knownMessageIds = new Set();
 let messageToastReady = false;
+const listenerErrors = new Map();
 
 function cloneState() {
   return {
@@ -104,9 +106,13 @@ function sortNewestFirst(list) {
   return [...list].sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
 }
 
+function normalizeAccountSection(section) {
+  return String(section || "info").trim().toLowerCase() === "friends" ? "info" : String(section || "info").trim().toLowerCase();
+}
+
 function buildAccountHref(section, sub = null, targetId = null) {
   const params = new URLSearchParams();
-  if (section) params.set("tab", section);
+  if (section) params.set("tab", normalizeAccountSection(section));
   if (sub) params.set("sub", sub);
   if (targetId) params.set("target", targetId);
   const query = params.toString();
@@ -187,23 +193,72 @@ async function createMessage(payload) {
   });
 }
 
-async function findPendingFriendRequestBetween(sourceUid, otherUid) {
-  const source = cleanUid(sourceUid);
-  const other = cleanUid(otherUid);
-  if (!source || !other) return null;
+function firstListenerError() {
+  return [...listenerErrors.values()][0] || null;
+}
 
-  const qs = await getDocs(query(collection(db, "messages"), where("participants", "array-contains", source)));
-  for (const snap of qs.docs) {
-    const data = snap.data();
-    if (data.kind !== "friend-request") continue;
-    if ((data.status || "pending") !== "pending") continue;
-    const participants = unique(data.participants);
-    if (participants.includes(other)) {
-      return { id: snap.id, ...data };
-    }
+function permissionSetupMessage() {
+  return "Firestore rules are blocking part of the social system. Allow signed-in users to access their own user document plus message docs where their UID is in participants.";
+}
+
+function friendlyRealtimeError(scope, error) {
+  const code = String(error?.code || "");
+  if (code === "permission-denied") {
+    return scope.startsWith("group")
+      ? "Firestore rules are blocking group chat data. Friends can still work, but group chats and invites need matching Firestore permissions."
+      : permissionSetupMessage();
   }
 
-  return null;
+  return `Could not load ${scope}.`;
+}
+
+function clearListenerError(key, shouldEmit = false) {
+  if (!listenerErrors.delete(key)) return;
+  socialState.socialError = firstListenerError();
+  if (shouldEmit) emit();
+}
+
+function setListenerError(key, scope, error, reset = null) {
+  console.error(`${scope} listener error:`, error);
+  listenerErrors.set(key, friendlyRealtimeError(scope, error));
+  socialState.socialError = firstListenerError();
+  if (typeof reset === "function") reset();
+  emit();
+}
+
+async function getCurrentUserMessages() {
+  const currentUid = cleanUid(auth.currentUser?.uid);
+  if (!currentUid) return [];
+
+  if (socialState.user?.uid === currentUid && Array.isArray(socialState.messages) && socialState.messages.length) {
+    return [...socialState.messages];
+  }
+
+  const qs = await getDocs(query(collection(db, "messages"), where("participants", "array-contains", currentUid)));
+  return qs.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+}
+
+async function findPendingFriendRequestsWithUser(otherUid) {
+  const currentUid = cleanUid(auth.currentUser?.uid);
+  const other = cleanUid(otherUid);
+  if (!currentUid || !other) return [];
+
+  const messages = await getCurrentUserMessages();
+  return messages.filter((data) => {
+    if (data.kind !== "friend-request") return false;
+    if ((data.status || "pending") !== "pending") return false;
+    const participants = unique(data.participants);
+    return participants.includes(currentUid) && participants.includes(other);
+  });
+}
+
+function friendlyActionError(error) {
+  const code = String(error?.code || "");
+  if (code === "permission-denied") {
+    return permissionSetupMessage();
+  }
+
+  return error?.message || "Social action failed.";
 }
 
 function toastConfigForMessage(message) {
@@ -272,47 +327,52 @@ function maybeToastNewMessages(messages) {
 }
 
 async function sendFriendRequestById(targetUid, note = "") {
-  const user = auth.currentUser;
-  const id = cleanUid(targetUid);
-  if (!user) throw new Error("Not logged in.");
-  if (!id) throw new Error("Enter a valid user ID.");
-  if (id === user.uid) throw new Error("You cannot send a request to yourself.");
+  try {
+    const user = auth.currentUser;
+    const id = cleanUid(targetUid);
+    if (!user) throw new Error("Not logged in.");
+    if (!id) throw new Error("Enter a valid user ID.");
+    if (id === user.uid) throw new Error("You cannot send a request to yourself.");
 
-  const me = await loadUser(user.uid);
-  const target = await loadUser(id);
-  if (!target) throw new Error("That user was not found.");
+    const me = await loadUser(user.uid);
+    const target = await loadUser(id);
+    if (!target) throw new Error("That user was not found.");
 
-  const meSettings = { ...DEFAULT_SETTINGS, ...(me?.socialSettings || {}) };
-  const targetSettings = { ...DEFAULT_SETTINGS, ...(target?.socialSettings || {}) };
+    const meSettings = { ...DEFAULT_SETTINGS, ...(me?.socialSettings || {}) };
+    const targetSettings = { ...DEFAULT_SETTINGS, ...(target?.socialSettings || {}) };
 
-  if (!meSettings.systemEnabled || !meSettings.requestsEnabled) throw new Error("Friend requests are turned off.");
-  if (!targetSettings.systemEnabled || !targetSettings.requestsEnabled) throw new Error("That user is not accepting friend requests.");
-  if (unique(me?.friends).includes(id)) throw new Error("You are already friends with that user.");
-  if (unique(me?.blocked).includes(id) || unique(target?.blocked).includes(user.uid)) throw new Error("You cannot send a request to this user.");
+    if (!meSettings.systemEnabled || !meSettings.requestsEnabled) throw new Error("Friend requests are turned off.");
+    if (!targetSettings.systemEnabled || !targetSettings.requestsEnabled) throw new Error("That user is not accepting friend requests.");
+    if (unique(me?.friends).includes(id)) throw new Error("You are already friends with that user.");
+    if (unique(me?.blocked).includes(id) || unique(target?.blocked).includes(user.uid)) throw new Error("You cannot send a request to this user.");
 
-  const outgoingPending = await findPendingFriendRequestBetween(user.uid, id);
-  if (outgoingPending) throw new Error("You already have a pending friend request to that user.");
+    const pendingBetween = await findPendingFriendRequestsWithUser(id);
+    const outgoingPending = pendingBetween.find((request) => request.fromUid === user.uid && request.toUid === id);
+    if (outgoingPending) throw new Error("You already have a pending friend request to that user.");
 
-  const incomingPending = await findPendingFriendRequestBetween(id, user.uid);
-  if (incomingPending) throw new Error("That user already sent you a request. Open your requests to accept it.");
+    const incomingPending = pendingBetween.find((request) => request.fromUid === id && request.toUid === user.uid);
+    if (incomingPending) throw new Error("That user already sent you a request. Open your requests to accept it.");
 
-  const ref = await createMessage({
-    fromUid: user.uid,
-    toUid: id,
-    participants: [user.uid, id],
-    fromName: usernameOf(me),
-    toName: usernameOf(target),
-    kind: "friend-request",
-    status: "pending",
-    title: "Friend request",
-    body: note ? `${usernameOf(me)}: ${note}` : `${usernameOf(me)} sent you a friend request.`,
-    targetSection: "friends",
-    targetSubSection: "requests",
-    requestId: null,
-    readBy: [user.uid]
-  });
+    const ref = await createMessage({
+      fromUid: user.uid,
+      toUid: id,
+      participants: [user.uid, id],
+      fromName: usernameOf(me),
+      toName: usernameOf(target),
+      kind: "friend-request",
+      status: "pending",
+      title: "Friend request",
+      body: note ? `${usernameOf(me)}: ${note}` : `${usernameOf(me)} sent you a friend request.`,
+      targetSection: "info",
+      targetSubSection: "requests",
+      requestId: null,
+      readBy: [user.uid]
+    });
 
-  return ref.id;
+    return ref.id;
+  } catch (error) {
+    throw new Error(friendlyActionError(error));
+  }
 }
 
 async function respondToFriendRequest(requestId, action) {
@@ -349,7 +409,7 @@ async function respondToFriendRequest(requestId, action) {
       kind: "friend-accepted",
       title: "Friend request accepted",
       body: `${currentName} accepted your friend request.`,
-      targetSection: "friends",
+      targetSection: "info",
       targetSubSection: "friends",
       targetId: user.uid,
       readBy: [user.uid]
@@ -892,9 +952,11 @@ function startRealtime() {
     teardownGroupListeners();
 
     if (!user) {
+      listenerErrors.clear();
       socialState.user = null;
       socialState.profile = null;
       socialState.settings = { ...DEFAULT_SETTINGS };
+      socialState.socialError = null;
       socialState.friends = [];
       socialState.blocked = [];
       socialState.incomingRequests = [];
@@ -915,9 +977,11 @@ function startRealtime() {
       return;
     }
 
+    listenerErrors.clear();
     socialState.user = user;
     socialState.profile = await ensureUserProfile(user);
     socialState.settings = { ...DEFAULT_SETTINGS, ...(socialState.profile?.socialSettings || {}) };
+    socialState.socialError = null;
     socialState.friends = unique(socialState.profile?.friends);
     socialState.blocked = unique(socialState.profile?.blocked);
     socialState.selectedProfile = publicProfile(socialState.profile, user.uid);
@@ -926,6 +990,7 @@ function startRealtime() {
     emit();
 
     unsubProfile = onSnapshot(userRef(user.uid), async (snap) => {
+      clearListenerError("profile");
       const fresh = snap.exists() ? snap.data() : null;
       socialState.profile = fresh;
       socialState.settings = { ...DEFAULT_SETTINGS, ...(fresh?.socialSettings || {}) };
@@ -936,9 +1001,12 @@ function startRealtime() {
         : publicProfile(fresh, user.uid);
       await loadFriendProfiles([...socialState.friends, ...socialState.blocked]);
       emit();
+    }, (error) => {
+      setListenerError("profile", "profile", error);
     });
 
     unsubMessages = onSnapshot(query(collection(db, "messages"), where("participants", "array-contains", user.uid)), (snap) => {
+      clearListenerError("messages");
       const all = [];
       snap.forEach(d => all.push({ id: d.id, ...d.data() }));
       const sorted = sortNewestFirst(all);
@@ -948,9 +1016,17 @@ function startRealtime() {
       socialState.outgoingRequests = sortNewestFirst(sorted.filter(m => m.kind === "friend-request" && m.fromUid === user.uid && (m.status || "pending") === "pending"));
       socialState.unreadCount = sorted.filter(m => m.toUid === user.uid && !unique(m.readBy).includes(user.uid)).length;
       emit();
+    }, (error) => {
+      setListenerError("messages", "messages", error, () => {
+        socialState.messages = [];
+        socialState.incomingRequests = [];
+        socialState.outgoingRequests = [];
+        socialState.unreadCount = 0;
+      });
     });
 
     unsubGroupChats = onSnapshot(query(collection(db, "groupChats"), where("members", "array-contains", user.uid)), (snap) => {
+      clearListenerError("groupChats");
       const chats = [];
       snap.forEach(d => chats.push({ id: d.id, ...d.data() }));
       socialState.groupChats = sortNewestFirst(chats.filter(c => !c.deleted));
@@ -972,22 +1048,38 @@ function startRealtime() {
       for (const chat of socialState.groupChats) {
         if (groupMessageUnsubs.has(chat.id)) continue;
         const unsub = onSnapshot(collection(db, "groupChats", chat.id, "messages"), (msgSnap) => {
+          clearListenerError(`groupMessage:${chat.id}`);
           const arr = [];
           msgSnap.forEach(m => arr.push({ id: m.id, ...m.data() }));
           socialState.groupMessagesByChat[chat.id] = sortNewestFirst(arr);
           emit();
+        }, (error) => {
+          setListenerError(`groupMessage:${chat.id}`, "group messages", error, () => {
+            delete socialState.groupMessagesByChat[chat.id];
+          });
         });
         groupMessageUnsubs.set(chat.id, unsub);
       }
 
       emit();
+    }, (error) => {
+      setListenerError("groupChats", "group chats", error, () => {
+        socialState.groupChats = [];
+        socialState.groupMessagesByChat = {};
+        socialState.selectedGroupChatId = null;
+      });
     });
 
     unsubGroupInvites = onSnapshot(query(collection(db, "groupChatInvites"), where("toUid", "==", user.uid)), (snap) => {
+      clearListenerError("groupInvites");
       const invites = [];
       snap.forEach(d => invites.push({ id: d.id, ...d.data() }));
       socialState.groupInvites = sortNewestFirst(invites.filter(i => i.status === "pending"));
       emit();
+    }, (error) => {
+      setListenerError("groupInvites", "group invites", error, () => {
+        socialState.groupInvites = [];
+      });
     });
   });
 }

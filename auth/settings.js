@@ -3,6 +3,9 @@ import {
   changeEmail,
   changePassword,
   setAvatarPreset,
+  AVATAR_PRESET_REQUIREMENTS,
+  doesRankMeetRequirement,
+  getRankFromXp,
   setAvatarLetter,
   useDefaultProfilePicture,
   resendVerificationEmail,
@@ -14,6 +17,7 @@ import {
 } from "./auth.js";
 
 const $ = (id) => document.getElementById(id);
+const PRESET_IDS = ["1", "2", "3", "4"];
 
 function setStatus(message, kind = "info") {
   const el = $("auth-status");
@@ -26,7 +30,7 @@ function syncForm(profile, user) {
   const usernameInput = $("profile-username");
   const emailInput = $("change-email-input");
   const letterInput = $("avatar-letter-input");
-  const note = $("security-note");
+  const note = $("settings-provider-note");
 
   if (usernameInput && document.activeElement !== usernameInput) {
     usernameInput.value = profile?.username || user.displayName || "";
@@ -45,6 +49,31 @@ function syncForm(profile, user) {
     note.textContent = providerIds.has("password")
       ? "Email and password changes work for email/password accounts."
       : "This account uses Google sign-in, so email/password changes are not available here.";
+  }
+}
+
+function syncAvatarPresetLocks(profile) {
+  const currentRank = getRankFromXp(profile?.xp || 0);
+
+  for (const presetId of PRESET_IDS) {
+    const button = $(`avatar-preset-${presetId}-btn`);
+    if (!button) continue;
+
+    const requiredRank = AVATAR_PRESET_REQUIREMENTS[presetId] || "Explorer";
+    const unlocked = doesRankMeetRequirement(currentRank, requiredRank);
+    const note = button.querySelector("[data-avatar-rank-note]");
+
+    button.disabled = !unlocked;
+    button.dataset.locked = unlocked ? "false" : "true";
+    button.title = unlocked
+      ? `Unlocked at ${requiredRank}`
+      : `Unlocks at ${requiredRank} rank`;
+
+    if (note) {
+      note.textContent = unlocked
+        ? `${requiredRank} rank`
+        : `Unlocks at ${requiredRank}`;
+    }
   }
 }
 
@@ -140,6 +169,7 @@ function bindButtons() {
   $("avatar-preset-1-btn")?.addEventListener("click", () => applyAvatarPreset("1"));
   $("avatar-preset-2-btn")?.addEventListener("click", () => applyAvatarPreset("2"));
   $("avatar-preset-3-btn")?.addEventListener("click", () => applyAvatarPreset("3"));
+  $("avatar-preset-4-btn")?.addEventListener("click", () => applyAvatarPreset("4"));
   $("avatar-default-btn")?.addEventListener("click", applyDefaultAvatar);
   $("avatar-letter-btn")?.addEventListener("click", applyAvatarLetter);
 
@@ -199,7 +229,9 @@ function start() {
       return;
     }
 
-    syncForm(profile || (await getProfile(user.uid)) || {}, user);
+    const nextProfile = profile || (await getProfile(user.uid)) || {};
+    syncForm(nextProfile, user);
+    syncAvatarPresetLocks(nextProfile);
     setStatus("Settings ready.", "info");
   });
 }

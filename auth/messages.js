@@ -58,7 +58,7 @@ function resolveMessageTarget(msg) {
 
 
   if (msg.kind === "friend-request") {
-    return { section: "friends", sub: "requests", targetId: msg.fromUid || msg.targetId || null };
+    return { section: "info", sub: "requests", targetId: msg.fromUid || msg.targetId || null };
   }
 
   if (msg.kind === "chat") {
@@ -451,7 +451,7 @@ function bind(root) {
       if (action === "accept-friend-request") {
         await respondToFriendRequest(id, "accept");
         if (typeof window.openAccountArea === "function") {
-          window.openAccountArea("friends", "friends", uid);
+          window.openAccountArea("info", "friends", uid);
         }
         return;
       }

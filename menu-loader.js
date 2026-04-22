@@ -58,7 +58,7 @@ document.addEventListener("DOMContentLoaded", function () {
   menuHTML += `
     <div class="line">
       <div class="menu-main-title">The Panategwa Hub</div>
-      <div class="menu-sub-title">Alpha</div>
+      <div class="menu-sub-title">0.0.1 - Alpha Testing</div>
     </div>
   `;
 

@@ -1,4 +1,4 @@
-import { auth, db, googleProvider } from "./firebase-config.js";
+import { auth, db, googleProvider, microsoftProvider } from "./firebase-config.js";
 
 import {
   createUserWithEmailAndPassword,
@@ -258,6 +258,17 @@ async function maybeCreateLoginMessage(user) {
   );
 }
 
+function providerIdsForUser(user) {
+  return new Set((user?.providerData || []).map((provider) => provider.providerId));
+}
+
+function socialProviderInfo(user) {
+  const providers = providerIdsForUser(user);
+  if (providers.has("google.com")) return { provider: googleProvider, label: "Google" };
+  if (providers.has("microsoft.com")) return { provider: microsoftProvider, label: "Microsoft" };
+  return null;
+}
+
 async function createAccount(email, password, username) {
   const cleanName = cleanText(username).slice(0, 20);
   const cleanMail = cleanEmail(email);
@@ -307,6 +318,15 @@ async function login(email, password) {
 
 async function loginWithGoogle() {
   const cred = await signInWithPopup(auth, googleProvider);
+  await ensureUserProfile(cred.user);
+  await touchLastLoginOnce(cred.user);
+  await maybeCreateLoginMessage(cred.user);
+  localStorage.setItem("ptg_logged_in", "1");
+  return cred.user;
+}
+
+async function loginWithMicrosoft() {
+  const cred = await signInWithPopup(auth, microsoftProvider);
   await ensureUserProfile(cred.user);
   await touchLastLoginOnce(cred.user);
   await maybeCreateLoginMessage(cred.user);
@@ -416,9 +436,10 @@ async function changeEmail(newEmail, currentPassword) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
-  const providers = new Set((user.providerData || []).map(p => p.providerId));
+  const providers = providerIdsForUser(user);
   if (!providers.has("password")) {
-    throw new Error("This account was created with Google, so email changes are not available here.");
+    const providerInfo = socialProviderInfo(user);
+    throw new Error(`This account uses ${providerInfo?.label || "social"} sign-in, so email changes are not available here.`);
   }
 
   const cleanMail = cleanEmail(newEmail);
@@ -442,9 +463,10 @@ async function changePassword(currentPassword, newPassword) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
-  const providers = new Set((user.providerData || []).map(p => p.providerId));
+  const providers = providerIdsForUser(user);
   if (!providers.has("password")) {
-    throw new Error("This account was created with Google, so password changes are not available here.");
+    const providerInfo = socialProviderInfo(user);
+    throw new Error(`This account uses ${providerInfo?.label || "social"} sign-in, so password changes are not available here.`);
   }
 
   const nextPass = String(newPassword || "");
@@ -477,11 +499,13 @@ async function deleteAccount(password) {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
-  const providerIds = new Set((user.providerData || []).map(p => p.providerId));
+  const providerIds = providerIdsForUser(user);
   const cleanPass = String(password || "");
 
-  if (providerIds.has("google.com") && !providerIds.has("password")) {
-    await reauthenticateWithPopup(user, googleProvider);
+  if (!providerIds.has("password")) {
+    const providerInfo = socialProviderInfo(user);
+    if (!providerInfo) throw new Error("This account needs a supported provider reauthentication flow before it can be deleted.");
+    await reauthenticateWithPopup(user, providerInfo.provider);
   } else {
     if (!cleanPass) throw new Error("Password is required to delete your account.");
     const credential = EmailAuthProvider.credential(user.email, cleanPass);
@@ -522,6 +546,7 @@ export {
   createAccount,
   login,
   loginWithGoogle,
+  loginWithMicrosoft,
   logout,
   saveUsername,
   saveProfilePictureFromFile,

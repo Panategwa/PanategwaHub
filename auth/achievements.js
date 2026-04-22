@@ -41,10 +41,10 @@ const KNOWN_IDS = new Set(ACHIEVEMENTS.map(a => a.id));
 
 let started = false;
 let profileUnsub = null;
+let pollTimer = null;
 let toastQueue = [];
 let toastActive = false;
 let toastTimer = null;
-let pollTimer = null;
 
 function pageId() {
   return (window.location.pathname.split("/").pop() || "index.html").toLowerCase();
@@ -135,8 +135,12 @@ function computeUnlocks(user, profile, pages) {
   add("nocturnal", hour >= 21 || hour < 3);
   add("morning_person", hour >= 3 && hour < 11);
 
-  add("achievement_collector", unlocked.size + pending.length >= 10);
-  add("veteran", unlocked.size + pending.length >= 20);
+  const projectedAchievementCount = unlocked.size + pending.length;
+  const currentXp = typeof profile?.xp === "number" ? profile.xp : unlocked.size;
+  const projectedXp = currentXp + pending.reduce((sum, id) => sum + rewardForId(id), 0);
+
+  add("achievement_collector", projectedAchievementCount >= 10);
+  add("veteran", projectedXp >= 20);
 
   return pending;
 }
@@ -201,7 +205,7 @@ function ensureToastSystem() {
   }
 
   const stackId = "achievement-toast-stack";
-  const stack = () => {
+  const getStack = () => {
     let el = document.getElementById(stackId);
     if (!el) {
       el = document.createElement("div");
@@ -213,12 +217,13 @@ function ensureToastSystem() {
 
   window.PanategwaToast = ({ title = "Message", body = "", xp = null, href = "" } = {}) => {
     toastQueue.push({ title, body, xp, href });
-    if (!toastActive) showNextToast(stack);
+    if (!toastActive) showNextToast();
   };
 
-  function showNextToast(getStack) {
+  function showNextToast() {
     if (toastActive || toastQueue.length === 0) return;
     toastActive = true;
+
     const item = toastQueue.shift();
     const el = document.createElement("div");
     el.className = "achievement-toast";
@@ -230,13 +235,14 @@ function ensureToastSystem() {
     el.addEventListener("click", () => {
       if (item.href) window.location.href = item.href;
     });
+
     getStack().appendChild(el);
 
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => {
       el.remove();
       toastActive = false;
-      showNextToast(getStack);
+      showNextToast();
     }, 5000);
   }
 }
@@ -348,7 +354,7 @@ function renderAchievements(profile) {
 
     return `
       <div class="achievement-card ${isUnlocked ? "unlocked" : "locked"}" id="achievement-card-${achievement.id}" data-achievement-id="${achievement.id}">
-        <div class="achievement-icon">${isUnlocked ? "🏆" : "🔒"}</div>
+        <div class="achievement-icon">${isUnlocked ? "Unlocked" : "Locked"}</div>
         <div>
           <div class="achievement-name">${title}</div>
           <div class="achievement-desc">${desc}</div>
@@ -377,7 +383,7 @@ function startAccountWatcher() {
           ensureToastSystem();
           window.PanategwaToast({
             title: "Achievement unlocked",
-            body: `${achievement.name} — +${achievement.reward} XP`,
+            body: `${achievement.name} - +${achievement.reward} XP`,
             xp: achievement.reward,
             href: "account-page.html?tab=progress"
           });
@@ -426,7 +432,7 @@ function startPoller() {
           ensureToastSystem();
           window.PanategwaToast({
             title: "Achievement unlocked",
-            body: `${achievement.name} — +${achievement.reward} XP`,
+            body: `${achievement.name} - +${achievement.reward} XP`,
             xp: achievement.reward,
             href: "account-page.html?tab=progress"
           });

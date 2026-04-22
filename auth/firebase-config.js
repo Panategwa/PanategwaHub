@@ -3,7 +3,8 @@ import {
   getAuth,
   setPersistence,
   browserLocalPersistence,
-  GoogleAuthProvider
+  GoogleAuthProvider,
+  OAuthProvider
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
@@ -21,8 +22,12 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
+const microsoftProvider = new OAuthProvider("microsoft.com");
+
+googleProvider.setCustomParameters({ prompt: "select_account" });
+microsoftProvider.setCustomParameters({ prompt: "select_account" });
 
 auth.useDeviceLanguage();
 setPersistence(auth, browserLocalPersistence).catch(console.error);
 
-export { app, auth, db, googleProvider };
+export { app, auth, db, googleProvider, microsoftProvider };

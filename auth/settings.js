@@ -27,7 +27,7 @@ function syncForm(profile, user) {
   const usernameInput = $("profile-username");
   const emailInput = $("change-email-input");
   const letterInput = $("avatar-letter-input");
-  const avatarNote = $("security-note");
+  const note = $("security-note");
 
   if (usernameInput && document.activeElement !== usernameInput) {
     usernameInput.value = profile?.username || user.displayName || "";
@@ -42,10 +42,14 @@ function syncForm(profile, user) {
   }
 
   const providerIds = new Set((user.providerData || []).map(p => p.providerId));
-  if (avatarNote) {
-    avatarNote.textContent = providerIds.has("password")
+  const socialProvider = providerIds.has("google.com")
+    ? "Google"
+    : (providerIds.has("microsoft.com") ? "Microsoft" : "social");
+
+  if (note) {
+    note.textContent = providerIds.has("password")
       ? "Email and password changes work for email/password accounts."
-      : "This account uses Google sign-in, so email/password changes are not available here.";
+      : `This account uses ${socialProvider} sign-in, so email/password changes are not available here.`;
   }
 }
 
@@ -141,11 +145,27 @@ function bindButtons() {
   $("avatar-preset-1-btn")?.addEventListener("click", () => applyAvatarPreset("1"));
   $("avatar-preset-2-btn")?.addEventListener("click", () => applyAvatarPreset("2"));
   $("avatar-preset-3-btn")?.addEventListener("click", () => applyAvatarPreset("3"));
-  $("avatar-letter-btn")?.addEventListener("click", applyAvatarLetter);
   $("avatar-default-btn")?.addEventListener("click", applyDefaultAvatar);
+  $("avatar-letter-btn")?.addEventListener("click", applyAvatarLetter);
 
   $("change-email-btn")?.addEventListener("click", applyEmailChange);
   $("change-password-btn")?.addEventListener("click", applyPasswordChange);
+  $("send-reset-email-btn")?.addEventListener("click", async () => {
+    const email = String($("change-email-input")?.value || $("profile-email")?.value || "").trim();
+    try {
+      if (!email) {
+        setStatus("Type an email first.", "error");
+        return;
+      }
+      // uses the built-in reset email flow
+      const { requestPasswordReset } = await import("./auth.js");
+      await requestPasswordReset(email);
+      setStatus("Reset email sent.", "success");
+    } catch (err) {
+      console.error(err);
+      setStatus(err.message || "Could not send reset email.", "error");
+    }
+  });
 
   $("resend-verification-btn")?.addEventListener("click", async () => {
     try {
@@ -190,6 +210,7 @@ function start() {
 
   watchAuth(async (user, profile) => {
     activeUid = user?.uid || null;
+
     if (!user) {
       setStatus("Not logged in.", "info");
       return;

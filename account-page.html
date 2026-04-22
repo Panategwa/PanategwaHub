@@ -2,20 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Panategwa Hub - Account</title>
 
-  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 
   <script src="menu-loader.js" defer></script>
-  <script src="settings/text-size.js" defer></script>
-  <script src="settings/color-theme.js" defer></script>
-  <script src="settings/translate.js" defer></script>
   <script src="settings/settings.js" defer></script>
 
   <script type="module" src="auth/achievements.js"></script>
   <script type="module" src="auth/messages.js"></script>
   <script type="module" src="auth/settings.js"></script>
+  <script type="module" src="auth/social.js"></script>
   <script type="module" src="auth/account.js"></script>
 
   <style>
@@ -46,6 +45,15 @@
     .page-subtitle {
       margin: 0;
       opacity: 0.82;
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.76;
     }
 
     .tab-bar {
@@ -112,6 +120,17 @@
       outline: none;
     }
 
+    .input-group {
+      display: grid;
+      gap: 6px;
+      font-weight: 500;
+    }
+
+    .input-group span {
+      font-size: 0.92rem;
+      opacity: 0.88;
+    }
+
     .button-row {
       display: flex;
       flex-wrap: wrap;
@@ -121,6 +140,24 @@
     .button-row button {
       margin: 0;
       border-radius: 999px;
+    }
+
+    .button-ghost,
+    .link-button,
+    .provider-btn {
+      font: inherit;
+    }
+
+    .button-ghost,
+    .link-button {
+      background: transparent;
+      border: 0;
+      padding: 0;
+      color: inherit;
+      cursor: pointer;
+      font-weight: 700;
+      text-decoration: underline;
+      text-underline-offset: 0.18em;
     }
 
     .danger {
@@ -136,6 +173,162 @@
 
     .status[data-kind="error"] { color: #ffb3b3; }
     .status[data-kind="success"] { color: #b6ffcb; }
+
+    .auth-shell {
+      display: grid;
+      gap: 18px;
+    }
+
+    .auth-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .auth-toggle {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .auth-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .auth-main,
+    .auth-helper-card {
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: var(--panel-soft);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+    }
+
+    .auth-main {
+      display: grid;
+      gap: 16px;
+    }
+
+    .auth-panel {
+      display: none;
+      gap: 14px;
+    }
+
+    .auth-panel.active {
+      display: grid;
+    }
+
+    .auth-primary {
+      min-width: 150px;
+      font-weight: 700;
+    }
+
+    .auth-switch-line {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .auth-provider-separator {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0.8;
+      font-weight: 500;
+    }
+
+    .auth-provider-separator::before,
+    .auth-provider-separator::after {
+      content: "";
+      flex: 1 1 auto;
+      height: 1px;
+      background: rgba(255,255,255,0.14);
+    }
+
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .provider-btn {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+      color: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .provider-note {
+      margin: 0;
+      opacity: 0.82;
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .auth-helper-card {
+      display: grid;
+      gap: 12px;
+    }
+
+    .auth-helper-card h3 {
+      margin-bottom: 0;
+    }
+
+    .auth-helper-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .auth-helper-item {
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .auth-helper-item strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .locked-state {
+      display: grid;
+      gap: 12px;
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px dashed rgba(255,255,255,0.24);
+      background: rgba(255,255,255,0.04);
+      margin-bottom: 16px;
+    }
+
+    .locked-state h3,
+    .locked-state p {
+      margin: 0;
+    }
+
+    .section-note {
+      margin: 0;
+      opacity: 0.84;
+      line-height: 1.45;
+    }
+
+    .section-hidden {
+      display: none;
+    }
 
     .info-grid {
       display: grid;
@@ -197,10 +390,13 @@
       flex: 0 0 auto;
     }
 
-    .mini-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
+    .profile-badge {
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      font-size: 0.84rem;
+      font-weight: 700;
     }
 
     .xp-panel,
@@ -281,11 +477,17 @@
     }
 
     .achievement-icon {
-      font-size: 24px;
-      line-height: 1;
-      width: 28px;
+      min-width: 62px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.1;
       text-align: center;
       flex: 0 0 auto;
+      text-transform: uppercase;
     }
 
     .achievement-name {
@@ -515,19 +717,278 @@
       gap: 4px;
     }
 
+    .progress-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin: 12px 0 14px;
+      font-weight: 700;
+    }
+
+    .subsection-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .subsection-head h3 {
+      margin: 0;
+    }
+
+    .friends-toolbar {
+      display: grid;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .friends-subtabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .friends-panel {
+      display: none;
+    }
+
+    .friends-panel.active {
+      display: block;
+      animation: fadeUp 180ms ease-out;
+    }
+
+    .friends-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .friends-list-card,
+    .friend-profile-card,
+    .requests-card,
+    .blocked-card {
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: var(--panel-soft);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+    }
+
+    .friends-list-card,
+    .friend-profile-card {
+      display: grid;
+      gap: 12px;
+    }
+
+    .friend-list-stack,
+    .blocked-stack,
+    .request-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .friend-list-stack {
+      max-height: 560px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .friend-entry {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .friend-entry-button {
+      width: 100%;
+      margin: 0;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: inherit;
+      cursor: pointer;
+      text-align: left;
+      display: grid;
+      gap: 10px;
+    }
+
+    .friend-entry-button.active {
+      background: rgba(175,200,75,0.18);
+      border-color: rgba(175,200,75,0.3);
+    }
+
+    .friend-entry-main {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .friend-entry-avatar,
+    .profile-avatar-large {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: rgba(255,255,255,0.1);
+      overflow: hidden;
+      font-size: 22px;
+      border: 1px solid rgba(255,255,255,0.12);
+      flex: 0 0 auto;
+    }
+
+    .profile-avatar-large {
+      width: 74px;
+      height: 74px;
+      font-size: 30px;
+    }
+
+    .friend-entry-text {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .friend-entry-name {
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .friend-entry-meta,
+    .profile-body-note,
+    .request-card-note {
+      opacity: 0.82;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .friend-entry-menu {
+      position: relative;
+    }
+
+    .friend-entry-menu summary {
+      list-style: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      user-select: none;
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .friend-entry-menu summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .friend-entry-menu[open] summary {
+      background: rgba(175,200,75,0.18);
+      border-color: rgba(175,200,75,0.3);
+    }
+
+    .friend-entry-popover {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      min-width: 170px;
+      padding: 8px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(18,18,28,0.96);
+      box-shadow: 0 18px 32px rgba(0,0,0,0.24);
+      display: grid;
+      gap: 6px;
+      z-index: 20;
+    }
+
+    .friend-entry-popover button {
+      width: 100%;
+      margin: 0;
+      text-align: left;
+      border-radius: 12px;
+      justify-content: flex-start;
+    }
+
+    .profile-hero {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .requests-card,
+    .blocked-card {
+      display: grid;
+      gap: 12px;
+    }
+
+    .request-block {
+      display: grid;
+      gap: 10px;
+    }
+
+    .request-card {
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.05);
+      display: grid;
+      gap: 12px;
+    }
+
+    .request-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .request-card-title {
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .request-card-meta {
+      opacity: 0.76;
+      font-size: 0.92rem;
+      word-break: break-word;
+    }
+
+    .request-card-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
     @media (max-width: 959px) {
+      .auth-layout,
       .settings-grid,
       .profile-meta,
       .info-grid {
         grid-template-columns: 1fr;
       }
 
+      .friends-grid,
       .discord-layout {
         grid-template-columns: 1fr;
       }
     }
 
     @media (max-width: 700px) {
+      .provider-grid,
+      .friend-entry,
       .social-item,
       .msg-card,
       .invite-card {
@@ -543,6 +1004,15 @@
       .composer-row {
         grid-template-columns: 1fr;
       }
+
+      .friend-entry-menu {
+        justify-self: start;
+      }
+
+      .friend-entry-popover {
+        left: 0;
+        right: auto;
+      }
     }
 
     @keyframes fadeUp {
@@ -557,7 +1027,7 @@
 
   <div class="account-wrap">
     <div class="page-head">
-      <h1>👤 Account</h1>
+      <h1>Account</h1>
       <p class="page-subtitle">Profile, progress, friends, and messages all in one place.</p>
     </div>
 
@@ -572,91 +1042,240 @@
     </div>
 
     <section class="account-section active" data-section="info">
-      <div class="card" id="auth-card">
-        <h2>Login</h2>
-        <div class="field-row">
-          <input id="login-email" type="email" placeholder="Email" autocomplete="email" />
-          <input id="login-password" type="password" placeholder="Password" autocomplete="current-password" />
+      <div class="card auth-shell" id="auth-card">
+        <div class="auth-head">
+          <div>
+            <p class="eyebrow">Account access</p>
+            <h2 id="auth-mode-heading">Log in</h2>
+            <p id="auth-mode-copy" class="page-subtitle">Use your email and password or a provider to sign in.</p>
+          </div>
+
+          <div class="auth-toggle">
+            <button id="auth-mode-login-btn" type="button" class="tab-chip active" data-auth-mode="login">Log in</button>
+            <button id="auth-mode-signup-btn" type="button" class="tab-chip" data-auth-mode="signup">Create account</button>
+          </div>
         </div>
 
-        <div class="button-row">
-          <button id="login-btn" type="button">Login with email</button>
+        <div class="auth-layout">
+          <div class="auth-main">
+            <form id="login-form" class="auth-panel active" data-auth-panel="login">
+              <div class="field-row">
+                <label class="input-group">
+                  <span>Email</span>
+                  <input id="login-email" type="email" placeholder="you@example.com" autocomplete="email" />
+                </label>
+                <label class="input-group">
+                  <span>Password</span>
+                  <input id="login-password" type="password" placeholder="Your password" autocomplete="current-password" />
+                </label>
+              </div>
 
-          <button id="google-btn" type="button" style="display:flex; align-items:center; gap:8px;">
-            <span aria-hidden="true">
-              <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.65 32.657 29.288 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.958 3.042l5.657-5.657C34.247 6.053 29.427 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.651-.389-3.917z"/>
-                <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.958 3.042l5.657-5.657C34.247 6.053 29.427 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
-                <path fill="#4CAF50" d="M24 44c5.237 0 10.023-2.007 13.662-5.288l-6.31-5.338C29.334 35.091 26.873 36 24 36c-5.267 0-9.612-3.322-11.293-7.946l-6.53 5.025C9.466 39.556 16.189 44 24 44z"/>
-                <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.817 2.328-2.365 4.337-4.432 5.374l.003-.002 6.31 5.338C36.78 36.89 44 31 44 24c0-1.341-.138-2.651-.389-3.917z"/>
-              </svg>
-            </span>
-            <span>Google</span>
-          </button>
+              <div class="button-row">
+                <button id="login-btn" class="auth-primary" type="submit">Log in</button>
+                <button id="reset-password-btn" type="button" class="button-ghost">Forgot password?</button>
+              </div>
+            </form>
 
-          <button id="reset-password-btn" type="button">Forgot password</button>
-        </div>
+            <form id="signup-form" class="auth-panel" data-auth-panel="signup">
+              <div class="field-row">
+                <label class="input-group">
+                  <span>Username</span>
+                  <input id="signup-username" type="text" maxlength="20" placeholder="Choose a username" autocomplete="nickname" />
+                </label>
+                <label class="input-group">
+                  <span>Email</span>
+                  <input id="signup-email" type="email" placeholder="you@example.com" autocomplete="email" />
+                </label>
+                <label class="input-group">
+                  <span>Password</span>
+                  <input id="signup-password" type="password" placeholder="Create a password" autocomplete="new-password" />
+                </label>
+                <label class="input-group">
+                  <span>Confirm password</span>
+                  <input id="signup-password-confirm" type="password" placeholder="Repeat your password" autocomplete="new-password" />
+                </label>
+              </div>
 
-        <hr>
+              <div class="button-row">
+                <button id="signup-btn" class="auth-primary" type="submit">Create account</button>
+              </div>
+            </form>
 
-        <h2>Sign up with email</h2>
-        <div class="field-row">
-          <input id="signup-username" type="text" maxlength="20" placeholder="Username (max 20 chars)" autocomplete="nickname" />
-          <input id="signup-email" type="email" placeholder="Email" autocomplete="email" />
-          <input id="signup-password" type="password" placeholder="Password" autocomplete="new-password" />
-        </div>
+            <div class="auth-switch-line">
+              <span id="auth-switch-copy">Don't have an account?</span>
+              <button id="auth-switch-btn" type="button" class="link-button">Create one</button>
+            </div>
 
-        <div class="button-row">
-          <button id="signup-btn" type="button">Create account</button>
+            <div class="auth-provider-separator">
+              <span>Or continue with</span>
+            </div>
+
+            <div class="provider-grid">
+              <button id="google-btn" type="button" class="provider-btn">
+                <span aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.65 32.657 29.288 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.958 3.042l5.657-5.657C34.247 6.053 29.427 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.651-.389-3.917z"/>
+                    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.958 3.042l5.657-5.657C34.247 6.053 29.427 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                    <path fill="#4CAF50" d="M24 44c5.237 0 10.023-2.007 13.662-5.288l-6.31-5.338C29.334 35.091 26.873 36 24 36c-5.267 0-9.612-3.322-11.293-7.946l-6.53 5.025C9.466 39.556 16.189 44 24 44z"/>
+                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.817 2.328-2.365 4.337-4.432 5.374l.003-.002 6.31 5.338C36.78 36.89 44 31 44 24c0-1.341-.138-2.651-.389-3.917z"/>
+                  </svg>
+                </span>
+                <span>Google</span>
+              </button>
+
+              <button id="microsoft-btn" type="button" class="provider-btn">
+                <span aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path fill="#f35325" d="M2 2h9v9H2z"/>
+                    <path fill="#81bc06" d="M13 2h9v9h-9z"/>
+                    <path fill="#05a6f0" d="M2 13h9v9H2z"/>
+                    <path fill="#ffba08" d="M13 13h9v9h-9z"/>
+                  </svg>
+                </span>
+                <span>Microsoft</span>
+              </button>
+            </div>
+
+            <p class="provider-note">Google and Microsoft sign-in need their providers enabled in Firebase Authentication.</p>
+          </div>
+
+          <aside class="auth-helper-card">
+            <h3>What unlocks after login</h3>
+
+            <div class="auth-helper-list">
+              <div class="auth-helper-item">
+                <strong>Friends and requests</strong>
+                Send requests, accept them from your inbox, and view friend profiles.
+              </div>
+              <div class="auth-helper-item">
+                <strong>Messages and groups</strong>
+                Open direct chats, system messages, and group conversations from one place.
+              </div>
+              <div class="auth-helper-item">
+                <strong>Saved progress</strong>
+                Sync achievements, XP, streak-related messages, and profile settings to your account.
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
 
       <section class="card" id="account-card" style="display:none; margin-top: 16px;">
-        <h2>Your info</h2>
+        <div class="subsection-head">
+          <h2>Your info</h2>
+          <span class="profile-badge">Signed in</span>
+        </div>
         <div id="user-info"></div>
-
-        <hr>
-
-        <section style="margin-top: 16px;">
-          <h2>Danger zone</h2>
-          <p style="margin-top: 0;">Deleting your account removes the Auth user and the saved Firestore profile.</p>
-
-          <div class="field-row">
-            <input id="delete-password" type="password" placeholder="Current password for delete" autocomplete="current-password" />
-          </div>
-
-          <button id="delete-account-btn" class="danger" type="button">Delete account</button>
-        </section>
       </section>
     </section>
 
     <section class="account-section" data-section="settings">
       <div class="card">
-        <h2>Account settings</h2>
-
-        <div class="field-row">
-          <input id="profile-username" type="text" maxlength="20" placeholder="Change username (max 20 chars)" />
-          <input id="display-id-input" type="text" placeholder="Display ID (weekly change)" />
+        <div class="subsection-head">
+          <div>
+            <h2>Account settings</h2>
+            <p class="section-note">Manage your profile, password, avatar, and account access.</p>
+          </div>
         </div>
 
-        <div class="field-row">
-          <input id="profile-picture-file" type="file" accept="image/*" />
+        <div id="settings-locked" class="locked-state">
+          <h3>Log in to edit your settings</h3>
+          <p>Your profile, password, avatar, and account actions are available after you sign in.</p>
+          <div class="button-row">
+            <button type="button" class="tab-chip" data-open-section="info">Go to login</button>
+          </div>
         </div>
 
-        <div class="button-row">
-          <button id="save-username-btn" type="button">Save name</button>
-          <button id="save-display-id-btn" type="button">Save display ID</button>
-          <button id="save-avatar-btn" type="button">Save custom pfp</button>
-          <button id="use-default-avatar-btn" type="button">Use default pfp</button>
-          <button id="resend-verification-btn" type="button">Resend verification email</button>
-          <button id="logout-btn" type="button">Logout</button>
+        <div id="settings-content" class="settings-grid">
+          <div class="setting-card">
+            <div class="setting-title">Profile</div>
+            <div class="field-row">
+              <input id="profile-username" type="text" maxlength="20" placeholder="Username (max 20 chars)" />
+            </div>
+            <div class="button-row">
+              <button id="save-username-btn" type="button">Save name</button>
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-title">Profile picture</div>
+            <p id="security-note" class="setting-desc">Pick a preset, use a letter, or reset to default.</p>
+            <div class="button-row">
+              <button id="avatar-preset-1-btn" type="button" style="display:grid; gap:6px; place-items:center;">
+                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%230984e3"/%3E%3Cpath d="M64 30l10 20 22 3-16 16 4 22-20-10-20 10 4-22-16-16 22-3z" fill="white"/%3E%3C/svg%3E' style="width:34px;height:34px;border-radius:50%;object-fit:cover;">
+                <span>Preset 1</span>
+              </button>
+              <button id="avatar-preset-2-btn" type="button" style="display:grid; gap:6px; place-items:center;">
+                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%236c5ce7"/%3E%3Ccircle cx="64" cy="66" r="26" fill="rgba(255,255,255,0.15)"/%3E%3Ccircle cx="50" cy="58" r="5" fill="white"/%3E%3Ccircle cx="78" cy="58" r="5" fill="white"/%3E%3C/svg%3E' style="width:34px;height:34px;border-radius:50%;object-fit:cover;">
+                <span>Preset 2</span>
+              </button>
+              <button id="avatar-preset-3-btn" type="button" style="display:grid; gap:6px; place-items:center;">
+                <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%2300b894"/%3E%3Ccircle cx="64" cy="64" r="22" fill="none" stroke="white" stroke-width="6"/%3E%3Ccircle cx="64" cy="64" r="8" fill="white"/%3E%3C/svg%3E' style="width:34px;height:34px;border-radius:50%;object-fit:cover;">
+                <span>Preset 3</span>
+              </button>
+              <button id="avatar-default-btn" type="button">Default</button>
+            </div>
+            <div class="field-row" style="margin-top:10px;">
+              <input id="avatar-letter-input" type="text" maxlength="1" placeholder="Letter avatar" />
+            </div>
+            <div class="button-row">
+              <button id="avatar-letter-btn" type="button">Use letter avatar</button>
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-title">Email</div>
+            <div class="field-row">
+              <input id="change-email-input" type="email" placeholder="New email" />
+              <input id="change-email-password" type="password" placeholder="Current password" />
+            </div>
+            <div class="button-row">
+              <button id="change-email-btn" type="button">Change email</button>
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-title">Password</div>
+            <div class="field-row">
+              <input id="current-password" type="password" placeholder="Current password" />
+              <input id="new-password" type="password" placeholder="New password" />
+              <input id="confirm-password" type="password" placeholder="Confirm new password" />
+            </div>
+            <div class="button-row">
+              <button id="change-password-btn" type="button">Change password</button>
+              <button id="send-reset-email-btn" type="button">Send reset email</button>
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-title">Account actions</div>
+            <div class="button-row">
+              <button id="resend-verification-btn" type="button">Resend verification email</button>
+              <button id="logout-btn" type="button">Logout</button>
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-title">Danger zone</div>
+            <div class="field-row">
+              <input id="delete-password" type="password" placeholder="Current password for delete" autocomplete="current-password" />
+            </div>
+            <div class="button-row">
+              <button id="delete-account-btn" class="danger" type="button">Delete account</button>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
     <section class="account-section" data-section="progress">
       <div class="card">
-        <h2>Progress</h2>
+        <div class="subsection-head">
+          <div>
+            <h2>Progress</h2>
+            <p id="progress-login-hint" class="section-note">Log in to sync achievements and XP to your account.</p>
+          </div>
+        </div>
 
         <div class="xp-panel">
           <div class="xp-panel-topline">
@@ -669,7 +1288,7 @@
           </div>
 
           <div class="xp-foot">
-            <span id="xp-total">0</span> XP total • <span id="xp-need">5 XP to next rank</span>
+            <span id="xp-total">0</span> XP total. <span id="xp-need">5 XP to next rank</span>
           </div>
         </div>
 
@@ -684,47 +1303,94 @@
 
     <section class="account-section" data-section="friends">
       <div class="card">
-        <h2>Friends</h2>
-        <p id="friends-status">Loading friends...</p>
-
-        <div class="field-row">
-          <input id="friend-id-input" type="text" placeholder="Type a user ID" />
-          <input id="friend-note-input" type="text" placeholder="Optional message" />
-        </div>
-
-        <div class="button-row">
-          <button id="friend-request-send-btn" type="button">Send request</button>
-          <button id="block-user-btn" type="button">Block user</button>
-        </div>
-
-        <div class="field-row" style="margin-top: 14px;">
-          <input id="friend-search-input" type="text" placeholder="Search your friends" />
-        </div>
-
         <div class="subsection-head">
-          <h3>Your friends</h3>
+          <div>
+            <h2>Friends</h2>
+            <p class="section-note">Send requests, accept them from your inbox, and manage your friend list.</p>
+          </div>
         </div>
-        <div id="friend-search-results" class="achievement-list"></div>
 
-        <div class="subsection-head" style="margin-top:16px;">
-          <h3>Friends</h3>
+        <div id="friends-locked" class="locked-state">
+          <h3>Log in to use the friends system</h3>
+          <p>You need an account to send requests, accept them, open friend chats, and view saved profiles.</p>
+          <div class="button-row">
+            <button type="button" class="tab-chip" data-open-section="info">Go to login</button>
+          </div>
         </div>
-        <div id="friends-list"></div>
 
-        <div class="subsection-head" style="margin-top:16px;">
-          <h3>Blocked</h3>
-        </div>
-        <div id="blocked-list"></div>
+        <div id="friends-content">
+        <div class="friends-toolbar">
+          <div>
+            <p id="friends-status">Loading friends...</p>
+          </div>
 
-        <div class="subsection-head" style="margin-top:16px;">
-          <h3>Requests</h3>
+          <div class="field-row">
+            <input id="friend-id-input" type="text" placeholder="Type a user ID" />
+            <input id="friend-note-input" type="text" placeholder="Optional message" />
+          </div>
+
+          <div class="button-row">
+            <button id="friend-request-send-btn" type="button">Send request</button>
+            <button id="block-user-btn" type="button">Block user</button>
+          </div>
+
+          <div class="friends-subtabs">
+            <button type="button" class="tab-chip active" data-friends-subtab="friends">Friends</button>
+            <button type="button" class="tab-chip" data-friends-subtab="requests">Requests</button>
+            <button type="button" class="tab-chip" data-friends-subtab="blocked">Blocked</button>
+          </div>
         </div>
-        <div id="requests-list"></div>
+
+        <div class="friends-panel active" data-friends-subpanel="friends">
+          <div class="friends-grid">
+            <div class="friends-list-card">
+              <div class="subsection-head">
+                <h3>Your friends</h3>
+              </div>
+
+              <div class="field-row">
+                <input id="friend-search-input" type="text" placeholder="Search your friends" />
+              </div>
+
+              <div id="friends-list" class="friend-list-stack"></div>
+            </div>
+
+            <div id="friend-profile-view"></div>
+          </div>
+        </div>
+
+        <div class="friends-panel" data-friends-subpanel="requests">
+          <div id="requests-list" class="request-stack"></div>
+        </div>
+
+        <div class="friends-panel" data-friends-subpanel="blocked">
+          <div id="blocked-list" class="blocked-stack"></div>
+        </div>
+        </div>
       </div>
     </section>
 
     <section class="account-section" data-section="messages">
-      <div id="messages-root"></div>
+      <div class="card">
+        <div class="subsection-head">
+          <div>
+            <h2>Messages</h2>
+            <p class="section-note">System updates, friend requests, direct chats, and groups live here.</p>
+          </div>
+        </div>
+
+        <div id="messages-locked" class="locked-state">
+          <h3>Log in to use messages</h3>
+          <p>Your inbox, chats, and group messages only load after you sign in.</p>
+          <div class="button-row">
+            <button type="button" class="tab-chip" data-open-section="info">Go to login</button>
+          </div>
+        </div>
+
+        <div id="messages-content">
+          <div id="messages-root"></div>
+        </div>
+      </div>
     </section>
   </div>
 </body>

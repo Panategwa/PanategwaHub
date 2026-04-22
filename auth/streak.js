@@ -33,12 +33,12 @@ function todayKey() {
 
 function loadStreak(uid) {
   const raw = localStorage.getItem(streakKey(uid));
-  if (!raw) return { streak: 0, lastClaimAt: 0, lastClaimDay: "", totalClaims: 0 };
+  if (!raw) return { streak: 0, longestStreak: 0, lastClaimAt: 0, lastClaimDay: "", totalClaims: 0 };
 
   try {
     return JSON.parse(raw);
   } catch {
-    return { streak: 0, lastClaimAt: 0, lastClaimDay: "", totalClaims: 0 };
+    return { streak: 0, longestStreak: 0, lastClaimAt: 0, lastClaimDay: "", totalClaims: 0 };
   }
 }
 
@@ -209,6 +209,7 @@ async function claimStreak() {
   }
 
   local.streak = (local.streak || 0) + 1;
+  local.longestStreak = Math.max(local.longestStreak || 0, local.streak);
   local.lastClaimAt = now;
   local.lastClaimDay = todayKey();
   local.totalClaims = (local.totalClaims || 0) + 1;
@@ -222,8 +223,10 @@ async function claimStreak() {
 
   await setDoc(userRef(currentUser.uid), {
     xp: currentXp + reward,
+    longestStreak: Math.max(profile.longestStreak || 0, local.longestStreak || local.streak),
     streak: {
       current: local.streak,
+      longest: Math.max(profile.longestStreak || 0, local.longestStreak || local.streak),
       lastClaimAt: now,
       lastClaimDay: local.lastClaimDay
     },
@@ -239,6 +242,8 @@ async function claimStreak() {
     xp: reward,
     href: "streak-page.html"
   });
+
+  renderPage();
 }
 
 function renderPage() {
@@ -247,6 +252,7 @@ function renderPage() {
   const profile = currentProfile || {};
   const local = loadStreak(currentUser.uid);
   const streak = profile?.streak?.current || local.streak || 0;
+  const longest = profile?.longestStreak || profile?.streak?.longest || local.longestStreak || streak || 0;
   const nextReward = rewardForDay(streak + 1);
 
   const root = $("streak-root");
@@ -269,6 +275,11 @@ function renderPage() {
         </div>
 
         <div class="setting-card">
+          <div class="setting-title">Longest streak</div>
+          <div class="setting-desc">${longest} day${longest === 1 ? "" : "s"}</div>
+        </div>
+
+        <div class="setting-card">
           <div class="setting-title">Next reward</div>
           <div class="setting-desc">${nextReward} XP</div>
         </div>
@@ -276,11 +287,6 @@ function renderPage() {
         <div class="setting-card">
           <div class="setting-title">Last claim</div>
           <div class="setting-desc">${prettyDate(profile?.streak?.lastClaimAt || local.lastClaimAt)}</div>
-        </div>
-
-        <div class="setting-card">
-          <div class="setting-title">Total claims</div>
-          <div class="setting-desc">${local.totalClaims || 0}</div>
         </div>
       </div>
 

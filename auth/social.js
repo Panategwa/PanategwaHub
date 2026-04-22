@@ -54,6 +54,8 @@ let unsubMessages = null;
 let unsubGroupChats = null;
 let unsubGroupInvites = null;
 const groupMessageUnsubs = new Map();
+let knownMessageIds = new Set();
+let messageToastReady = false;
 
 function cloneState() {
   return {
@@ -100,6 +102,15 @@ function toMs(value) {
 
 function sortNewestFirst(list) {
   return [...list].sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
+}
+
+function buildAccountHref(section, sub = null, targetId = null) {
+  const params = new URLSearchParams();
+  if (section) params.set("tab", section);
+  if (sub) params.set("sub", sub);
+  if (targetId) params.set("target", targetId);
+  const query = params.toString();
+  return query ? `account-page.html?${query}` : "account-page.html";
 }
 
 function userRef(uid) {
@@ -176,6 +187,90 @@ async function createMessage(payload) {
   });
 }
 
+async function findPendingFriendRequestBetween(sourceUid, otherUid) {
+  const source = cleanUid(sourceUid);
+  const other = cleanUid(otherUid);
+  if (!source || !other) return null;
+
+  const qs = await getDocs(query(collection(db, "messages"), where("participants", "array-contains", source)));
+  for (const snap of qs.docs) {
+    const data = snap.data();
+    if (data.kind !== "friend-request") continue;
+    if ((data.status || "pending") !== "pending") continue;
+    const participants = unique(data.participants);
+    if (participants.includes(other)) {
+      return { id: snap.id, ...data };
+    }
+  }
+
+  return null;
+}
+
+function toastConfigForMessage(message) {
+  if (!message) return null;
+
+  if (message.kind === "friend-request") {
+    return {
+      title: message.title || "Friend request",
+      body: message.body || `${message.fromName || "Someone"} sent you a friend request.`,
+      href: buildAccountHref("friends", "requests", message.fromUid || message.targetId || null)
+    };
+  }
+
+  if (message.kind === "friend-accepted") {
+    return {
+      title: message.title || "Friend request accepted",
+      body: message.body || `${message.fromName || "Someone"} accepted your friend request.`,
+      href: buildAccountHref("friends", "friends", message.targetId || message.fromUid || null)
+    };
+  }
+
+  if (message.kind === "friend-declined") {
+    return {
+      title: message.title || "Friend request declined",
+      body: message.body || `${message.fromName || "Someone"} declined your friend request.`,
+      href: buildAccountHref("messages", "system")
+    };
+  }
+
+  return null;
+}
+
+function maybeToastNewMessages(messages) {
+  const currentUid = socialState.user?.uid;
+  const ids = new Set((messages || []).map(message => message.id));
+
+  if (!currentUid) {
+    knownMessageIds = ids;
+    messageToastReady = false;
+    return;
+  }
+
+  if (!messageToastReady) {
+    knownMessageIds = ids;
+    messageToastReady = true;
+    return;
+  }
+
+  const freshIncoming = (messages || []).filter(message =>
+    message.toUid === currentUid &&
+    !knownMessageIds.has(message.id) &&
+    !unique(message.readBy).includes(currentUid)
+  );
+
+  knownMessageIds = ids;
+
+  if (typeof window.PanategwaToast !== "function") return;
+
+  freshIncoming
+    .slice()
+    .reverse()
+    .forEach(message => {
+      const config = toastConfigForMessage(message);
+      if (config) window.PanategwaToast(config);
+    });
+}
+
 async function sendFriendRequestById(targetUid, note = "") {
   const user = auth.currentUser;
   const id = cleanUid(targetUid);
@@ -192,7 +287,14 @@ async function sendFriendRequestById(targetUid, note = "") {
 
   if (!meSettings.systemEnabled || !meSettings.requestsEnabled) throw new Error("Friend requests are turned off.");
   if (!targetSettings.systemEnabled || !targetSettings.requestsEnabled) throw new Error("That user is not accepting friend requests.");
+  if (unique(me?.friends).includes(id)) throw new Error("You are already friends with that user.");
   if (unique(me?.blocked).includes(id) || unique(target?.blocked).includes(user.uid)) throw new Error("You cannot send a request to this user.");
+
+  const outgoingPending = await findPendingFriendRequestBetween(user.uid, id);
+  if (outgoingPending) throw new Error("You already have a pending friend request to that user.");
+
+  const incomingPending = await findPendingFriendRequestBetween(id, user.uid);
+  if (incomingPending) throw new Error("That user already sent you a request. Open your requests to accept it.");
 
   const ref = await createMessage({
     fromUid: user.uid,
@@ -224,29 +326,39 @@ async function respondToFriendRequest(requestId, action) {
   const req = snap.data();
   if (req.kind !== "friend-request") throw new Error("That is not a friend request.");
   if (req.toUid !== user.uid) throw new Error("You cannot edit this request.");
+  if ((req.status || "pending") !== "pending") throw new Error("That request is no longer pending.");
 
   const senderRef = userRef(req.fromUid);
   const receiverRef = userRef(req.toUid);
+  const me = await loadUser(user.uid);
+  const sender = await loadUser(req.fromUid);
+  const currentName = usernameOf(me);
+  const senderName = usernameOf(sender);
 
   if (action === "accept") {
     await setDoc(senderRef, { friends: arrayUnion(user.uid), blocked: arrayRemove(user.uid), updatedAt: serverTimestamp() }, { merge: true });
-    await setDoc(receiverRef, { friends: arrayUnion(req.fromUid), updatedAt: serverTimestamp() }, { merge: true });
+    await setDoc(receiverRef, { friends: arrayUnion(req.fromUid), blocked: arrayRemove(req.fromUid), updatedAt: serverTimestamp() }, { merge: true });
     await updateDoc(ref, { status: "accepted", readBy: arrayUnion(user.uid), updatedAt: serverTimestamp() });
 
     await createMessage({
       fromUid: user.uid,
       toUid: req.fromUid,
       participants: [user.uid, req.fromUid],
-      fromName: usernameOf(await loadUser(user.uid)),
-      toName: usernameOf(await loadUser(req.fromUid)),
+      fromName: currentName,
+      toName: senderName,
       kind: "friend-accepted",
-      title: "Friend accepted",
-      body: `${usernameOf(await loadUser(user.uid))} accepted your friend request.`,
-      targetSection: "messages",
-      targetSubSection: "chat",
-      conversationUid: req.fromUid,
+      title: "Friend request accepted",
+      body: `${currentName} accepted your friend request.`,
+      targetSection: "friends",
+      targetSubSection: "friends",
+      targetId: user.uid,
       readBy: [user.uid]
     });
+    return;
+  }
+
+  if (action === "ignore") {
+    await updateDoc(ref, { status: "ignored", readBy: arrayUnion(user.uid), updatedAt: serverTimestamp() });
     return;
   }
 
@@ -256,14 +368,14 @@ async function respondToFriendRequest(requestId, action) {
       fromUid: user.uid,
       toUid: req.fromUid,
       participants: [user.uid, req.fromUid],
-      fromName: usernameOf(await loadUser(user.uid)),
-      toName: usernameOf(await loadUser(req.fromUid)),
+      fromName: currentName,
+      toName: senderName,
       kind: "friend-declined",
-      title: "Friend declined",
-      body: `${usernameOf(await loadUser(user.uid))} declined your friend request.`,
+      title: "Friend request declined",
+      body: `${currentName} declined your friend request.`,
       targetSection: "messages",
-      targetSubSection: "chat",
-      conversationUid: req.fromUid,
+      targetSubSection: "system",
+      targetId: null,
       readBy: [user.uid]
     });
     return;
@@ -277,14 +389,14 @@ async function respondToFriendRequest(requestId, action) {
       fromUid: user.uid,
       toUid: req.fromUid,
       participants: [user.uid, req.fromUid],
-      fromName: usernameOf(await loadUser(user.uid)),
-      toName: usernameOf(await loadUser(req.fromUid)),
+      fromName: currentName,
+      toName: senderName,
       kind: "friend-blocked",
       title: "Blocked",
-      body: `${usernameOf(await loadUser(user.uid))} blocked you.`,
+      body: `${currentName} blocked you.`,
       targetSection: "messages",
-      targetSubSection: "chat",
-      conversationUid: req.fromUid,
+      targetSubSection: "system",
+      targetId: null,
       readBy: [user.uid]
     });
   }
@@ -797,6 +909,8 @@ function startRealtime() {
       socialState.groupChats = [];
       socialState.groupMessagesByChat = {};
       socialState.groupInvites = [];
+      knownMessageIds = new Set();
+      messageToastReady = false;
       emit();
       return;
     }
@@ -808,7 +922,7 @@ function startRealtime() {
     socialState.blocked = unique(socialState.profile?.blocked);
     socialState.selectedProfile = publicProfile(socialState.profile, user.uid);
     socialState.selectedProfileId = user.uid;
-    await loadFriendProfiles(socialState.friends);
+    await loadFriendProfiles([...socialState.friends, ...socialState.blocked]);
     emit();
 
     unsubProfile = onSnapshot(userRef(user.uid), async (snap) => {
@@ -820,7 +934,7 @@ function startRealtime() {
       socialState.selectedProfile = socialState.selectedProfileId
         ? (socialState.selectedProfileId === user.uid ? publicProfile(fresh, user.uid) : socialState.friendProfiles[socialState.selectedProfileId] || socialState.selectedProfile)
         : publicProfile(fresh, user.uid);
-      await loadFriendProfiles(socialState.friends);
+      await loadFriendProfiles([...socialState.friends, ...socialState.blocked]);
       emit();
     });
 
@@ -828,6 +942,7 @@ function startRealtime() {
       const all = [];
       snap.forEach(d => all.push({ id: d.id, ...d.data() }));
       const sorted = sortNewestFirst(all);
+      maybeToastNewMessages(sorted);
       socialState.messages = sorted;
       socialState.incomingRequests = sortNewestFirst(sorted.filter(m => m.kind === "friend-request" && m.toUid === user.uid && (m.status || "pending") === "pending"));
       socialState.outgoingRequests = sortNewestFirst(sorted.filter(m => m.kind === "friend-request" && m.fromUid === user.uid && (m.status || "pending") === "pending"));

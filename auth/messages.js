@@ -15,6 +15,7 @@ import {
   deleteGroupChat,
   inviteToGroupChat,
   respondToGroupInvite,
+  respondToFriendRequest,
   leaveGroupChat,
   getConversationMessages,
   getGroupChatMessages
@@ -37,8 +38,15 @@ function friendName(uid) {
   return socialState.friendProfiles?.[uid]?.username || uid || "Player";
 }
 
+function directConversationTarget(msg) {
+  const currentUid = socialState.user?.uid;
+  if (!msg || !currentUid) return msg?.targetId || msg?.conversationUid || msg?.fromUid || null;
+  if (msg.fromUid === currentUid) return msg.toUid || msg.targetId || msg.conversationUid || null;
+  return msg.fromUid || msg.targetId || msg.conversationUid || null;
+}
+
 function resolveMessageTarget(msg) {
-  if (!msg) return { section: "messages", sub: "chat", targetId: null };
+  if (!msg) return { section: "messages", sub: "system", targetId: null };
 
   if (msg.kind === "achievement") {
     return { section: "progress", sub: "progress", targetId: msg.targetId || msg.achievementId || null };
@@ -50,31 +58,31 @@ function resolveMessageTarget(msg) {
 
 
   if (msg.kind === "friend-request") {
-    return { section: "friends", sub: "requests", targetId: msg.fromUid || null };
+    return { section: "friends", sub: "requests", targetId: msg.fromUid || msg.targetId || null };
   }
 
-  if (msg.kind === "friend-accepted" || msg.kind === "friend-declined" || msg.kind === "friend-blocked" || msg.kind === "chat") {
-    return { section: "messages", sub: "chat", targetId: msg.conversationUid || msg.fromUid || null };
+  if (msg.kind === "chat") {
+    return { section: "messages", sub: "chat", targetId: directConversationTarget(msg) };
   }
 
   if (msg.kind === "group-invite") {
-    return { section: "messages", sub: "chat", targetId: msg.groupChatId || msg.targetId || null };
+    return { section: "messages", sub: "groups", targetId: msg.groupChatId || msg.targetId || null };
   }
 
   return {
     section: msg.targetSection || "messages",
     sub: msg.targetSubSection || "system",
-    targetId: msg.targetId || msg.conversationUid || msg.fromUid || null
+    targetId: msg.targetId || directConversationTarget(msg) || null
   };
 }
 
 function showTarget(msg) {
   const target = resolveMessageTarget(msg);
 
-if (target.section === "streak") {
-  window.location.href = "streak-page.html";
-  return;
-}
+  if (target.section === "streak") {
+    window.location.href = "streak-page.html";
+    return;
+  }
 
   if (typeof window.openAccountArea === "function") {
     window.openAccountArea(target.section, target.sub, target.targetId);
@@ -90,13 +98,42 @@ if (target.section === "streak") {
   }
 }
 
+function openMessagesView(sub = "system", targetId = null) {
+  if (!socialState.user) {
+    activeTab = "system";
+    render(socialState);
+    return;
+  }
+
+  if (sub === "chat") {
+    activeTab = "chat";
+    chatMode = "direct";
+    if (targetId) setSelectedConversation(targetId);
+  } else if (sub === "groups") {
+    activeTab = "chat";
+    chatMode = "groups";
+    if (targetId) setSelectedGroupChatId(targetId);
+  } else {
+    activeTab = "system";
+  }
+
+  render(socialState);
+}
+
 function messageCard(msg) {
   const unread = msg.toUid === socialState.user?.uid && !(msg.readBy || []).includes(socialState.user?.uid);
   const target = resolveMessageTarget(msg);
+  const requestButtons = msg.kind === "friend-request" && msg.toUid === socialState.user?.uid && (msg.status || "pending") === "pending"
+    ? `
+      <button type="button" data-action="accept-friend-request" data-id="${escapeHtml(msg.id)}" data-uid="${escapeHtml(msg.fromUid || "")}">Accept</button>
+      <button type="button" data-action="ignore-friend-request" data-id="${escapeHtml(msg.id)}" data-uid="${escapeHtml(msg.fromUid || "")}">Ignore</button>
+      <button type="button" data-action="decline-friend-request" data-id="${escapeHtml(msg.id)}" data-uid="${escapeHtml(msg.fromUid || "")}">Decline</button>
+    `
+    : "";
 
   return `
     <div class="msg-card ${unread ? "unread" : "read"}" data-msg-id="${escapeHtml(msg.id)}" data-kind="${escapeHtml(msg.kind || "system")}" data-target-id="${escapeHtml(target.targetId || "")}" data-target-section="${escapeHtml(target.section)}" data-target-sub="${escapeHtml(target.sub)}">
-      <div class="msg-avatar">${unread ? "✉️" : (msg.kind === "chat" ? "💬" : "📭")}</div>
+      <div class="msg-avatar">${unread ? "🔔" : (msg.kind === "chat" ? "💬" : "📭")}</div>
       <div class="msg-body">
         <div class="msg-top">
           <div class="msg-title">${escapeHtml(msg.title || msg.kind || "Message")}</div>
@@ -106,6 +143,7 @@ function messageCard(msg) {
       </div>
       <div class="msg-actions">
         <button type="button" data-action="open-target">Open</button>
+        ${requestButtons}
         <button type="button" data-action="show-in-messages">Show in Messages</button>
         <button type="button" data-action="toggle-read">${unread ? "Read" : "Unread"}</button>
       </div>
@@ -248,6 +286,15 @@ function render(state) {
   const root = $("messages-root");
   if (!root) return;
 
+  if (!state.user) {
+    root.innerHTML = `
+      <div class="msg-empty">
+        Log in to open your inbox, direct chats, and group messages.
+      </div>
+    `;
+    return;
+  }
+
   root.innerHTML = `
     <div class="messages-wrap">
       <div class="messages-head">
@@ -275,7 +322,7 @@ function render(state) {
           <button class="tab-chip ${chatMode === "groups" ? "active" : ""}" type="button" data-chatmode="groups">Groups</button>
         </div>
 
-        <div class="discord-layout">
+        <div class="discord-layout" style="${chatMode === "direct" ? "" : "display:none;"}">
           <aside class="discord-side">
             <input id="messages-friend-search" type="text" placeholder="Search friends" />
             <div id="messages-friend-list" class="stack"></div>
@@ -293,7 +340,7 @@ function render(state) {
           </main>
         </div>
 
-        <div class="discord-layout" style="margin-top:14px;">
+        <div class="discord-layout" style="${chatMode === "groups" ? "margin-top:14px;" : "display:none; margin-top:14px;"}">
           <aside class="discord-side">
             <div class="side-block">
               <div class="side-title">Your groups</div>
@@ -335,7 +382,7 @@ function render(state) {
 
 function bind(root) {
   root.addEventListener("click", async (e) => {
-    const btn = e.target.closest("[data-action]");
+    const btn = e.target.closest("[data-action], [data-tab], [data-chatmode]");
     if (!btn) return;
 
     const action = btn.dataset.action;
@@ -390,9 +437,7 @@ function bind(root) {
       if (action === "show-in-messages") {
         const card = btn.closest("[data-msg-id]");
         if (!card) return;
-        if (typeof window.openAccountArea === "function") {
-          window.openAccountArea("messages", "system", card.dataset.targetId || uid);
-        }
+        openMessagesView(card.dataset.targetSub || "system", card.dataset.targetId || uid || null);
         return;
       }
 
@@ -400,6 +445,26 @@ function bind(root) {
         const card = btn.closest("[data-msg-id]");
         if (!card) return;
         await markMessageRead(card.dataset.msgId, btn.textContent === "Read");
+        return;
+      }
+
+      if (action === "accept-friend-request") {
+        await respondToFriendRequest(id, "accept");
+        if (typeof window.openAccountArea === "function") {
+          window.openAccountArea("friends", "friends", uid);
+        }
+        return;
+      }
+
+      if (action === "ignore-friend-request") {
+        await respondToFriendRequest(id, "ignore");
+        render(socialState);
+        return;
+      }
+
+      if (action === "decline-friend-request") {
+        await respondToFriendRequest(id, "decline");
+        render(socialState);
         return;
       }
 
@@ -414,9 +479,7 @@ function bind(root) {
       }
 
       if (action === "view-group-invite") {
-        activeTab = "chat";
-        setSelectedGroupChatId(id);
-        render(socialState);
+        openMessagesView("groups", id);
         return;
       }
 
@@ -514,6 +577,12 @@ function bind(root) {
       }
     }
   });
+
+  root.addEventListener("input", (e) => {
+    if (e.target?.id === "messages-friend-search" || e.target?.id === "groups-search") {
+      render(socialState);
+    }
+  });
 }
 
 function start() {
@@ -531,5 +600,6 @@ if (document.readyState === "loading") {
 }
 
 window.PanategwaMessagesRender = () => render(socialState);
+window.PanategwaMessagesOpen = openMessagesView;
 
-export { render, resolveMessageTarget };
+export { render, resolveMessageTarget, openMessagesView };

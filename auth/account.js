@@ -43,6 +43,7 @@ const FRIENDS_SUBSECTIONS = new Set(["friends", "requests", "blocked"]);
 let copiedUserIdValue = null;
 let copiedUserIdUntil = 0;
 let copiedUserIdTimer = null;
+let lastAchievementSignature = "";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -154,6 +155,16 @@ function updateSidebarAvatar(profile, user) {
   if (typeof window.PanategwaUpdateSidebarAvatar === "function") {
     window.PanategwaUpdateSidebarAvatar(user && photoURL ? photoURL : "");
   }
+}
+
+function syncMessagesTabBadge(state) {
+  const button = $("tab-messages");
+  if (!button) return;
+
+  const unread = Number(state.unreadCount || 0);
+  button.classList.toggle("has-dot", unread > 0);
+  button.setAttribute("aria-label", unread > 0 ? `Messages (${unread} unread)` : "Messages");
+  button.title = unread > 0 ? `${unread} unread message${unread === 1 ? "" : "s"}` : "Messages";
 }
 
 function setVisible(id, visible) {
@@ -381,6 +392,15 @@ function renderAchievements(state) {
   const list = $("achievements-list");
   if (!list) return;
 
+  const signature = JSON.stringify({
+    uid: state.user?.uid || "",
+    xp: typeof state.profile?.xp === "number" ? state.profile.xp : 0,
+    achievements: [...new Set(state.profile?.achievements || [])].sort()
+  });
+
+  if (signature === lastAchievementSignature) return;
+  lastAchievementSignature = signature;
+
   const unlocked = new Set(state.profile?.achievements || []);
   const ordered = [...ACHIEVEMENTS].sort((a, b) => {
     const unlockedDiff = Number(unlocked.has(b.id)) - Number(unlocked.has(a.id));
@@ -394,8 +414,8 @@ function renderAchievements(state) {
 
     return `
       <div class="achievement-card ${isUnlocked ? "unlocked" : "locked"}" id="achievement-card-${escapeHtml(achievement.id)}" data-achievement-id="${escapeHtml(achievement.id)}">
-        <div class="achievement-icon">${isUnlocked ? "Unlocked" : "Locked"}</div>
-        <div>
+        <div class="achievement-status ${isUnlocked ? "unlocked" : "locked"}">${isUnlocked ? "Unlocked" : "Locked"}</div>
+        <div class="achievement-copy">
           <div class="achievement-name">${escapeHtml(title)}</div>
           <div class="achievement-desc">${escapeHtml(description)}</div>
           <div class="achievement-desc">Reward: +${escapeHtml(String(achievement.reward || 0))} XP</div>
@@ -526,7 +546,7 @@ function renderFriends(state) {
         </button>
 
         <details class="friend-entry-menu">
-          <summary aria-label="Friend actions">⋮</summary>
+          <summary aria-label="Friend actions">&#8942;</summary>
           <div class="friend-entry-popover">
             <button type="button" data-action="friend-message" data-uid="${escapeHtml(friend.uid)}">Message</button>
             <button type="button" data-action="friend-copy" data-uid="${escapeHtml(friend.uid)}">Copy ID</button>
@@ -608,6 +628,7 @@ function renderAll(state) {
   renderAchievements(state);
   renderFriends(state);
   applyAuthGuards();
+  syncMessagesTabBadge(state);
 }
 
 async function copyText(value) {

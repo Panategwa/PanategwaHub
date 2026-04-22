@@ -167,6 +167,7 @@
 
     .tab-button,
     .tab-chip {
+      position: relative;
       margin: 0;
       padding: 11px 15px;
       border-radius: 999px;
@@ -183,6 +184,23 @@
       background: var(--accent);
       border-color: var(--accent-border);
       box-shadow: 0 16px 30px rgba(37, 99, 235, 0.28);
+    }
+
+    .tab-button.has-dot {
+      padding-right: 26px;
+    }
+
+    .tab-button.has-dot::after {
+      content: "";
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #ef4444;
+      border: 2px solid rgba(15, 23, 42, 0.92);
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
     }
 
     .account-section {
@@ -582,9 +600,8 @@
     }
 
     .achievement-card {
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
+      display: grid;
+      gap: 8px;
       padding: 12px;
       border-radius: 16px;
       border: 1px solid rgba(255, 255, 255, 0.12);
@@ -601,18 +618,33 @@
       background: rgba(255, 255, 255, 0.09);
     }
 
-    .achievement-icon {
-      min-width: 62px;
-      padding: 8px 10px;
+    .achievement-status {
+      justify-self: start;
+      padding: 7px 11px;
       border-radius: 999px;
       background: rgba(255,255,255,0.08);
       font-size: 0.78rem;
       font-weight: 700;
       letter-spacing: 0.04em;
       line-height: 1.1;
-      text-align: center;
-      flex: 0 0 auto;
       text-transform: uppercase;
+    }
+
+    .achievement-status.unlocked {
+      background: rgba(59, 130, 246, 0.18);
+      color: #dbeafe;
+      border: 1px solid rgba(125, 211, 252, 0.22);
+    }
+
+    .achievement-status.locked {
+      background: rgba(148, 163, 184, 0.12);
+      color: rgba(226, 232, 240, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    .achievement-copy {
+      display: grid;
+      gap: 4px;
     }
 
     .achievement-name {
@@ -700,6 +732,22 @@
       flex-wrap: wrap;
       gap: 8px;
       align-items: center;
+      justify-content: flex-end;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 4px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .messages-summary {
+      font-size: 0.92rem;
+      opacity: 0.8;
     }
 
     .messages-panel {
@@ -756,6 +804,29 @@
     .group-pill.active {
       background: rgba(59,130,246,0.22);
       border: 1px solid rgba(125,211,252,0.28);
+    }
+
+    .friend-pill small,
+    .group-pill small {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      opacity: 0.78;
+    }
+
+    .pill-counter {
+      display: inline-grid;
+      place-items: center;
+      min-width: 1.65em;
+      padding: 0 0.45em;
+      border-radius: 999px;
+      background: rgba(239, 68, 68, 0.18);
+      color: #fecaca;
+      font-size: 0.78rem;
+      font-weight: 700;
+      line-height: 1.8;
+      flex: 0 0 auto;
     }
 
     .channel-bar {
@@ -845,6 +916,53 @@
       word-break: break-word;
     }
 
+    .msg-card.unread {
+      border-color: rgba(125, 211, 252, 0.32);
+      background: rgba(30, 41, 59, 0.52);
+    }
+
+    .msg-title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .msg-meta,
+    .msg-kind-line {
+      opacity: 0.75;
+      font-size: 0.88rem;
+      line-height: 1.3;
+    }
+
+    .msg-kind-line {
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .msg-state-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .msg-state-pill.unread {
+      background: rgba(239, 68, 68, 0.16);
+      color: #fecaca;
+      border: 1px solid rgba(248, 113, 113, 0.18);
+    }
+
+    .msg-state-pill.read {
+      background: rgba(148, 163, 184, 0.14);
+      color: rgba(226, 232, 240, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
     .social-actions,
     .msg-actions,
     .invite-actions {
@@ -852,6 +970,7 @@
       flex-wrap: wrap;
       gap: 8px;
       justify-content: flex-end;
+      align-items: flex-start;
     }
 
     .social-actions button,
@@ -859,6 +978,44 @@
     .invite-actions button {
       margin: 0;
       border-radius: 999px;
+    }
+
+    .message-entry-menu {
+      position: relative;
+    }
+
+    .message-entry-menu summary {
+      list-style: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      border: 1px solid var(--button-border);
+      background: var(--button-bg);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      user-select: none;
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .message-entry-menu summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .message-entry-menu[open] summary {
+      background: var(--accent);
+      border-color: var(--accent-border);
+    }
+
+    .message-entry-popover {
+      right: 0;
+      left: auto;
+      min-width: 160px;
+    }
+
+    .group-msg-card {
+      grid-template-columns: auto 1fr;
     }
 
     .profile-meta {
@@ -980,8 +1137,8 @@
     }
 
     .friend-entry-button.active {
-      background: rgba(175,200,75,0.18);
-      border-color: rgba(175,200,75,0.3);
+      background: rgba(59,130,246,0.22);
+      border-color: rgba(125,211,252,0.28);
     }
 
     .friend-entry-main {
@@ -1173,6 +1330,11 @@
       }
 
       .friend-entry-popover {
+        left: 0;
+        right: auto;
+      }
+
+      .message-entry-popover {
         left: 0;
         right: auto;
       }

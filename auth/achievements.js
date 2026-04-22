@@ -297,6 +297,10 @@ export async function syncAchievementProgress(user, profile) {
 }
 
 export function renderAchievements(profile) {
+  if (pageId() === "account-page.html" && document.getElementById("achievements-list")) {
+    return;
+  }
+
   const container = document.getElementById("achievements-list");
   const xpEl = document.getElementById("xp-count");
   const totalEl = document.getElementById("xp-total");

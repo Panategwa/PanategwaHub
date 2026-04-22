@@ -125,9 +125,9 @@ document.addEventListener("DOMContentLoaded", function () {
   const handle = document.getElementById("resize-handle");
   let isResizing = false;
 
-  const MIN_WIDTH = 160;
-  const MAX_WIDTH = 500;
-  const DEFAULT_WIDTH = 220;
+  const MIN_WIDTH = 300;
+  const MAX_WIDTH = 600;
+  const DEFAULT_WIDTH = 350;
 
   let savedWidth = localStorage.getItem("menuWidth");
 

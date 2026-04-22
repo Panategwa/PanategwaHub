@@ -281,6 +281,18 @@ function friendlyActionError(error) {
   return error?.message || "Social action failed.";
 }
 
+function isUnreadForUser(message, uid) {
+  const currentUid = cleanUid(uid);
+  if (!currentUid || !message || cleanUid(message.toUid) !== currentUid) return false;
+  return !unique(message.readBy).includes(currentUid);
+}
+
+function shortenToastBody(value, max = 120) {
+  const text = String(value || "").trim().replace(/\s+/g, " ");
+  if (!text) return "";
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
 function toastConfigForMessage(message) {
   if (!message) return null;
 
@@ -321,6 +333,23 @@ function toastConfigForMessage(message) {
       title: message.title || "Blocked",
       body: message.body || `${message.fromName || "Someone"} blocked you.`,
       href: buildAccountHref("messages", "system")
+    };
+  }
+
+  if (message.kind === "group-invite") {
+    return {
+      title: message.title || "Group invite",
+      body: message.body || `${message.fromName || "Someone"} invited you to a group chat.`,
+      href: buildAccountHref("messages", "groups", message.groupChatId || message.targetId || null)
+    };
+  }
+
+  if (message.kind === "chat") {
+    const targetUid = cleanUid(message.fromUid || message.targetId || message.conversationUid);
+    return {
+      title: message.title || `Message from ${message.fromName || "Someone"}`,
+      body: shortenToastBody(message.body || ""),
+      href: buildAccountHref("messages", "chat", targetUid || null)
     };
   }
 
@@ -1007,28 +1036,68 @@ async function markMessageRead(messageId, read = true) {
   }
 }
 
+async function setMessagesReadState(messageIds = [], read = true) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const uniqueIds = [...new Set((Array.isArray(messageIds) ? messageIds : []).map((value) => cleanUid(value)).filter(Boolean))];
+  if (!uniqueIds.length) return;
+
+  const messageMap = new Map((socialState.messages || []).map((message) => [message.id, message]));
+
+  for (const messageId of uniqueIds) {
+    const data = messageMap.get(messageId);
+    if (!data || cleanUid(data.toUid) !== user.uid) continue;
+
+    const alreadyRead = unique(data.readBy).includes(user.uid);
+    if (read && alreadyRead) continue;
+    if (!read && !alreadyRead) continue;
+
+    await updateDoc(doc(db, "messages", messageId), read
+      ? { readBy: arrayUnion(user.uid), readAt: serverTimestamp() }
+      : { readBy: arrayRemove(user.uid), readAt: null });
+  }
+}
+
 async function markAllMessagesRead() {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-  const qs = await getDocs(query(collection(db, "messages"), where("toUid", "==", user.uid)));
-  for (const snap of qs.docs) {
-    const data = snap.data();
-    if (!unique(data.readBy).includes(user.uid)) {
-      await updateDoc(snap.ref, { readBy: arrayUnion(user.uid), readAt: serverTimestamp() });
-    }
-  }
+  const ids = (socialState.messages || [])
+    .filter((message) => cleanUid(message.toUid) === user.uid && isUnreadForUser(message, user.uid))
+    .map((message) => message.id);
+  await setMessagesReadState(ids, true);
 }
 
 async function markAllMessagesUnread() {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
-  const qs = await getDocs(query(collection(db, "messages"), where("toUid", "==", user.uid)));
-  for (const snap of qs.docs) {
-    const data = snap.data();
-    if (unique(data.readBy).includes(user.uid)) {
-      await updateDoc(snap.ref, { readBy: arrayRemove(user.uid), readAt: null });
-    }
+  const ids = (socialState.messages || [])
+    .filter((message) => cleanUid(message.toUid) === user.uid && !isUnreadForUser(message, user.uid))
+    .map((message) => message.id);
+  await setMessagesReadState(ids, false);
+}
+
+async function deleteMessageForCurrentUser(messageId) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  const id = cleanUid(messageId);
+  if (!id) throw new Error("Message not found.");
+
+  const ref = doc(db, "messages", id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+
+  const data = snap.data();
+  const participants = unique(data.participants);
+  if (!participants.includes(user.uid) && cleanUid(data.toUid) !== user.uid && cleanUid(data.fromUid) !== user.uid) {
+    throw new Error("You cannot delete that message.");
   }
+
+  await updateDoc(ref, {
+    deletedFor: arrayUnion(user.uid),
+    updatedAt: serverTimestamp()
+  });
 }
 
 async function viewProfileById(uid) {
@@ -1149,10 +1218,11 @@ function startRealtime() {
       snap.forEach(d => all.push({ id: d.id, ...d.data() }));
       const sorted = sortNewestFirst(all);
       maybeToastNewMessages(sorted);
-      socialState.messages = sorted;
-      socialState.incomingRequests = sortNewestFirst(sorted.filter(m => m.kind === "friend-request" && m.toUid === user.uid && (m.status || "pending") === "pending"));
-      socialState.outgoingRequests = sortNewestFirst(sorted.filter(m => m.kind === "friend-request" && m.fromUid === user.uid && (m.status || "pending") === "pending"));
-      socialState.unreadCount = sorted.filter(m => m.toUid === user.uid && !unique(m.readBy).includes(user.uid)).length;
+      const visible = sorted.filter((message) => !unique(message.deletedFor).includes(user.uid));
+      socialState.messages = visible;
+      socialState.incomingRequests = sortNewestFirst(visible.filter(m => m.kind === "friend-request" && m.toUid === user.uid && (m.status || "pending") === "pending"));
+      socialState.outgoingRequests = sortNewestFirst(visible.filter(m => m.kind === "friend-request" && m.fromUid === user.uid && (m.status || "pending") === "pending"));
+      socialState.unreadCount = visible.filter(m => isUnreadForUser(m, user.uid)).length;
       await syncRelationshipSignals(sorted);
       emit();
     }, (error) => {
@@ -1249,8 +1319,10 @@ export {
   sendGroupMessage,
   leaveGroupChat,
   markMessageRead,
+  setMessagesReadState,
   markAllMessagesRead,
   markAllMessagesUnread,
+  deleteMessageForCurrentUser,
   viewProfileById,
   setSelectedConversation,
   setSelectedGroupChatId,

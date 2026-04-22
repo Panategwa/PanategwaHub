@@ -116,11 +116,16 @@
 
   <style>
     :root {
-      --panel-bg: rgba(255,255,255,0.08);
-      --panel-border: rgba(255,255,255,0.14);
-      --panel-soft: rgba(255,255,255,0.05);
-      --accent: rgba(175,200,75,0.28);
-      --soft-shadow: 0 18px 40px rgba(0,0,0,0.18);
+      --panel-bg: rgba(10, 17, 31, 0.74);
+      --panel-border: rgba(148, 163, 184, 0.18);
+      --panel-soft: rgba(15, 23, 42, 0.56);
+      --accent: linear-gradient(135deg, rgba(56, 189, 248, 0.94), rgba(59, 130, 246, 0.9));
+      --accent-border: rgba(125, 211, 252, 0.42);
+      --button-bg: linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.96));
+      --button-border: rgba(148, 163, 184, 0.24);
+      --button-hover-border: rgba(125, 211, 252, 0.4);
+      --button-shadow: 0 12px 26px rgba(2, 6, 23, 0.18);
+      --soft-shadow: 0 20px 44px rgba(2, 6, 23, 0.28);
     }
 
     .account-wrap {
@@ -165,9 +170,9 @@
       margin: 0;
       padding: 11px 15px;
       border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.18);
-      background: rgba(255,255,255,0.08);
-      color: inherit;
+      border: 1px solid var(--button-border);
+      background: var(--button-bg);
+      color: #f8fafc;
       font: inherit;
       font-weight: 700;
       cursor: pointer;
@@ -175,8 +180,9 @@
 
     .tab-button.active,
     .tab-chip.active {
-      filter: brightness(0.9);
       background: var(--accent);
+      border-color: var(--accent-border);
+      box-shadow: 0 16px 30px rgba(37, 99, 235, 0.28);
     }
 
     .account-section {
@@ -239,6 +245,31 @@
       border-radius: 999px;
     }
 
+    .account-wrap button:not(.link-button) {
+      transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
+      border: 1px solid var(--button-border);
+      background: var(--button-bg);
+      color: #f8fafc;
+      box-shadow: var(--button-shadow);
+    }
+
+    .account-wrap button:not(.link-button):hover {
+      transform: translateY(-1px);
+      border-color: var(--button-hover-border);
+      box-shadow: 0 16px 32px rgba(2, 6, 23, 0.26);
+    }
+
+    .account-wrap button:not(.link-button):active {
+      transform: translateY(0);
+    }
+
+    .account-wrap button:not(.link-button):disabled {
+      opacity: 0.58;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
     .button-ghost,
     .link-button,
     .provider-btn {
@@ -258,8 +289,9 @@
     }
 
     .danger {
-      background: rgba(180, 40, 40, 0.9);
+      background: linear-gradient(135deg, rgba(220, 38, 38, 0.92), rgba(185, 28, 28, 0.92));
       color: white;
+      border-color: rgba(254, 202, 202, 0.28);
     }
 
     .status {
@@ -359,9 +391,6 @@
       width: 100%;
       padding: 12px 14px;
       border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.18);
-      background: rgba(255,255,255,0.08);
-      color: inherit;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -481,8 +510,6 @@
       height: 30px;
       padding: 0;
       border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.18);
-      background: rgba(255,255,255,0.09);
       color: inherit;
       cursor: pointer;
       flex: 0 0 auto;
@@ -537,7 +564,7 @@
       width: 0%;
       height: 100%;
       border-radius: 999px;
-      background: linear-gradient(90deg, rgba(175,200,75,0.95), rgba(80,180,255,0.95));
+      background: linear-gradient(90deg, rgba(56,189,248,0.95), rgba(59,130,246,0.95));
       transition: none;
     }
 
@@ -727,8 +754,8 @@
 
     .friend-pill.active,
     .group-pill.active {
-      background: rgba(175,200,75,0.2);
-      border: 1px solid rgba(175,200,75,0.22);
+      background: rgba(59,130,246,0.22);
+      border: 1px solid rgba(125,211,252,0.28);
     }
 
     .channel-bar {
@@ -1014,8 +1041,8 @@
       width: 44px;
       height: 44px;
       border-radius: 14px;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--button-border);
+      background: var(--button-bg);
       display: grid;
       place-items: center;
       cursor: pointer;
@@ -1029,8 +1056,8 @@
     }
 
     .friend-entry-menu[open] summary {
-      background: rgba(175,200,75,0.18);
-      border-color: rgba(175,200,75,0.3);
+      background: var(--accent);
+      border-color: var(--accent-border);
     }
 
     .friend-entry-popover {

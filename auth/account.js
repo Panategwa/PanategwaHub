@@ -526,7 +526,7 @@ function renderFriends(state) {
         </button>
 
         <details class="friend-entry-menu">
-          <summary aria-label="Friend actions">...</summary>
+          <summary aria-label="Friend actions">⋮</summary>
           <div class="friend-entry-popover">
             <button type="button" data-action="friend-message" data-uid="${escapeHtml(friend.uid)}">Message</button>
             <button type="button" data-action="friend-copy" data-uid="${escapeHtml(friend.uid)}">Copy ID</button>

@@ -4,8 +4,8 @@ import {
   changePassword,
   setAvatarPreset,
   AVATAR_PRESET_REQUIREMENTS,
-  doesRankMeetRequirement,
-  getRankFromXp,
+  getAvatarPresetRequirementText,
+  isAvatarPresetUnlocked,
   setAvatarLetter,
   useDefaultProfilePicture,
   updatePrivacySettings,
@@ -62,26 +62,28 @@ function syncForm(profile, user) {
 }
 
 function syncAvatarPresetLocks(profile) {
-  const currentRank = getRankFromXp(profile?.xp || 0);
-
   for (const presetId of PRESET_IDS) {
     const button = $(`avatar-preset-${presetId}-btn`);
     if (!button) continue;
 
-    const requiredRank = AVATAR_PRESET_REQUIREMENTS[presetId] || "Explorer";
-    const unlocked = doesRankMeetRequirement(currentRank, requiredRank);
+    const requirement = AVATAR_PRESET_REQUIREMENTS[presetId] || AVATAR_PRESET_REQUIREMENTS["1"];
+    const unlocked = isAvatarPresetUnlocked(profile, presetId);
     const note = button.querySelector("[data-avatar-rank-note]");
 
     button.disabled = !unlocked;
     button.dataset.locked = unlocked ? "false" : "true";
     button.title = unlocked
-      ? `Unlocked at ${requiredRank}`
-      : `Unlocks at ${requiredRank} rank`;
+      ? `Unlocked: ${getAvatarPresetRequirementText(presetId, true)}`
+      : `Locked: ${getAvatarPresetRequirementText(presetId, false)}`;
 
     if (note) {
-      note.textContent = unlocked
-        ? `${requiredRank} rank`
-        : `Unlocks at ${requiredRank}`;
+      note.textContent = getAvatarPresetRequirementText(presetId, unlocked);
+    }
+
+    if (requirement.hiddenAchievement) {
+      button.dataset.secretRequirement = "true";
+    } else {
+      delete button.dataset.secretRequirement;
     }
   }
 }

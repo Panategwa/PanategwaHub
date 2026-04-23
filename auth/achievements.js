@@ -93,6 +93,24 @@ function createdAtMs(value) {
   return 0;
 }
 
+function normalizeProgressBaseline(value = {}) {
+  return {
+    resetAt: createdAtMs(value.resetAt),
+    username: String(value.username || ""),
+    verified: !!value.verified,
+    theme: String(value.theme || ""),
+    textSize: String(value.textSize || ""),
+    hourBucket: String(value.hourBucket || ""),
+    friends: [...new Set((Array.isArray(value.friends) ? value.friends : []).map((entry) => String(entry || "").trim()).filter(Boolean))]
+  };
+}
+
+function hourBucket(hour) {
+  if (hour >= 21 || hour < 3) return "nocturnal";
+  if (hour >= 3 && hour < 11) return "morning";
+  return "day";
+}
+
 function computeUnlocks(user, profile, pages) {
   const unlocked = unlockedSet(profile);
   const pending = [];
@@ -101,10 +119,23 @@ function computeUnlocks(user, profile, pages) {
   };
 
   const page = pageId();
+  const baseline = normalizeProgressBaseline(profile?.progressBaseline);
+  const hasResetBaseline = baseline.resetAt > 0;
+  const currentUsername = String(profile?.username || user.displayName || "").trim();
+  const loginMs = createdAtMs(profile?.lastLoginAt);
+  const theme = currentTheme();
+  const size = currentTextSize();
+  const hour = new Date().getHours();
+  const currentBucket = hourBucket(hour);
+  const baselineFriends = new Set(baseline.friends);
+  const currentFriends = [...new Set((Array.isArray(profile?.friends) ? profile.friends : []).map((value) => String(value || "").trim()).filter(Boolean))];
+  const newFriendsCount = hasResetBaseline
+    ? currentFriends.filter((uid) => !baselineFriends.has(uid)).length
+    : currentFriends.length;
 
-  add("first_login", true);
-  add("profile_name", !!(profile?.username || user.displayName));
-  add("verified_email", !!user.emailVerified);
+  add("first_login", hasResetBaseline ? loginMs > baseline.resetAt + 1000 : true);
+  add("profile_name", hasResetBaseline ? (!!currentUsername && currentUsername !== baseline.username) : !!currentUsername);
+  add("verified_email", hasResetBaseline ? (!!user.emailVerified && !baseline.verified) : !!user.emailVerified);
   add("panategwa_b", page === "panategwa-b-page.html");
   add("panategwa_c", page === "panategwa-c-page.html");
   add("panategwa_d", page === "panategwa-d-page.html");
@@ -123,29 +154,25 @@ function computeUnlocks(user, profile, pages) {
     "panategwa-g-page.html"
   ].every((targetPage) => pages.includes(targetPage)));
 
-  const theme = currentTheme();
-  add("theme_shifter", theme !== "Panategwa Mode (Default)");
-  add("dark_mode", theme === "Dark Mode");
-  add("light_mode", theme === "Light Mode");
-  add("ocean_mode", theme === "Ocean");
-  add("space_mode", theme === "Space");
+  add("theme_shifter", hasResetBaseline ? (theme !== "Panategwa Mode (Default)" && theme !== baseline.theme) : theme !== "Panategwa Mode (Default)");
+  add("dark_mode", theme === "Dark Mode" && (!hasResetBaseline || baseline.theme !== "Dark Mode"));
+  add("light_mode", theme === "Light Mode" && (!hasResetBaseline || baseline.theme !== "Light Mode"));
+  add("ocean_mode", theme === "Ocean" && (!hasResetBaseline || baseline.theme !== "Ocean"));
+  add("space_mode", theme === "Space" && (!hasResetBaseline || baseline.theme !== "Space"));
 
-  const size = currentTextSize();
-  add("big_reader", size === "large");
-  add("tiny_text", size === "small");
-
-  const hour = new Date().getHours();
-  add("nocturnal", hour >= 21 || hour < 3);
-  add("morning_person", hour >= 3 && hour < 11);
+  add("big_reader", size === "large" && (!hasResetBaseline || baseline.textSize !== "large"));
+  add("tiny_text", size === "small" && (!hasResetBaseline || baseline.textSize !== "small"));
+  add("nocturnal", currentBucket === "nocturnal" && (!hasResetBaseline || baseline.hourBucket !== "nocturnal"));
+  add("morning_person", currentBucket === "morning" && (!hasResetBaseline || baseline.hourBucket !== "morning"));
 
   const currentXp = typeof profile?.xp === "number" ? profile.xp : unlocked.size;
-  const friendsCount = Array.isArray(profile?.friends) ? profile.friends.length : 0;
   const streakCurrent = Number(profile?.streak?.current || 0);
   const joinedMs = createdAtMs(profile?.createdAt);
+  const progressAgeStart = hasResetBaseline ? baseline.resetAt : joinedMs;
 
-  add("first_friend", friendsCount >= 1);
-  add("three_friends", friendsCount >= 3);
-  add("site_20_minutes", joinedMs > 0 && (Date.now() - joinedMs) >= 20 * 60 * 1000);
+  add("first_friend", newFriendsCount >= 1);
+  add("three_friends", newFriendsCount >= 3);
+  add("site_20_minutes", progressAgeStart > 0 && (Date.now() - progressAgeStart) >= 20 * 60 * 1000);
   add("explorer_rank", currentXp >= 10);
   add("expert_rank", currentXp >= 20);
   add("week_streak", streakCurrent >= 7);

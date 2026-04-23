@@ -28,7 +28,8 @@ import {
   collection,
   query,
   where,
-  serverTimestamp
+  serverTimestamp,
+  arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 function userRef(uid) {
@@ -56,6 +57,41 @@ function normalizePrivacySettings(settings = {}) {
   };
 }
 
+function currentThemeSetting() {
+  try {
+    return localStorage.getItem("theme") || "Panategwa Mode (Default)";
+  } catch {
+    return "Panategwa Mode (Default)";
+  }
+}
+
+function currentTextSizeSetting() {
+  try {
+    return localStorage.getItem("textsize") || "medium";
+  } catch {
+    return "medium";
+  }
+}
+
+function currentHourBucket() {
+  const hour = new Date().getHours();
+  if (hour >= 21 || hour < 3) return "nocturnal";
+  if (hour >= 3 && hour < 11) return "morning";
+  return "day";
+}
+
+function normalizeProgressBaseline(value = {}) {
+  return {
+    resetAt: typeof value.resetAt === "number" ? value.resetAt : 0,
+    username: String(value.username || ""),
+    verified: !!value.verified,
+    theme: String(value.theme || ""),
+    textSize: String(value.textSize || ""),
+    hourBucket: String(value.hourBucket || ""),
+    friends: uniqueStrings(value.friends)
+  };
+}
+
 function defaultUsername(user) {
   return user?.displayName || user?.email?.split("@")?.[0] || "Player";
 }
@@ -68,14 +104,14 @@ const RANK_LEVELS = Object.freeze({
 });
 
 export const AVATAR_PRESET_REQUIREMENTS = Object.freeze({
-  "1": "Adventurer",
-  "2": "Adventurer",
-  "3": "Explorer",
-  "4": "Explorer",
-  "5": "Experienced",
-  "6": "Experienced",
-  "7": "Veteran",
-  "8": "Veteran"
+  "1": Object.freeze({ rank: "Adventurer", note: "Adventurer rank" }),
+  "2": Object.freeze({ rank: "Adventurer", note: "Adventurer rank" }),
+  "3": Object.freeze({ rank: "Explorer", note: "Explorer rank" }),
+  "4": Object.freeze({ rank: "Explorer", note: "Explorer rank" }),
+  "5": Object.freeze({ rank: "Experienced", achievementId: "first_friend", achievementName: "First Signal", hiddenAchievement: false, note: "Experienced + First Signal" }),
+  "6": Object.freeze({ rank: "Experienced", achievementId: "site_20_minutes", achievementName: "Settled In", hiddenAchievement: false, note: "Experienced + Settled In" }),
+  "7": Object.freeze({ rank: "Veteran", achievementId: "achievement_collector", achievementName: "Achievement Collector", hiddenAchievement: false, note: "Veteran + Achievement Collector" }),
+  "8": Object.freeze({ rank: "Veteran", achievementId: "nocturnal", achievementName: "Secret achievement", hiddenAchievement: true, note: "Veteran + secret achievement" })
 });
 
 export function getRankFromXp(xp) {
@@ -87,6 +123,57 @@ export function getRankFromXp(xp) {
 
 export function doesRankMeetRequirement(rank, requiredRank) {
   return (RANK_LEVELS[rank] ?? 0) >= (RANK_LEVELS[requiredRank] ?? 0);
+}
+
+export function getAvatarPresetRequirement(presetId) {
+  const raw = AVATAR_PRESET_REQUIREMENTS[String(presetId || "1")] || AVATAR_PRESET_REQUIREMENTS["1"];
+  return {
+    rank: String(raw.rank || "Adventurer"),
+    achievementId: raw.achievementId ? String(raw.achievementId) : "",
+    achievementName: raw.hiddenAchievement ? "Secret achievement" : String(raw.achievementName || ""),
+    hiddenAchievement: !!raw.hiddenAchievement,
+    note: String(raw.note || raw.rank || "Adventurer rank")
+  };
+}
+
+export function getAvatarPresetRequirementText(presetId, unlocked = false) {
+  const requirement = getAvatarPresetRequirement(presetId);
+  if (!requirement.achievementId) {
+    return unlocked ? `${requirement.rank} rank` : `Unlocks at ${requirement.rank}`;
+  }
+
+  if (requirement.hiddenAchievement) {
+    return unlocked
+      ? `${requirement.rank} + secret`
+      : `${requirement.rank} + secret`;
+  }
+
+  return unlocked
+    ? `${requirement.rank} + ${requirement.achievementName}`
+    : `${requirement.rank} + ${requirement.achievementName}`;
+}
+
+export function isAvatarPresetUnlocked(profile, presetId) {
+  const requirement = getAvatarPresetRequirement(presetId);
+  const currentRank = getRankFromXp(profile?.xp || 0);
+  const hasRank = doesRankMeetRequirement(currentRank, requirement.rank);
+  const achievements = uniqueStrings(profile?.achievements);
+  const hasAchievement = !requirement.achievementId || achievements.includes(requirement.achievementId);
+  return hasRank && hasAchievement;
+}
+
+function lockedAvatarReason(profile, presetId) {
+  const requirement = getAvatarPresetRequirement(presetId);
+  const currentRank = getRankFromXp(profile?.xp || 0);
+  if (!doesRankMeetRequirement(currentRank, requirement.rank)) {
+    return `Preset ${presetId} unlocks at ${requirement.rank} rank.`;
+  }
+  if (requirement.achievementId) {
+    return requirement.hiddenAchievement
+      ? `Preset ${presetId} also needs a secret achievement.`
+      : `Preset ${presetId} also needs the "${requirement.achievementName}" achievement.`;
+  }
+  return `Preset ${presetId} is locked.`;
 }
 
 function svgDataUrl(svg) {
@@ -227,6 +314,7 @@ function baseProfile(user) {
       blocked: []
     },
     privacySettings: normalizePrivacySettings(),
+    progressBaseline: normalizeProgressBaseline(),
     streak: {
       current: 0,
       longest: 0,
@@ -344,6 +432,7 @@ export async function ensureUserProfile(user) {
     socialSettings: normalizeSocialSettings(data.socialSettings),
     socialBackup,
     privacySettings: normalizePrivacySettings(data.privacySettings),
+    progressBaseline: normalizeProgressBaseline(data.progressBaseline),
     streak: normalizeStreak(data.streak),
     longestStreak: Number(data.longestStreak || data.streak?.longest || 0),
     streakHistory: normalizeStreakHistory(data.streakHistory),
@@ -463,6 +552,7 @@ export async function saveUsername(username) {
   await updateProfile(user, { displayName: cleanName });
   await setDoc(userRef(user.uid), {
     username: cleanName,
+    usernameUpdatedAt: Date.now(),
     updatedAt: serverTimestamp()
   }, { merge: true });
 
@@ -475,11 +565,8 @@ export async function setAvatarPreset(presetId) {
 
   const id = String(presetId || "1");
   const profile = await getProfile(user.uid);
-  const requiredRank = AVATAR_PRESET_REQUIREMENTS[id] || "Explorer";
-  const currentRank = getRankFromXp(profile?.xp || 0);
-
-  if (!doesRankMeetRequirement(currentRank, requiredRank)) {
-    throw new Error(`Preset ${id} unlocks at ${requiredRank} rank.`);
+  if (!isAvatarPresetUnlocked(profile, id)) {
+    throw new Error(lockedAvatarReason(profile, id));
   }
 
   const dataUrl = presetAvatarDataUrl(id);
@@ -656,6 +743,15 @@ async function removeUserFromGroups(uid) {
   }
 }
 
+function otherParticipantFromMessage(data, currentUid) {
+  const fromUid = String(data?.fromUid || "").trim();
+  const toUid = String(data?.toUid || "").trim();
+  if (fromUid && fromUid !== currentUid) return fromUid;
+  if (toUid && toUid !== currentUid) return toUid;
+  const participants = uniqueStrings(data?.participants);
+  return participants.find((uid) => uid !== currentUid) || "";
+}
+
 export async function resetAccountData(mode = "progress") {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
@@ -670,7 +766,24 @@ export async function resetAccountData(mode = "progress") {
   };
 
   if (nextMode === "progress" || nextMode === "all") {
+    updates.xp = 0;
     updates.achievements = [];
+    updates.visitedPages = [];
+    updates.stats = {
+      ...(profile.stats || {}),
+      pagesVisited: 0,
+      planetsFound: 0,
+      secretsFound: 0
+    };
+    updates.progressBaseline = normalizeProgressBaseline({
+      resetAt: Date.now(),
+      username: profile.username || user.displayName || "",
+      verified: !!user.emailVerified,
+      theme: currentThemeSetting(),
+      textSize: currentTextSizeSetting(),
+      hourBucket: currentHourBucket(),
+      friends: uniqueStrings(profile.friends)
+    });
     updates.longestStreak = 0;
     updates.streak = {
       current: 0,
@@ -685,6 +798,7 @@ export async function resetAccountData(mode = "progress") {
     const friends = uniqueStrings(profile.friends);
     const blocked = uniqueStrings(profile.blocked);
     const nextBlocked = nextMode === "all" ? [] : blocked;
+    const historyIds = new Set([...friends, ...blocked]);
 
     updates.friends = [];
     updates.blocked = nextBlocked;
@@ -692,10 +806,21 @@ export async function resetAccountData(mode = "progress") {
       friends: [],
       blocked: nextBlocked
     };
+    updates.progressBaseline = {
+      ...normalizeProgressBaseline(profile.progressBaseline),
+      friends: []
+    };
 
     const messagesSnap = await getDocs(query(collection(db, "messages"), where("participants", "array-contains", user.uid)));
     for (const messageDoc of messagesSnap.docs) {
       const data = messageDoc.data() || {};
+      const otherUid = otherParticipantFromMessage(data, user.uid);
+      if (data.kind === "friend-request" || historyIds.has(otherUid)) {
+        await updateDoc(messageDoc.ref, {
+          deletedFor: arrayUnion(user.uid),
+          updatedAt: serverTimestamp()
+        });
+      }
       if (data.kind !== "friend-request" || (data.status || "pending") !== "pending") continue;
       await updateDoc(messageDoc.ref, {
         status: data.toUid === user.uid ? "ignored" : "cancelled",
@@ -733,6 +858,9 @@ export async function resetAccountData(mode = "progress") {
 
   await setDoc(userRef(user.uid), updates, { merge: true });
   localStorage.removeItem(`ptg_streak_${user.uid}`);
+  try {
+    sessionStorage.removeItem(`ptg_last_login_${user.uid}`);
+  } catch {}
   return true;
 }
 

@@ -63,7 +63,7 @@ function defaultUsername(user) {
 const RANK_LEVELS = Object.freeze({
   Adventurer: 0,
   Explorer: 1,
-  Expert: 2,
+  Experienced: 2,
   Veteran: 3
 });
 
@@ -72,15 +72,15 @@ export const AVATAR_PRESET_REQUIREMENTS = Object.freeze({
   "2": "Adventurer",
   "3": "Explorer",
   "4": "Explorer",
-  "5": "Expert",
-  "6": "Expert",
+  "5": "Experienced",
+  "6": "Experienced",
   "7": "Veteran",
   "8": "Veteran"
 });
 
 export function getRankFromXp(xp) {
   if (Number(xp || 0) >= 30) return "Veteran";
-  if (Number(xp || 0) >= 20) return "Expert";
+  if (Number(xp || 0) >= 20) return "Experienced";
   if (Number(xp || 0) >= 10) return "Explorer";
   return "Adventurer";
 }
@@ -670,15 +670,7 @@ export async function resetAccountData(mode = "progress") {
   };
 
   if (nextMode === "progress" || nextMode === "all") {
-    updates.xp = 0;
     updates.achievements = [];
-    updates.visitedPages = [];
-    updates.stats = {
-      ...(profile.stats || {}),
-      pagesVisited: 0,
-      planetsFound: 0,
-      secretsFound: 0
-    };
     updates.longestStreak = 0;
     updates.streak = {
       current: 0,

@@ -1,5 +1,5 @@
-import { auth, db } from "./firebase-config.js";
-import { watchAuth, ensureUserProfile, getProfile } from "./auth.js";
+import { db } from "./firebase-config.js";
+import { watchAuth, ensureUserProfile } from "./auth.js";
 
 import {
   doc,
@@ -11,7 +11,6 @@ import {
 export const ACHIEVEMENTS = [
   { id: "achievement_collector", name: "Achievement Collector", description: "Unlock 10 achievements.", secret: false, reward: 5 },
   { id: "all_planets", name: "Astronaut", description: "Visit all celestial bodies of the Panategwa system.", secret: false, reward: 5 },
-  { id: "account_viewed", name: "Account Viewer", description: "Open the account page.", secret: false, reward: 1 },
   { id: "big_reader", name: "Need some glasses?", description: "Set text size to Large.", secret: true, reward: 2 },
   { id: "dark_mode", name: "Dark Night", description: "Use Dark Mode.", secret: false, reward: 1 },
   { id: "first_login", name: "First Contact", description: "Log in for the first time.", secret: false, reward: 1 },
@@ -31,12 +30,13 @@ export const ACHIEVEMENTS = [
   { id: "site_20_minutes", name: "Settled In", description: "Be part of the site for over 20 minutes.", secret: false, reward: 2 },
   { id: "space_mode", name: "Stargazer", description: "Use the Space theme.", secret: false, reward: 1 },
   { id: "explorer_rank", name: "Explorer Rank", description: "Reach Explorer rank (10 XP).", secret: false, reward: 2 },
-  { id: "expert_rank", name: "Expert Rank", description: "Reach Expert rank (20 XP).", secret: false, reward: 3 },
+  { id: "expert_rank", name: "Experienced Rank", description: "Reach Experienced rank (20 XP).", secret: false, reward: 3 },
   { id: "theme_shifter", name: "Aesthetic Control", description: "Change your theme.", secret: false, reward: 1 },
   { id: "thrinsachelom_history", name: "Historian", description: "View the history of the Thrinsacheloms.", secret: false, reward: 2 },
   { id: "tiny_text", name: "Microscopic Text", description: "Set text size to Small.", secret: true, reward: 2 },
   { id: "verified_email", name: "Verified Signal", description: "Verify your email address.", secret: false, reward: 2 },
-  { id: "week_streak", name: "Seven Sunrises", description: "Reach a 7 day streak.", secret: false, reward: 4 },
+  { id: "week_streak", name: "Week Streak", description: "Reach a 7 day streak.", secret: false, reward: 4 },
+  { id: "year_streak", name: "Year Streak", description: "Reach a 365 day streak.", secret: true, reward: 50 },
   { id: "veteran", name: "Veteran", description: "Reach Veteran rank (30 XP).", secret: false, reward: 5 }
 ];
 
@@ -45,7 +45,6 @@ const KNOWN_IDS = new Set(ACHIEVEMENTS.map((achievement) => achievement.id));
 
 let started = false;
 let profileUnsub = null;
-let pollTimer = null;
 let toastQueue = [];
 let toastActive = false;
 
@@ -106,7 +105,6 @@ function computeUnlocks(user, profile, pages) {
   add("first_login", true);
   add("profile_name", !!(profile?.username || user.displayName));
   add("verified_email", !!user.emailVerified);
-  add("account_viewed", page === "account-page.html");
   add("panategwa_b", page === "panategwa-b-page.html");
   add("panategwa_c", page === "panategwa-c-page.html");
   add("panategwa_d", page === "panategwa-d-page.html");
@@ -151,6 +149,7 @@ function computeUnlocks(user, profile, pages) {
   add("explorer_rank", currentXp >= 10);
   add("expert_rank", currentXp >= 20);
   add("week_streak", streakCurrent >= 7);
+  add("year_streak", streakCurrent >= 365);
   add("veteran", currentXp >= 30);
 
   const projectedAchievementCount = unlocked.size + pending.length;
@@ -390,31 +389,12 @@ function startLiveProfileListener() {
   });
 }
 
-function startPoller() {
-  if (pollTimer) return;
-
-  pollTimer = setInterval(async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-      const profile = await getProfile(user.uid);
-      const result = await syncAchievementProgress(user, profile);
-      renderAchievements(result.profile || profile);
-      emitAchievementToasts(user, result.newlyUnlocked);
-    } catch (error) {
-      console.error("Achievement poll error:", error);
-    }
-  }, 3000);
-}
-
 function startAchievementSystem() {
   if (started) return;
   started = true;
 
   startAccountWatcher();
   startLiveProfileListener();
-  startPoller();
 }
 
 if (document.readyState === "loading") {

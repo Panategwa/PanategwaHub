@@ -80,15 +80,15 @@ function checkIcon() {
 
 function getRank(xp) {
   if (xp >= 30) return "Veteran";
-  if (xp >= 20) return "Expert";
+  if (xp >= 20) return "Experienced";
   if (xp >= 10) return "Explorer";
   return "Adventurer";
 }
 
 function getRankInfo(xp) {
   if (xp >= 30) return { current: "Veteran", next: "Max rank", start: 30, end: 30 };
-  if (xp >= 20) return { current: "Expert", next: "Veteran", start: 20, end: 30 };
-  if (xp >= 10) return { current: "Explorer", next: "Expert", start: 10, end: 20 };
+  if (xp >= 20) return { current: "Experienced", next: "Veteran", start: 20, end: 30 };
+  if (xp >= 10) return { current: "Explorer", next: "Experienced", start: 10, end: 20 };
   return { current: "Adventurer", next: "Explorer", start: 0, end: 10 };
 }
 

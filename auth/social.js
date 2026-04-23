@@ -157,7 +157,7 @@ function usernameOf(profile) {
 
 function rankFromXp(xp) {
   if (Number(xp || 0) >= 30) return "Veteran";
-  if (Number(xp || 0) >= 20) return "Expert";
+  if (Number(xp || 0) >= 20) return "Experienced";
   if (Number(xp || 0) >= 10) return "Explorer";
   return "Adventurer";
 }
@@ -170,7 +170,7 @@ function syncUnreadCount() {
   }
 
   const unreadDirect = (socialState.messages || []).filter((message) => message.kind === "chat" && isUnreadForUser(message, uid)).length;
-  socialState.unreadCount = unreadDirect + Number(socialState.incomingRequests?.length || 0) + Number(socialState.groupInvites?.length || 0);
+  socialState.unreadCount = unreadDirect + Number(socialState.incomingRequests?.length || 0);
 }
 
 function currentStreakOf(profile) {
@@ -431,7 +431,7 @@ function maybeToastNewMessages(messages) {
   if (typeof window.PanategwaToast !== "function") return;
 
   const toastable = freshIncoming.filter((message) => {
-    return ["chat", "friend-request", "friend-accepted", "friend-declined", "friend-removed", "friend-blocked", "group-invite"].includes(message.kind)
+    return ["chat", "friend-request", "friend-accepted", "friend-declined", "friend-removed", "friend-blocked"].includes(message.kind)
       && !!toastConfigForMessage(message);
   });
   if (!toastable.length) return;
@@ -1350,68 +1350,12 @@ function startRealtime() {
       });
     });
 
-    unsubGroupChats = onSnapshot(query(collection(db, "groupChats"), where("members", "array-contains", user.uid)), (snap) => {
-      clearListenerError("groupChats");
-      const chats = [];
-      snap.forEach(d => chats.push({ id: d.id, ...d.data() }));
-      socialState.groupChats = sortNewestFirst(chats.filter(c => !c.deleted));
-
-      if (!socialState.selectedGroupChatId && socialState.groupChats[0]) socialState.selectedGroupChatId = socialState.groupChats[0].id;
-      if (socialState.selectedGroupChatId && !socialState.groupChats.some(c => c.id === socialState.selectedGroupChatId)) {
-        socialState.selectedGroupChatId = socialState.groupChats[0]?.id || null;
-      }
-
-      const activeIds = new Set(socialState.groupChats.map(c => c.id));
-      for (const [chatId, unsub] of groupMessageUnsubs.entries()) {
-        if (!activeIds.has(chatId)) {
-          try { unsub(); } catch {}
-          groupMessageUnsubs.delete(chatId);
-          delete socialState.groupMessagesByChat[chatId];
-        }
-      }
-
-      for (const chat of socialState.groupChats) {
-        if (groupMessageUnsubs.has(chat.id)) continue;
-        const unsub = onSnapshot(collection(db, "groupChats", chat.id, "messages"), (msgSnap) => {
-          clearListenerError(`groupMessage:${chat.id}`);
-          const arr = [];
-          msgSnap.forEach(m => arr.push({ id: m.id, ...m.data() }));
-          const sortedMessages = sortNewestFirst(arr);
-          maybeToastNewGroupMessages(chat, sortedMessages);
-          socialState.groupMessagesByChat[chat.id] = sortedMessages;
-          emit();
-        }, (error) => {
-          setListenerError(`groupMessage:${chat.id}`, "group messages", error, () => {
-            delete socialState.groupMessagesByChat[chat.id];
-          });
-        });
-        groupMessageUnsubs.set(chat.id, unsub);
-      }
-
-      emit();
-    }, (error) => {
-      setListenerError("groupChats", "group chats", error, () => {
-        socialState.groupChats = [];
-        socialState.groupMessagesByChat = {};
-        socialState.selectedGroupChatId = null;
-      });
-    });
-
-    unsubGroupInvites = onSnapshot(query(collection(db, "groupChatInvites"), where("toUid", "==", user.uid)), (snap) => {
-      clearListenerError("groupInvites");
-      const invites = [];
-      snap.forEach(d => invites.push({ id: d.id, ...d.data() }));
-      const pendingInvites = sortNewestFirst(invites.filter(i => i.status === "pending"));
-      maybeToastPendingGroupInvites(pendingInvites);
-      socialState.groupInvites = pendingInvites;
-      syncUnreadCount();
-      emit();
-    }, (error) => {
-      setListenerError("groupInvites", "group invites", error, () => {
-        socialState.groupInvites = [];
-        syncUnreadCount();
-      });
-    });
+    socialState.groupChats = [];
+    socialState.groupMessagesByChat = {};
+    socialState.groupInvites = [];
+    socialState.selectedGroupChatId = null;
+    syncUnreadCount();
+    emit();
   });
 }
 

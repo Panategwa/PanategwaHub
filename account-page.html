@@ -1420,42 +1420,94 @@
       gap: 8px;
     }
 
-    .social-layout {
+    .social-layout,
+    .social-layout-direct-only {
       display: grid;
-      grid-template-columns: 220px 320px minmax(0, 1fr) 320px;
-      gap: 14px;
-      min-height: 640px;
+      grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
+      gap: 16px;
+      min-height: 680px;
+      align-items: start;
     }
 
     .social-panel,
-    .social-rail-card,
-    .social-quick-card,
-    .social-detail-card {
-      border-radius: 22px;
+    .social-quick-card {
+      border-radius: 24px;
       border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(15, 23, 42, 0.34);
-      backdrop-filter: blur(16px);
-      box-shadow: 0 16px 32px rgba(8, 15, 31, 0.18);
-      padding: 14px;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.46), rgba(15, 23, 42, 0.3));
+      backdrop-filter: blur(18px);
+      box-shadow: 0 18px 38px rgba(8, 15, 31, 0.2);
+      padding: 16px;
     }
 
-    .social-rail {
+    .social-panel-friends {
       display: grid;
-      gap: 12px;
+      gap: 14px;
       align-content: start;
     }
 
+    .social-panel-chat-wide {
+      min-height: 680px;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+
+    .social-shell-head,
+    .social-list-head,
+    .social-chat-head,
+    .social-profile-sheet-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .social-shell-head {
+      align-items: start;
+      flex-wrap: wrap;
+    }
+
+    .social-shell-head h3,
+    .social-list-head h3,
+    .social-chat-head h3 {
+      margin: 0;
+      border: 0;
+      padding: 0;
+      font-size: 1.08rem;
+    }
+
+    .social-shell-head p,
+    .social-list-head p,
+    .social-chat-head p {
+      margin: 4px 0 0;
+      opacity: 0.8;
+      font-size: 0.92rem;
+    }
+
+    .social-filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
     .social-switch {
-      width: 100%;
-      margin: 0 0 8px;
+      width: auto;
+      margin: 0;
+      padding: 10px 14px;
       display: inline-flex;
       justify-content: space-between;
       align-items: center;
       gap: 10px;
     }
 
-    .social-switch:last-child {
-      margin-bottom: 0;
+    .social-quick-card-inline {
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .social-quick-title {
+      font-weight: 700;
+      font-size: 0.96rem;
     }
 
     .social-form-stack {
@@ -1464,62 +1516,39 @@
       margin-top: 10px;
     }
 
-    .social-list-head,
-    .social-chat-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .social-list-head h3,
-    .social-chat-head h3,
-    .social-quick-card h3,
-    .social-detail-card h3 {
-      margin: 0;
-      border: 0;
-      padding: 0;
-      font-size: 1.08rem;
-    }
-
-    .social-list-head p,
-    .social-chat-head p {
-      margin: 2px 0 0;
-      opacity: 0.78;
-      font-size: 0.92rem;
+    .social-form-stack.compact {
+      margin-top: 0;
     }
 
     .social-list-scroll {
-      max-height: 560px;
+      max-height: 500px;
       overflow: auto;
       display: grid;
-      gap: 10px;
+      gap: 12px;
       padding-right: 4px;
+      align-content: start;
     }
 
-    .social-entry,
-    .social-entry-buttononly {
-      margin: 0;
+    .social-friend-card {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .social-friend-card.active {
+      background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(14,165,233,0.12));
+      border-color: rgba(125,211,252,0.3);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .social-friend-row {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 10px;
-      align-items: start;
-      border-radius: 18px;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: rgba(255,255,255,0.04);
-      padding: 10px;
-      box-shadow: none;
-    }
-
-    .social-entry-buttononly {
-      grid-template-columns: 1fr;
-    }
-
-    .social-entry.active,
-    .social-entry-buttononly.active {
-      background: rgba(59,130,246,0.18);
-      border-color: rgba(125,211,252,0.26);
+      align-items: center;
     }
 
     .social-entry-main {
@@ -1530,7 +1559,7 @@
       background: transparent;
       box-shadow: none;
       display: grid;
-      grid-template-columns: auto 1fr;
+      grid-template-columns: auto minmax(0, 1fr);
       gap: 12px;
       align-items: center;
       text-align: left;
@@ -1563,28 +1592,52 @@
       white-space: nowrap;
     }
 
+    .social-menu-toggle {
+      width: 42px;
+      min-width: 42px;
+      height: 42px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      font-size: 1.12rem;
+    }
+
+    .social-inline-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .social-inline-actions.tight,
+    .social-inline-actions-tight {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .social-inline-actions button {
+      width: 100%;
+      margin: 0;
+      justify-content: center;
+    }
+
     .social-avatar,
     .social-avatar.detail {
-      width: 48px;
-      height: 48px;
+      width: 50px;
+      height: 50px;
       border-radius: 18px;
       display: grid;
       place-items: center;
       overflow: hidden;
-      background: linear-gradient(135deg, rgba(59,130,246,0.28), rgba(15,23,42,0.8));
+      background: linear-gradient(135deg, rgba(59,130,246,0.28), rgba(15,23,42,0.84));
       border: 1px solid rgba(255,255,255,0.12);
       font-weight: 700;
       flex: 0 0 auto;
     }
 
     .social-avatar.detail {
-      width: 64px;
-      height: 64px;
-      border-radius: 22px;
-    }
-
-    .social-avatar.group {
-      font-size: 1.25rem;
+      width: 72px;
+      height: 72px;
+      border-radius: 24px;
     }
 
     .social-avatar-img {
@@ -1607,56 +1660,35 @@
       font-weight: 700;
     }
 
-    .social-entry-menu {
-      position: relative;
+    .social-chat-head-strong {
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 14px;
+      align-items: center;
     }
 
-    .social-entry-menu summary {
-      list-style: none;
-      width: 42px;
-      height: 42px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,0.1);
-      background: rgba(255,255,255,0.05);
+    .social-chat-hero {
       display: grid;
-      place-items: center;
-      cursor: pointer;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      min-width: 0;
     }
 
-    .social-entry-menu summary::-webkit-details-marker {
-      display: none;
-    }
-
-    .social-entry-popover {
-      position: absolute;
-      top: calc(100% + 8px);
-      right: 0;
-      min-width: 180px;
-      padding: 8px;
-      display: grid;
+    .social-chat-actions {
+      display: flex;
+      flex-wrap: wrap;
       gap: 8px;
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(15,23,42,0.92);
-      z-index: 30;
-      box-shadow: 0 18px 36px rgba(0,0,0,0.24);
-    }
-
-    .social-entry-popover button {
-      width: 100%;
-      margin: 0;
-      text-align: left;
-      justify-content: flex-start;
-      border-radius: 12px;
+      justify-content: flex-end;
     }
 
     .social-message-stream {
-      min-height: 420px;
-      max-height: 420px;
+      min-height: 500px;
+      max-height: 500px;
       overflow: auto;
       display: grid;
-      gap: 10px;
-      padding: 10px 4px 10px 0;
+      gap: 12px;
+      padding: 10px 6px 10px 0;
       align-content: start;
     }
 
@@ -1669,31 +1701,24 @@
     }
 
     .chat-bubble-shell {
-      max-width: min(78%, 560px);
+      max-width: min(78%, 620px);
       display: grid;
       gap: 6px;
     }
 
-    .chat-author {
-      font-size: 0.84rem;
-      font-weight: 700;
-      opacity: 0.82;
-      padding-left: 6px;
-    }
-
     .chat-bubble {
-      padding: 12px 14px;
+      padding: 13px 15px;
       border-radius: 18px;
       background: rgba(255,255,255,0.08);
       border: 1px solid rgba(255,255,255,0.1);
-      color: rgba(255,255,255,0.94);
-      line-height: 1.45;
+      color: rgba(255,255,255,0.96);
+      line-height: 1.48;
       word-break: break-word;
     }
 
     .chat-message.mine .chat-bubble {
-      background: linear-gradient(135deg, rgba(59,130,246,0.92), rgba(37,99,235,0.82));
-      border-color: rgba(125,211,252,0.2);
+      background: linear-gradient(135deg, rgba(59,130,246,0.94), rgba(37,99,235,0.84));
+      border-color: rgba(125,211,252,0.24);
     }
 
     .chat-meta {
@@ -1706,22 +1731,8 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 10px;
-      margin-top: 12px;
+      margin-top: 14px;
       align-items: center;
-    }
-
-    .jump-to-latest {
-      margin: 0 auto 10px 0;
-      opacity: 0;
-      pointer-events: none;
-      transform: translateY(8px);
-      transition: opacity 0.18s ease, transform 0.18s ease;
-    }
-
-    .jump-to-latest.visible {
-      opacity: 1;
-      pointer-events: auto;
-      transform: translateY(0);
     }
 
     .social-chat-empty,
@@ -1730,24 +1741,41 @@
       border: 1px dashed rgba(255,255,255,0.14);
       background: rgba(255,255,255,0.03);
       padding: 18px;
-      opacity: 0.86;
+      opacity: 0.88;
     }
 
     .social-empty.inline {
       padding: 12px;
     }
 
+    .social-profile-sheet {
+      display: grid;
+      gap: 18px;
+      min-height: 100%;
+    }
+
+    .social-profile-sheet-top {
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-wrap: wrap;
+    }
+
+    .social-profile-sheet-body {
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+
     .social-detail-hero {
       display: grid;
       grid-template-columns: auto 1fr;
-      gap: 12px;
+      gap: 14px;
       align-items: center;
-      margin-bottom: 12px;
     }
 
     .social-detail-name {
       font-weight: 700;
-      font-size: 1.02rem;
+      font-size: 1.08rem;
     }
 
     .social-detail-id {
@@ -1756,8 +1784,7 @@
       word-break: break-all;
     }
 
-    .request-tight,
-    .invite-card.compact {
+    .request-tight {
       margin: 0;
     }
 
@@ -1782,8 +1809,13 @@
 
       .friends-grid,
       .discord-layout,
-      .social-layout {
+      .social-layout,
+      .social-layout-direct-only {
         grid-template-columns: 1fr;
+      }
+
+      .social-panel-chat-wide {
+        min-height: 0;
       }
     }
 
@@ -1820,18 +1852,20 @@
         right: auto;
       }
 
-      .social-entry,
-      .social-entry-buttononly {
+      .social-friend-row,
+      .social-inline-actions,
+      .social-composer {
         grid-template-columns: 1fr;
       }
 
-      .social-entry-menu {
-        justify-self: start;
+      .social-chat-head,
+      .social-profile-sheet-top,
+      .social-shell-head {
+        align-items: flex-start;
       }
 
-      .social-entry-popover {
-        left: 0;
-        right: auto;
+      .social-chat-actions {
+        justify-content: flex-start;
       }
     }
 
@@ -1955,8 +1989,8 @@
                 Send requests, accept them from your inbox, and view friend profiles.
               </div>
               <div class="auth-helper-item">
-                <strong>Messages and groups</strong>
-                Open direct chats, system messages, and group conversations from one place.
+                <strong>Direct messages</strong>
+                Chat with friends, review requests, and open profiles from one place.
               </div>
               <div class="auth-helper-item">
                 <strong>Saved progress</strong>
@@ -2013,7 +2047,7 @@
 
               <div class="setting-card">
                 <div class="setting-title">Profile picture</div>
-                <p id="security-note" class="setting-desc">Pick a preset that matches your rank. Presets 1-2 unlock at Adventurer, 3-4 at Explorer, 5-6 at Expert, and 7-8 at Veteran.</p>
+                <p id="security-note" class="setting-desc">Pick a preset that matches your rank. Presets 1-2 unlock at Adventurer, 3-4 at Explorer, 5-6 at Experienced, and 7-8 at Veteran.</p>
                 <div class="avatar-grid">
                   <button id="avatar-preset-1-btn" type="button" class="avatar-choice">
                     <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%230984e3"/%3E%3Cpath d="M64 30l10 20 22 3-16 16 4 22-20-10-20 10 4-22-16-16 22-3z" fill="white"/%3E%3C/svg%3E'>
@@ -2038,12 +2072,12 @@
                   <button id="avatar-preset-5-btn" type="button" class="avatar-choice">
                     <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%230f172a"/%3E%3Cpath d="M64 20 84 36l24 2-15 19 5 23-22-8-12 20-12-20-22 8 5-23-15-19 24-2z" fill="white"/%3E%3C/svg%3E'>
                     <span data-avatar-name>Preset 5</span>
-                    <small data-avatar-rank-note>Expert rank</small>
+                    <small data-avatar-rank-note>Experienced rank</small>
                   </button>
                   <button id="avatar-preset-6-btn" type="button" class="avatar-choice">
                     <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%236365f1"/%3E%3Cpath d="M64 18 86 34l24 16-8 31-24 17H48L24 81l-8-31 24-16z" fill="white"/%3E%3C/svg%3E'>
                     <span data-avatar-name>Preset 6</span>
-                    <small data-avatar-rank-note>Expert rank</small>
+                    <small data-avatar-rank-note>Experienced rank</small>
                   </button>
                   <button id="avatar-preset-7-btn" type="button" class="avatar-choice">
                     <img alt="" src='data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"%3E%3Crect width="128" height="128" rx="64" fill="%237c2d12"/%3E%3Cpath d="M64 16 88 32l24 16-8 31-24 17H48L24 79l-8-31 24-16z" fill="white"/%3E%3C/svg%3E'>
@@ -2274,13 +2308,13 @@
         <div class="subsection-head">
           <div>
             <h2>Friends</h2>
-            <p class="section-note">Direct chats, groups, requests, and your friends list now live together here.</p>
+            <p class="section-note">Direct chats, requests, and your friends list all live together here.</p>
           </div>
         </div>
 
         <div id="messages-locked" class="locked-state">
           <h3>Log in to use the friends system</h3>
-          <p>Your friends, chats, group messages, and requests only load after you sign in.</p>
+          <p>Your friends, chats, and requests only load after you sign in.</p>
           <div class="button-row">
             <button type="button" class="tab-chip" data-open-section="info" onclick="window.openAccountArea('info')">Go to login</button>
           </div>

@@ -1,5 +1,6 @@
 import { auth, db } from "./firebase-config.js";
 import { watchAuth, getProfile } from "./auth.js";
+import { ensurePanategwaToast } from "./toast.js";
 
 import {
   doc,
@@ -293,6 +294,7 @@ function renderMonthGrid(profile, state) {
 
 async function claimStreak() {
   if (!currentUser) return;
+  ensurePanategwaToast();
 
   const today = localDateKey();
   const state = normalizedState(currentProfile, currentUser.uid);
@@ -462,6 +464,7 @@ function renderPage() {
 function start() {
   const root = $("streak-root");
   if (!root) return;
+  ensurePanategwaToast();
 
   watchAuth(async (user, profile) => {
     currentUser = user;

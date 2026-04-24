@@ -7,6 +7,7 @@ import {
   signOut,
   onAuthStateChanged,
   sendEmailVerification,
+  reload,
   updateProfile,
   deleteUser,
   reauthenticateWithCredential,
@@ -180,6 +181,26 @@ function svgDataUrl(svg) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
+function defaultAvatarDataUrl() {
+  return svgDataUrl(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1">
+          <stop stop-color="#38bdf8"/>
+          <stop offset="1" stop-color="#2563eb"/>
+        </linearGradient>
+      </defs>
+      <rect width="128" height="128" rx="64" fill="url(#g)"/>
+      <circle cx="64" cy="48" r="22" fill="rgba(255,255,255,0.92)"/>
+      <path d="M31 104c3-20 17-34 33-34s30 14 33 34" fill="rgba(255,255,255,0.92)"/>
+    </svg>
+  `);
+}
+
+export function getDefaultAvatarDataUrl() {
+  return defaultAvatarDataUrl();
+}
+
 function presetAvatarDataUrl(presetId) {
   const id = String(presetId || "1");
 
@@ -282,6 +303,22 @@ function letterAvatarDataUrl(letter) {
   `);
 }
 
+function resolvedStoredAvatar(data = {}) {
+  const photoURL = cleanText(data.photoURL);
+  const avatarType = String(data.avatarType || "").trim().toLowerCase();
+  const avatarPreset = String(data.avatarPreset || "").trim().toLowerCase();
+  if (avatarType === "custom" && photoURL) return photoURL;
+  if (avatarType === "default") return defaultAvatarDataUrl();
+  if (avatarType === "preset" && avatarPreset && avatarPreset !== "default") {
+    return presetAvatarDataUrl(avatarPreset);
+  }
+  if (avatarType === "letter") {
+    return letterAvatarDataUrl(data.avatarLetter || data.username || "P");
+  }
+
+  return defaultAvatarDataUrl();
+}
+
 function syncSidebarAvatar(photoURL) {
   if (typeof window.PanategwaUpdateSidebarAvatar === "function") {
     window.PanategwaUpdateSidebarAvatar(photoURL || "", "Account");
@@ -294,7 +331,9 @@ function baseProfile(user) {
     email: user.email || "",
     emailLower: cleanEmail(user.email),
     username: user.displayName || defaultUsername(user),
-    photoURL: user.photoURL || "",
+    photoURL: defaultAvatarDataUrl(),
+    avatarType: "default",
+    avatarPreset: "default",
     verified: !!user.emailVerified,
     xp: 0,
     achievements: [],
@@ -404,6 +443,13 @@ export async function ensureUserProfile(user) {
   if (!snap.exists()) {
     const data = baseProfile(user);
     await setDoc(ref, data, { merge: true });
+    if ((user.photoURL || "") !== data.photoURL) {
+      try {
+        await updateProfile(user, { photoURL: data.photoURL });
+      } catch (error) {
+        console.warn("Could not sync default avatar to auth profile:", error);
+      }
+    }
     return data;
   }
 
@@ -422,7 +468,9 @@ export async function ensureUserProfile(user) {
     email: user.email || data.email || "",
     emailLower: cleanEmail(user.email || data.email || ""),
     username: data.username || user.displayName || defaultUsername(user),
-    photoURL: user.photoURL || data.photoURL || "",
+    photoURL: resolvedStoredAvatar(data),
+    avatarType: data.avatarType || "default",
+    avatarPreset: data.avatarPreset || "default",
     verified: !!user.emailVerified,
     xp: typeof data.xp === "number" ? data.xp : achievements.length,
     achievements,
@@ -447,6 +495,13 @@ export async function ensureUserProfile(user) {
   };
 
   await setDoc(ref, merged, { merge: true });
+  if ((user.photoURL || "") !== merged.photoURL) {
+    try {
+      await updateProfile(user, { photoURL: merged.photoURL });
+    } catch (error) {
+      console.warn("Could not sync stored avatar to auth profile:", error);
+    }
+  }
   return merged;
 }
 
@@ -487,7 +542,7 @@ export async function createAccount(email, password, username) {
 
   try {
     const cred = await createUserWithEmailAndPassword(auth, cleanMail, cleanPass);
-    await updateProfile(cred.user, { displayName: cleanName });
+    await updateProfile(cred.user, { displayName: cleanName, photoURL: defaultAvatarDataUrl() });
     await sendEmailVerification(cred.user);
 
     await setDoc(userRef(cred.user.uid), {
@@ -575,6 +630,7 @@ export async function setAvatarPreset(presetId) {
     photoURL: dataUrl,
     avatarType: "preset",
     avatarPreset: id,
+    avatarLetter: "",
     updatedAt: serverTimestamp()
   }, { merge: true });
 
@@ -603,15 +659,18 @@ export async function useDefaultProfilePicture() {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
-  await updateProfile(user, { photoURL: "" });
+  const dataUrl = defaultAvatarDataUrl();
+  await updateProfile(user, { photoURL: dataUrl });
   await setDoc(userRef(user.uid), {
-    photoURL: "",
+    photoURL: dataUrl,
     avatarType: "default",
+    avatarPreset: "default",
+    avatarLetter: "",
     updatedAt: serverTimestamp()
   }, { merge: true });
 
-  syncSidebarAvatar("");
-  return true;
+  syncSidebarAvatar(dataUrl);
+  return dataUrl;
 }
 
 export async function changeEmail(newEmail, currentPassword) {
@@ -672,6 +731,16 @@ export async function resendVerificationEmail() {
 
   await sendEmailVerification(user);
   return true;
+}
+
+export async function refreshCurrentUserSession() {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not logged in.");
+
+  await reload(user);
+  const refreshedUser = auth.currentUser || user;
+  const profile = await ensureUserProfile(refreshedUser);
+  return { user: refreshedUser, profile };
 }
 
 export async function requestPasswordReset(email) {

@@ -6,7 +6,6 @@ import {
   AVATAR_PRESET_REQUIREMENTS,
   getAvatarPresetRequirementText,
   isAvatarPresetUnlocked,
-  setAvatarLetter,
   useDefaultProfilePicture,
   updatePrivacySettings,
   resendVerificationEmail,
@@ -31,7 +30,6 @@ function setStatus(message, kind = "info") {
 function syncForm(profile, user) {
   const usernameInput = $("profile-username");
   const emailInput = $("change-email-input");
-  const letterInput = $("avatar-letter-input");
   const note = $("settings-provider-note");
   const showRank = $("privacy-show-rank");
   const showJoined = $("privacy-show-joined");
@@ -43,10 +41,6 @@ function syncForm(profile, user) {
 
   if (emailInput && document.activeElement !== emailInput) {
     emailInput.value = user.email || "";
-  }
-
-  if (letterInput && document.activeElement !== letterInput) {
-    letterInput.value = (profile?.username || user.displayName || "P").slice(0, 1).toUpperCase();
   }
 
   const providerIds = new Set((user.providerData || []).map((provider) => provider.providerId));
@@ -114,26 +108,10 @@ async function applyAvatarPreset(presetId) {
   }
 }
 
-async function applyAvatarLetter() {
-  const letter = String($("avatar-letter-input")?.value || "").trim().slice(0, 1);
-  if (!letter) {
-    setStatus("Type a letter first.", "error");
-    return;
-  }
-
-  try {
-    await setAvatarLetter(letter);
-    setStatus("Letter avatar saved.", "success");
-  } catch (error) {
-    console.error(error);
-    setStatus(error.message || "Could not save letter avatar.", "error");
-  }
-}
-
 async function applyDefaultAvatar() {
   try {
     await useDefaultProfilePicture();
-    setStatus("Default profile picture restored.", "success");
+    setStatus("Default pfp restored.", "success");
   } catch (error) {
     console.error(error);
     setStatus(error.message || "Could not reset profile picture.", "error");
@@ -191,7 +169,6 @@ function bindButtons() {
     $(`avatar-preset-${presetId}-btn`)?.addEventListener("click", () => applyAvatarPreset(presetId));
   }
   $("avatar-default-btn")?.addEventListener("click", applyDefaultAvatar);
-  $("avatar-letter-btn")?.addEventListener("click", applyAvatarLetter);
 
   $("change-email-btn")?.addEventListener("click", applyEmailChange);
   $("change-password-btn")?.addEventListener("click", applyPasswordChange);
@@ -278,7 +255,7 @@ function start() {
     const nextProfile = profile || (await getProfile(user.uid)) || {};
     syncForm(nextProfile, user);
     syncAvatarPresetLocks(nextProfile);
-    setStatus("Settings ready.", "info");
+    setStatus(user.emailVerified ? "Settings ready." : "Verify your email to unlock settings.", "info");
   });
 }
 

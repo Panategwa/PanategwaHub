@@ -3,6 +3,9 @@ import {
   loginWithGoogle,
   createAccount,
   requestPasswordReset,
+  resendVerificationEmail,
+  refreshCurrentUserSession,
+  getDefaultAvatarDataUrl,
   watchAuth,
   getProfile
 } from "./auth.js";
@@ -121,6 +124,10 @@ function relativeSince(value) {
   return `${Math.floor(diff / year)} years`;
 }
 
+function isVerifiedState(user, profile = null) {
+  return !!(user?.emailVerified || profile?.verified);
+}
+
 function normalizeAccountSection(section = "info") {
   const nextSection = String(section || "info").trim().toLowerCase();
   return nextSection === "friends" ? "messages" : nextSection;
@@ -180,7 +187,7 @@ function initials(value, fallback = "P") {
 }
 
 function updateSidebarAvatar(profile, user) {
-  const photoURL = user?.photoURL || profile?.photoURL || "";
+  const photoURL = profile?.photoURL || (user ? getDefaultAvatarDataUrl() : "");
   localStorage.setItem("panategwa_sidebar_avatar_url", photoURL || "");
 
   if (typeof window.PanategwaUpdateSidebarAvatar === "function") {
@@ -193,15 +200,71 @@ function syncMessagesTabBadge(state) {
   if (!button) return;
 
   const unread = Number(state.unreadCount || 0);
-  button.classList.toggle("has-dot", unread > 0);
-  button.setAttribute("aria-label", unread > 0 ? `Friends (${unread} unread)` : "Friends");
-  button.title = unread > 0 ? `${unread} unread chat${unread === 1 ? "" : "s"}` : "Friends";
+  const canUseMessages = isVerifiedState(state.user, state.profile);
+  button.classList.toggle("has-dot", canUseMessages && unread > 0);
+  button.setAttribute("aria-label", canUseMessages && unread > 0 ? `Friends (${unread} unread)` : "Friends");
+  button.title = canUseMessages && unread > 0 ? `${unread} unread chat${unread === 1 ? "" : "s"}` : "Friends";
 }
 
 function setVisible(id, visible) {
   const el = $(id);
   if (!el) return;
   el.classList.toggle("section-hidden", !visible);
+}
+
+function updateLockedPanel(prefix, loggedIn, verified) {
+  const title = $(`${prefix}-locked-title`);
+  const copy = $(`${prefix}-locked-copy`);
+  const refreshBtn = $(`${prefix}-locked-refresh-btn`);
+  const resendBtn = $(`${prefix}-locked-resend-btn`);
+
+  if (title) {
+    title.textContent = !loggedIn
+      ? (prefix === "messages" ? "Log in to use the friends system" : "Log in to edit your settings")
+      : (prefix === "messages" ? "Verify your email to unlock friends" : "Verify your email to unlock settings");
+  }
+
+  if (copy) {
+    copy.textContent = !loggedIn
+      ? (prefix === "messages"
+        ? "Your friends, chats, and requests only load after you sign in."
+        : "Your profile, password, avatar, and account actions are available after you sign in.")
+      : (prefix === "messages"
+        ? "Direct messages, friend requests, and friend actions unlock after your email is verified."
+        : "Profile edits, avatars, privacy settings, and account actions unlock after your email is verified.");
+  }
+
+  setVisible(`${prefix}-locked-refresh-btn`, loggedIn && !verified);
+  setVisible(`${prefix}-locked-resend-btn`, loggedIn && !verified);
+}
+
+async function handleVerificationRefresh() {
+  try {
+    setStatus("Checking verification...", "info");
+    const refreshed = await refreshCurrentUserSession();
+    currentState.user = refreshed.user;
+    currentState.profile = refreshed.profile || currentState.profile;
+    renderAll(currentState);
+    if (typeof window.PanategwaMessagesRender === "function") {
+      window.PanategwaMessagesRender();
+    }
+    setStatus(isVerifiedState(refreshed.user, refreshed.profile)
+      ? "Email verified. Everything is unlocked now."
+      : "Your email still looks unverified. Check the inbox link, then try again.", isVerifiedState(refreshed.user, refreshed.profile) ? "success" : "info");
+  } catch (error) {
+    console.error(error);
+    setStatus(error?.message || "Could not refresh verification.", "error");
+  }
+}
+
+async function handleVerificationResend() {
+  try {
+    const sent = await resendVerificationEmail();
+    setStatus(sent === false ? "Your email is already verified." : "Verification email sent.", sent === false ? "info" : "success");
+  } catch (error) {
+    console.error(error);
+    setStatus(error?.message || "Could not resend verification email.", "error");
+  }
 }
 
 function setAuthMode(mode = "login") {
@@ -263,16 +326,23 @@ function showSettingsSubsection(name = "account") {
 
 function applyAuthGuards() {
   const loggedIn = !!currentState.user;
-  setVisible("settings-locked", !loggedIn);
-  setVisible("settings-content", loggedIn);
-  setVisible("messages-locked", !loggedIn);
-  setVisible("messages-content", loggedIn);
+  const verified = isVerifiedState(currentState.user, currentState.profile);
+  const unlocked = loggedIn && verified;
+
+  setVisible("settings-locked", !unlocked);
+  setVisible("settings-content", unlocked);
+  setVisible("messages-locked", !unlocked);
+  setVisible("messages-content", unlocked);
+  updateLockedPanel("settings", loggedIn, verified);
+  updateLockedPanel("messages", loggedIn, verified);
 
   const progressHint = $("progress-login-hint");
   if (progressHint) {
-    progressHint.textContent = loggedIn
-      ? "Achievements and XP sync automatically while you explore the site."
-      : "Log in to sync achievements and XP to your account.";
+    progressHint.textContent = !loggedIn
+      ? "Log in to sync achievements and XP to your account."
+      : (verified
+        ? "Achievements and XP sync automatically while you explore the site."
+        : "Verify your email to fully unlock synced account features.");
   }
 }
 
@@ -361,10 +431,19 @@ function renderAuth(state) {
   const streak = profile?.streak?.current || 0;
   const longestStreak = profile?.longestStreak || profile?.streak?.longest || streak || 0;
   const memberFor = relativeSince(profile.createdAt);
-  const avatar = user.photoURL || profile.photoURL
-    ? `<img src="${escapeHtml(user.photoURL || profile.photoURL)}" alt="Avatar" class="account-avatar" />`
-    : `<div class="account-avatar-placeholder">${escapeHtml(initials(username))}</div>`;
+  const avatarUrl = profile.photoURL || getDefaultAvatarDataUrl();
+  const avatar = `<img src="${escapeHtml(avatarUrl)}" alt="Avatar" class="account-avatar" />`;
   const copied = isUserIdCopied(user.uid);
+  const verifyNotice = !isVerifiedState(user, profile) ? `
+    <div class="verify-callout">
+      <strong>Verify your email to unlock account features</strong>
+      <p>Friends, direct messages, avatars, privacy controls, and the rest of your account tools open as soon as your email is verified.</p>
+      <div class="button-row">
+        <button id="inline-refresh-verification-btn" type="button">I've verified my email</button>
+        <button id="inline-resend-verification-btn" type="button">Resend verification email</button>
+      </div>
+    </div>
+  ` : "";
 
   info.innerHTML = `
     <div class="account-header">
@@ -396,6 +475,8 @@ function renderAuth(state) {
       <div class="info-row"><span>Streak</span><strong>${streak} day${streak === 1 ? "" : "s"}</strong></div>
       <div class="info-row"><span>Longest streak</span><strong>${longestStreak} day${longestStreak === 1 ? "" : "s"}</strong></div>
     </div>
+
+    ${verifyNotice}
   `;
 
   $("copy-user-id-btn")?.addEventListener("click", async () => {
@@ -407,6 +488,8 @@ function renderAuth(state) {
       window.prompt("Copy this ID:", user.uid);
     }
   });
+  $("inline-refresh-verification-btn")?.addEventListener("click", handleVerificationRefresh);
+  $("inline-resend-verification-btn")?.addEventListener("click", handleVerificationResend);
 
   updateSidebarAvatar(profile, user);
 }
@@ -486,9 +569,7 @@ function renderSelectedProfile(state) {
   const rank = profile.currentRank ?? (isSelf ? getRank(profile.xp || 0) : null);
   const streakCurrent = profile.streakCurrent ?? (isSelf ? (state.profile?.streak?.current || 0) : null);
   const streakLongest = profile.streakLongest ?? (isSelf ? (state.profile?.longestStreak || state.profile?.streak?.longest || streakCurrent || 0) : null);
-  const avatar = profile.photoURL
-    ? `<img src="${escapeHtml(profile.photoURL)}" alt="${escapeHtml(username)} avatar" class="profile-avatar-large" />`
-    : `<div class="profile-avatar-large">${escapeHtml(initials(username))}</div>`;
+  const avatar = `<img src="${escapeHtml(profile.photoURL || getDefaultAvatarDataUrl())}" alt="${escapeHtml(username)} avatar" class="profile-avatar-large" />`;
 
   if (!canViewProfile) {
     container.innerHTML = `
@@ -549,10 +630,7 @@ function renderSelectedProfile(state) {
 }
 
 function profileAvatarMarkup(profile) {
-  if (profile.photoURL) {
-    return `<img src="${escapeHtml(profile.photoURL)}" alt="" style="width: 46px; height: 46px; border-radius: 50%; object-fit: cover;" />`;
-  }
-  return escapeHtml(initials(profile.username || profile.uid || "P"));
+  return `<img src="${escapeHtml(profile.photoURL || getDefaultAvatarDataUrl())}" alt="" style="width: 46px; height: 46px; border-radius: 50%; object-fit: cover;" />`;
 }
 
 function renderFriends(state) {
@@ -695,8 +773,8 @@ function renderAll(state) {
     uid: state.user?.uid || "",
     username: state.profile?.username || "",
     email: state.user?.email || state.profile?.email || "",
-    verified: !!state.user?.emailVerified,
-    photoURL: state.user?.photoURL || state.profile?.photoURL || "",
+    verified: isVerifiedState(state.user, state.profile),
+    photoURL: state.profile?.photoURL || "",
     xp: state.profile?.xp || 0,
     streak: state.profile?.streak?.current || 0,
     longest: state.profile?.longestStreak || state.profile?.streak?.longest || 0,
@@ -777,7 +855,7 @@ function bindAuthForms() {
     try {
       setStatus("Logging in...", "info");
       await login($("login-email")?.value || "", $("login-password")?.value || "");
-      setStatus("Logged in.", "success");
+      setStatus("Logged in. Loading your account...", "success");
     } catch (error) {
       console.error(error);
       setStatus(error?.message || "Login failed.", "error");
@@ -842,6 +920,11 @@ function bindAuthForms() {
       window.alert(error?.message || "Could not send reset email.");
     }
   });
+
+  $("settings-locked-refresh-btn")?.addEventListener("click", handleVerificationRefresh);
+  $("settings-locked-resend-btn")?.addEventListener("click", handleVerificationResend);
+  $("messages-locked-refresh-btn")?.addEventListener("click", handleVerificationRefresh);
+  $("messages-locked-resend-btn")?.addEventListener("click", handleVerificationResend);
 }
 
 function bindFriends() {
@@ -971,7 +1054,9 @@ function start() {
       return;
     }
 
-    setStatus(user.emailVerified ? "Logged in and verified." : "Logged in.", "success");
+    setStatus(isVerifiedState(user, currentState.profile)
+      ? "Logged in and verified."
+      : "Logged in. Verify your email to unlock account features.", "success");
     if (typeof window.PanategwaMessagesRender === "function") {
       window.PanategwaMessagesRender();
     }

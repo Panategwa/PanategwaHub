@@ -1,5 +1,6 @@
 import { db } from "./firebase-config.js";
 import { watchAuth, ensureUserProfile } from "./auth.js";
+import { ensurePanategwaToast } from "./toast.js";
 
 import {
   doc,
@@ -12,27 +13,15 @@ export const ACHIEVEMENTS = [
   { id: "achievement_collector", name: "Achievement Collector", description: "Unlock 10 achievements.", secret: false, reward: 5 },
   { id: "all_planets", name: "Astronaut", description: "Visit all celestial bodies of the Panategwa system.", secret: false, reward: 5 },
   { id: "big_reader", name: "Need some glasses?", description: "Set text size to Large.", secret: true, reward: 2 },
-  { id: "dark_mode", name: "Dark Night", description: "Use Dark Mode.", secret: false, reward: 1 },
-  { id: "first_login", name: "First Contact", description: "Log in for the first time.", secret: false, reward: 1 },
-  { id: "light_mode", name: "Sunshine", description: "Use Light Mode.", secret: false, reward: 1 },
   { id: "morning_person", name: "Morning Person", description: "Visit between 3am and 10am.", secret: true, reward: 2 },
   { id: "nocturnal", name: "Nocturnal", description: "Visit between 9pm and 3am.", secret: true, reward: 2 },
   { id: "ocean_mode", name: "Wavefinder", description: "Use the Ocean theme.", secret: false, reward: 1 },
-  { id: "panategwa_b", name: "Panategwa B", description: "Visit Panategwa B.", secret: false, reward: 1 },
-  { id: "panategwa_c", name: "Panategwa C", description: "Visit Panategwa C.", secret: false, reward: 1 },
-  { id: "panategwa_d", name: "Panategwa D", description: "Visit Panategwa D.", secret: false, reward: 1 },
-  { id: "panategwa_e", name: "Panategwa E", description: "Visit Panategwa E.", secret: false, reward: 1 },
-  { id: "panategwa_f", name: "Panategwa F", description: "Visit Panategwa F.", secret: false, reward: 1 },
-  { id: "panategwa_g", name: "Panategwa G", description: "Visit Panategwa G.", secret: false, reward: 1 },
-  { id: "first_friend", name: "First Signal", description: "Add your first friend.", secret: false, reward: 2 },
   { id: "three_friends", name: "Small Crew", description: "Add 3 friends.", secret: false, reward: 3 },
   { id: "profile_name", name: "True Name", description: "Set your username.", secret: false, reward: 1 },
   { id: "site_20_minutes", name: "Settled In", description: "Be part of the site for over 20 minutes.", secret: false, reward: 2 },
   { id: "space_mode", name: "Stargazer", description: "Use the Space theme.", secret: false, reward: 1 },
-  { id: "explorer_rank", name: "Explorer Rank", description: "Reach Explorer rank (10 XP).", secret: false, reward: 2 },
-  { id: "expert_rank", name: "Experienced Rank", description: "Reach Experienced rank (20 XP).", secret: false, reward: 3 },
   { id: "theme_shifter", name: "Aesthetic Control", description: "Change your theme.", secret: false, reward: 1 },
-  { id: "thrinsachelom_history", name: "Historian", description: "View the history of the Thrinsacheloms.", secret: false, reward: 2 },
+  { id: "thrinsachelom_history", name: "Historian", description: "View the history of the Thrinsacheloms.", secret: false, reward: 5 },
   { id: "tiny_text", name: "Microscopic Text", description: "Set text size to Small.", secret: true, reward: 2 },
   { id: "verified_email", name: "Verified Signal", description: "Verify your email address.", secret: false, reward: 2 },
   { id: "week_streak", name: "Week Streak", description: "Reach a 7 day streak.", secret: false, reward: 4 },
@@ -45,8 +34,6 @@ const KNOWN_IDS = new Set(ACHIEVEMENTS.map((achievement) => achievement.id));
 
 let started = false;
 let profileUnsub = null;
-let toastQueue = [];
-let toastActive = false;
 
 function pageId() {
   return (window.location.pathname.split("/").pop() || "index.html").toLowerCase();
@@ -122,7 +109,6 @@ function computeUnlocks(user, profile, pages) {
   const baseline = normalizeProgressBaseline(profile?.progressBaseline);
   const hasResetBaseline = baseline.resetAt > 0;
   const currentUsername = String(profile?.username || user.displayName || "").trim();
-  const loginMs = createdAtMs(profile?.lastLoginAt);
   const theme = currentTheme();
   const size = currentTextSize();
   const hour = new Date().getHours();
@@ -133,15 +119,8 @@ function computeUnlocks(user, profile, pages) {
     ? currentFriends.filter((uid) => !baselineFriends.has(uid)).length
     : currentFriends.length;
 
-  add("first_login", hasResetBaseline ? loginMs > baseline.resetAt + 1000 : true);
   add("profile_name", hasResetBaseline ? (!!currentUsername && currentUsername !== baseline.username) : !!currentUsername);
   add("verified_email", hasResetBaseline ? (!!user.emailVerified && !baseline.verified) : !!user.emailVerified);
-  add("panategwa_b", page === "panategwa-b-page.html");
-  add("panategwa_c", page === "panategwa-c-page.html");
-  add("panategwa_d", page === "panategwa-d-page.html");
-  add("panategwa_e", page === "panategwa-e-page.html");
-  add("panategwa_f", page === "panategwa-f-page.html");
-  add("panategwa_g", page === "panategwa-g-page.html");
   add("thrinsachelom_history", page === "panategwa-d-thrinsachelom-history.html");
 
   add("all_planets", [
@@ -155,8 +134,6 @@ function computeUnlocks(user, profile, pages) {
   ].every((targetPage) => pages.includes(targetPage)));
 
   add("theme_shifter", hasResetBaseline ? (theme !== "Panategwa Mode (Default)" && theme !== baseline.theme) : theme !== "Panategwa Mode (Default)");
-  add("dark_mode", theme === "Dark Mode" && (!hasResetBaseline || baseline.theme !== "Dark Mode"));
-  add("light_mode", theme === "Light Mode" && (!hasResetBaseline || baseline.theme !== "Light Mode"));
   add("ocean_mode", theme === "Ocean" && (!hasResetBaseline || baseline.theme !== "Ocean"));
   add("space_mode", theme === "Space" && (!hasResetBaseline || baseline.theme !== "Space"));
 
@@ -170,11 +147,8 @@ function computeUnlocks(user, profile, pages) {
   const joinedMs = createdAtMs(profile?.createdAt);
   const progressAgeStart = hasResetBaseline ? baseline.resetAt : joinedMs;
 
-  add("first_friend", newFriendsCount >= 1);
   add("three_friends", newFriendsCount >= 3);
   add("site_20_minutes", progressAgeStart > 0 && (Date.now() - progressAgeStart) >= 20 * 60 * 1000);
-  add("explorer_rank", currentXp >= 10);
-  add("expert_rank", currentXp >= 20);
   add("week_streak", streakCurrent >= 7);
   add("year_streak", streakCurrent >= 365);
   add("veteran", currentXp >= 30);
@@ -183,93 +157,6 @@ function computeUnlocks(user, profile, pages) {
   add("achievement_collector", projectedAchievementCount >= 10);
 
   return pending;
-}
-
-function ensureToastSystem() {
-  if (window.PanategwaToast) return;
-
-  const styleId = "achievement-toast-style";
-  if (!document.getElementById(styleId)) {
-    const style = document.createElement("style");
-    style.id = styleId;
-    style.textContent = `
-      #achievement-toast-stack {
-        position: fixed;
-        right: 16px;
-        bottom: 16px;
-        z-index: 99999;
-        display: grid;
-        gap: 10px;
-        width: min(360px, calc(100vw - 32px));
-      }
-
-      .achievement-toast {
-        cursor: pointer;
-        border-radius: 14px;
-        padding: 14px 16px;
-        background: rgba(20, 20, 30, 0.94);
-        color: #fff;
-        border: 1px solid rgba(255,255,255,0.14);
-        box-shadow: 0 12px 30px rgba(0,0,0,0.35);
-        display: grid;
-        gap: 6px;
-      }
-
-      .achievement-toast-title {
-        font-weight: 700;
-      }
-
-      .achievement-toast-desc {
-        font-size: 0.92rem;
-        opacity: 0.84;
-        line-height: 1.35;
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  function getStack() {
-    let stack = document.getElementById("achievement-toast-stack");
-    if (!stack) {
-      stack = document.createElement("div");
-      stack.id = "achievement-toast-stack";
-      document.body.appendChild(stack);
-    }
-    return stack;
-  }
-
-  window.PanategwaToast = ({ title = "Message", body = "", href = "" } = {}) => {
-    toastQueue.push({ title, body, href });
-    if (toastActive) return;
-    toastActive = true;
-
-    const next = () => {
-      const item = toastQueue.shift();
-      if (!item) {
-        toastActive = false;
-        return;
-      }
-
-      const toast = document.createElement("div");
-      toast.className = "achievement-toast";
-      toast.innerHTML = `
-        <div class="achievement-toast-title">${item.title}</div>
-        <div class="achievement-toast-desc">${item.body}</div>
-      `;
-      toast.addEventListener("click", () => {
-        if (item.href) window.location.href = item.href;
-      });
-
-      getStack().appendChild(toast);
-
-      setTimeout(() => {
-        toast.remove();
-        next();
-      }, 4200);
-    };
-
-    next();
-  };
 }
 
 export async function syncAchievementProgress(user, profile) {
@@ -368,7 +255,7 @@ export function renderAchievements(profile) {
 
 function emitAchievementToasts(user, newlyUnlocked) {
   if (!newlyUnlocked.length) return;
-  ensureToastSystem();
+  ensurePanategwaToast();
 
   newlyUnlocked.forEach(async (id) => {
     const achievement = ACHIEVEMENT_MAP.get(id);
@@ -420,6 +307,7 @@ function startAchievementSystem() {
   if (started) return;
   started = true;
 
+  ensurePanategwaToast();
   startAccountWatcher();
   startLiveProfileListener();
 }

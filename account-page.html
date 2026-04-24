@@ -16,6 +16,7 @@
   <script type="module" src="auth/settings.js"></script>
   <script type="module" src="auth/social.js"></script>
   <script type="module" src="auth/account.js"></script>
+  <script type="module" src="toast.js"></script>
 
   <script>
     (function () {
@@ -487,6 +488,22 @@
 
     .locked-state h3,
     .locked-state p {
+      margin: 0;
+    }
+
+    .verify-callout {
+      margin-top: 16px;
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(125, 211, 252, 0.28);
+      background: linear-gradient(180deg, rgba(59, 130, 246, 0.18), rgba(15, 23, 42, 0.18));
+      box-shadow: 0 14px 28px rgba(2, 6, 23, 0.18);
+    }
+
+    .verify-callout strong,
+    .verify-callout p {
       margin: 0;
     }
 
@@ -2043,10 +2060,12 @@
         </div>
 
         <div id="settings-locked" class="locked-state">
-          <h3>Log in to edit your settings</h3>
-          <p>Your profile, password, avatar, and account actions are available after you sign in.</p>
+          <h3 id="settings-locked-title">Log in to edit your settings</h3>
+          <p id="settings-locked-copy">Your profile, password, avatar, and account actions are available after you sign in.</p>
           <div class="button-row">
             <button type="button" class="tab-chip" data-open-section="info" onclick="window.openAccountArea('info')">Go to login</button>
+            <button id="settings-locked-refresh-btn" type="button" class="tab-chip section-hidden">I've verified my email</button>
+            <button id="settings-locked-resend-btn" type="button" class="tab-chip section-hidden">Resend verification email</button>
           </div>
         </div>
 
@@ -2114,13 +2133,7 @@
                   </button>
                 </div>
                 <div class="button-row" style="margin-top:10px;">
-                  <button id="avatar-default-btn" type="button">Default</button>
-                </div>
-                <div class="field-row" style="margin-top:10px;">
-                  <input id="avatar-letter-input" type="text" maxlength="1" placeholder="Letter avatar" />
-                </div>
-                <div class="button-row">
-                  <button id="avatar-letter-btn" type="button">Use letter avatar</button>
+                  <button id="avatar-default-btn" type="button">Default pfp</button>
                 </div>
               </div>
 
@@ -2336,10 +2349,12 @@
         </div>
 
         <div id="messages-locked" class="locked-state">
-          <h3>Log in to use the friends system</h3>
-          <p>Your friends, chats, and requests only load after you sign in.</p>
+          <h3 id="messages-locked-title">Log in to use the friends system</h3>
+          <p id="messages-locked-copy">Your friends, chats, and requests only load after you sign in.</p>
           <div class="button-row">
             <button type="button" class="tab-chip" data-open-section="info" onclick="window.openAccountArea('info')">Go to login</button>
+            <button id="messages-locked-refresh-btn" type="button" class="tab-chip section-hidden">I've verified my email</button>
+            <button id="messages-locked-resend-btn" type="button" class="tab-chip section-hidden">Resend verification email</button>
           </div>
         </div>
 

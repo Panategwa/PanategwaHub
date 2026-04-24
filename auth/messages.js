@@ -1,3 +1,4 @@
+import { auth } from "./firebase-config.js";
 import {
   socialState,
   subscribeSocial,
@@ -97,6 +98,15 @@ function relativeSince(value) {
 
 function initials(value, fallback = "P") {
   return String(value || "").trim().slice(0, 1).toUpperCase() || fallback;
+}
+
+function activeUser(state) {
+  return state?.user || socialState.user || auth.currentUser || null;
+}
+
+function isVerifiedState(state) {
+  const user = activeUser(state);
+  return !!(user?.emailVerified || state?.profile?.verified || socialState.profile?.verified);
 }
 
 function isIncoming(message) {
@@ -432,7 +442,7 @@ function chatHeaderMarkup(profile, uid) {
         <span class="social-avatar">${profileAvatarMarkup(profile)}</span>
         <div>
           <h3>${escapeHtml(profile?.username || friendName(uid))}</h3>
-          <p>${escapeHtml(profile?.currentRank || "Friend")} â€¢ ${escapeHtml(uid)}</p>
+          <p>${escapeHtml(profile?.currentRank || "Friend")} • ${escapeHtml(uid)}</p>
         </div>
       </div>
       <div class="social-chat-actions">
@@ -515,9 +525,20 @@ function render(state) {
   const root = $("messages-root");
   if (!root) return;
   const uiState = captureUiState();
+  const user = activeUser(state);
 
-  if (!state.user) {
+  if (!user) {
     root.innerHTML = `<div class="msg-empty">Log in to open your friends, direct messages, and requests.</div>`;
+    return;
+  }
+
+  if (!isVerifiedState(state)) {
+    root.innerHTML = `
+      <div class="locked-state">
+        <h3>Verify your email to unlock friends</h3>
+        <p>Direct messages, friend requests, and the rest of the friends system unlock right after your email is verified.</p>
+      </div>
+    `;
     return;
   }
 

@@ -1,5 +1,6 @@
 import { auth, db } from "./firebase-config.js";
-import { watchAuth, ensureUserProfile } from "./auth.js";
+import { watchAuth, ensureUserProfile, getDefaultAvatarDataUrl } from "./auth.js";
+import { ensurePanategwaToast } from "./toast.js";
 
 import {
   collection,
@@ -95,6 +96,27 @@ function subscribeSocial(callback) {
 
 function cleanUid(value) {
   return String(value || "").trim();
+}
+
+function activeUser() {
+  return auth.currentUser || socialState.user || null;
+}
+
+function isVerifiedUser(user = null, profile = null) {
+  return !!(user?.emailVerified || profile?.verified);
+}
+
+async function requireSocialUser(feature = "this feature", options = {}) {
+  const user = activeUser();
+  if (!user) throw new Error("Log in first.");
+
+  const needsVerified = options.requireVerified !== false;
+  const profile = socialState.profile || await loadUser(user.uid) || await ensureUserProfile(user);
+  if (needsVerified && !isVerifiedUser(user, profile)) {
+    throw new Error(`Verify your email before you use ${feature}.`);
+  }
+
+  return { user, profile };
 }
 
 function unique(list) {
@@ -194,7 +216,7 @@ function publicProfile(profile, viewerUid) {
     return {
       uid: profile.uid,
       username: profile.username || "Player",
-      photoURL: "",
+      photoURL: getDefaultAvatarDataUrl(),
       email: "",
       xp: null,
       verified: null,
@@ -219,7 +241,7 @@ function publicProfile(profile, viewerUid) {
   return {
     uid: profile.uid,
     username: profile.username || "Player",
-    photoURL: profile.photoURL || "",
+    photoURL: profile.photoURL || getDefaultAvatarDataUrl(),
     email: self ? (profile.email || "") : "",
     xp: canShowRank ? Number(profile.xp || 0) : null,
     verified: !!profile.verified,
@@ -301,7 +323,7 @@ function setListenerError(key, scope, error, reset = null) {
 }
 
 async function getCurrentUserMessages() {
-  const currentUid = cleanUid(auth.currentUser?.uid);
+  const currentUid = cleanUid(activeUser()?.uid);
   if (!currentUid) return [];
 
   if (socialState.user?.uid === currentUid && Array.isArray(socialState.messages) && socialState.messages.length) {
@@ -313,7 +335,7 @@ async function getCurrentUserMessages() {
 }
 
 async function findPendingFriendRequestsWithUser(otherUid) {
-  const currentUid = cleanUid(auth.currentUser?.uid);
+  const currentUid = cleanUid(activeUser()?.uid);
   const other = cleanUid(otherUid);
   if (!currentUid || !other) return [];
 
@@ -421,6 +443,8 @@ function maybeToastNewMessages(messages) {
     return;
   }
 
+  ensurePanategwaToast();
+
   const seenIds = loadSeenToastIds(currentUid, "messages");
   const freshIncoming = (messages || []).filter(message =>
     message.toUid === currentUid &&
@@ -450,6 +474,7 @@ function maybeToastNewMessages(messages) {
 
 function maybeToastPendingGroupInvites(invites) {
   const currentUid = socialState.user?.uid;
+  ensurePanategwaToast();
   if (!currentUid || typeof window.PanategwaToast !== "function") return;
 
   const seenIds = loadSeenToastIds(currentUid, "group-invites");
@@ -473,6 +498,7 @@ function maybeToastPendingGroupInvites(invites) {
 
 function maybeToastNewGroupMessages(chat, messages) {
   const currentUid = socialState.user?.uid;
+  ensurePanategwaToast();
   if (!currentUid || typeof window.PanategwaToast !== "function" || !chat?.id) return;
 
   const seenIds = loadSeenToastIds(currentUid, "group-messages");
@@ -562,9 +588,8 @@ async function syncRelationshipSignals(messages) {
 
 async function sendFriendRequestById(targetUid, note = "") {
   try {
-    const user = auth.currentUser;
+    const { user } = await requireSocialUser("friend requests");
     const id = cleanUid(targetUid);
-    if (!user) throw new Error("Not logged in.");
     if (!id) throw new Error("Enter a valid user ID.");
     if (id === user.uid) throw new Error("You cannot send a request to yourself.");
 
@@ -611,8 +636,7 @@ async function sendFriendRequestById(targetUid, note = "") {
 
 async function respondToFriendRequest(requestId, action) {
   try {
-    const user = auth.currentUser;
-    if (!user) throw new Error("Not logged in.");
+    const { user } = await requireSocialUser("friend requests");
 
     const ref = doc(db, "messages", requestId);
     const snap = await getDoc(ref);
@@ -698,11 +722,10 @@ async function respondToFriendRequest(requestId, action) {
 }
 
 async function sendChatMessage(friendUid, text) {
-  const user = auth.currentUser;
+  const { user } = await requireSocialUser("direct messages");
   const id = cleanUid(friendUid);
   const body = String(text || "").trim();
 
-  if (!user) throw new Error("Not logged in.");
   if (!id) throw new Error("Pick a friend first.");
   if (!body) throw new Error("Type a message first.");
 
@@ -734,9 +757,8 @@ async function sendChatMessage(friendUid, text) {
 
 async function removeFriend(friendUid) {
   try {
-    const user = auth.currentUser;
+    const { user } = await requireSocialUser("friend actions");
     const id = cleanUid(friendUid);
-    if (!user) throw new Error("Not logged in.");
     if (!id) throw new Error("Enter a friend ID.");
 
     const me = await loadUser(user.uid);
@@ -767,9 +789,8 @@ async function removeFriend(friendUid) {
 
 async function blockUser(targetUid) {
   try {
-    const user = auth.currentUser;
+    const { user } = await requireSocialUser("friend actions");
     const id = cleanUid(targetUid);
-    if (!user) throw new Error("Not logged in.");
     if (!id) throw new Error("Enter a user ID.");
 
     const me = await loadUser(user.uid);
@@ -1138,8 +1159,7 @@ async function leaveGroupChat(chatId) {
 }
 
 async function markMessageRead(messageId, read = true) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
+  const { user } = await requireSocialUser("direct messages");
   const ref = doc(db, "messages", messageId);
   const snap = await getDoc(ref);
   if (!snap.exists()) return;
@@ -1154,8 +1174,7 @@ async function markMessageRead(messageId, read = true) {
 }
 
 async function setMessagesReadState(messageIds = [], read = true) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
+  const { user } = await requireSocialUser("direct messages");
 
   const uniqueIds = [...new Set((Array.isArray(messageIds) ? messageIds : []).map((value) => cleanUid(value)).filter(Boolean))];
   if (!uniqueIds.length) return;
@@ -1177,8 +1196,7 @@ async function setMessagesReadState(messageIds = [], read = true) {
 }
 
 async function markAllMessagesRead() {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
+  const { user } = await requireSocialUser("direct messages");
   const ids = (socialState.messages || [])
     .filter((message) => cleanUid(message.toUid) === user.uid && isUnreadForUser(message, user.uid))
     .map((message) => message.id);
@@ -1186,8 +1204,7 @@ async function markAllMessagesRead() {
 }
 
 async function markAllMessagesUnread() {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
+  const { user } = await requireSocialUser("direct messages");
   const ids = (socialState.messages || [])
     .filter((message) => cleanUid(message.toUid) === user.uid && !isUnreadForUser(message, user.uid))
     .map((message) => message.id);
@@ -1195,8 +1212,7 @@ async function markAllMessagesUnread() {
 }
 
 async function deleteMessageForCurrentUser(messageId) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
+  const { user } = await requireSocialUser("direct messages");
 
   const id = cleanUid(messageId);
   if (!id) throw new Error("Message not found.");
@@ -1270,6 +1286,7 @@ function teardownGroupListeners() {
 }
 
 function startRealtime() {
+  ensurePanategwaToast();
   watchAuth(async (user) => {
     if (unsubProfile) { try { unsubProfile(); } catch {} unsubProfile = null; }
     if (unsubMessages) { try { unsubMessages(); } catch {} unsubMessages = null; }

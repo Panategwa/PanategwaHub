@@ -2,13 +2,13 @@ const THEMES = [
   {
     name: "Panategwa Mode (Default)",
     vars: {
-      "--bg-color": "rgb(15, 23, 42)",
+      "--bg-color": "rgb(25, 25, 50)",
       "--text-color": "#e0e0e0",
-      "--menu-bg": "rgba(15, 23, 42, 0.82)",
+      "--menu-bg": "rgba(25, 20, 25, 0.75)",
       "--menu-button": "rgba(96, 165, 250, 0.18)",
       "--link-color": "#9cc8ff",
       "--button-text": "#f8fafc",
-      "--preview-bg": "rgba(15, 23, 42, 0.92)",
+      "--preview-bg": "rgba(25, 25, 50, 0.92)",
       "--preview-text": "#e0e0e0"
     }
   },

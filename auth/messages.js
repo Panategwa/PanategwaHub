@@ -1,4 +1,6 @@
-import { auth } from "./firebase-config.js";
+﻿import { auth } from "./firebase-config.js";
+import { authReady } from "./firebase-config.js";
+import { watchAuth } from "./auth.js";
 import {
   socialState,
   subscribeSocial,
@@ -21,6 +23,11 @@ const directDrafts = {};
 let openFriendMenuUid = "";
 let profileSheetUid = "";
 let pendingScrollMode = "keep";
+let authHydrated = false;
+let authSnapshot = {
+  user: null,
+  profile: null
+};
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -101,12 +108,16 @@ function initials(value, fallback = "P") {
 }
 
 function activeUser(state) {
-  return state?.user || socialState.user || auth.currentUser || null;
+  return authSnapshot.user || auth.currentUser || state?.user || socialState.user || null;
 }
 
 function isVerifiedState(state) {
   const user = activeUser(state);
-  return !!(user?.emailVerified || state?.profile?.verified || socialState.profile?.verified);
+  return !!(user?.emailVerified || authSnapshot.profile?.verified || state?.profile?.verified || socialState.profile?.verified);
+}
+
+function waitingForAuthRestore() {
+  return !authHydrated || (!activeUser(socialState) && localStorage.getItem("ptg_logged_in") === "1");
 }
 
 function isIncoming(message) {
@@ -442,7 +453,7 @@ function chatHeaderMarkup(profile, uid) {
         <span class="social-avatar">${profileAvatarMarkup(profile)}</span>
         <div>
           <h3>${escapeHtml(profile?.username || friendName(uid))}</h3>
-          <p>${escapeHtml(profile?.currentRank || "Friend")} � ${escapeHtml(uid)}</p>
+          <p>${escapeHtml(profile?.currentRank || "Friend")} • ${escapeHtml(uid)}</p>
         </div>
       </div>
       <div class="social-chat-actions">
@@ -528,7 +539,9 @@ function render(state) {
   const user = activeUser(state);
 
   if (!user) {
-    root.innerHTML = `<div class="msg-empty">Log in to open your friends, direct messages, and requests.</div>`;
+    root.innerHTML = waitingForAuthRestore()
+      ? `<div class="locked-state"><h3>Loading your account</h3><p>Your friends, chats, and requests are syncing now.</p></div>`
+      : `<div class="msg-empty">Log in to open your friends, direct messages, and requests.</div>`;
     return;
   }
 
@@ -728,6 +741,17 @@ function start() {
   bindRoot(root);
   render(socialState);
   subscribeSocial(render);
+
+  watchAuth((user, profile) => {
+    authHydrated = true;
+    authSnapshot = { user, profile };
+    render(socialState);
+  });
+
+  authReady.finally(() => {
+    authHydrated = true;
+    render(socialState);
+  });
 }
 
 if (document.readyState === "loading") {

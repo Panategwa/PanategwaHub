@@ -1,4 +1,4 @@
-import { auth, db, googleProvider } from "./firebase-config.js";
+import { auth, authReady, db, googleProvider } from "./firebase-config.js";
 
 import {
   createUserWithEmailAndPassword,
@@ -104,16 +104,101 @@ const RANK_LEVELS = Object.freeze({
   Veteran: 3
 });
 
-export const AVATAR_PRESET_REQUIREMENTS = Object.freeze({
-  "1": Object.freeze({ rank: "Adventurer", note: "Adventurer rank" }),
-  "2": Object.freeze({ rank: "Adventurer", note: "Adventurer rank" }),
-  "3": Object.freeze({ rank: "Explorer", note: "Explorer rank" }),
-  "4": Object.freeze({ rank: "Explorer", note: "Explorer rank" }),
-  "5": Object.freeze({ rank: "Experienced", achievementId: "first_friend", achievementName: "First Signal", hiddenAchievement: false, note: "Experienced + First Signal" }),
-  "6": Object.freeze({ rank: "Experienced", achievementId: "site_20_minutes", achievementName: "Settled In", hiddenAchievement: false, note: "Experienced + Settled In" }),
-  "7": Object.freeze({ rank: "Veteran", achievementId: "achievement_collector", achievementName: "Achievement Collector", hiddenAchievement: false, note: "Veteran + Achievement Collector" }),
-  "8": Object.freeze({ rank: "Veteran", achievementId: "nocturnal", achievementName: "Secret achievement", hiddenAchievement: true, note: "Veteran + secret achievement" })
-});
+export const AVATAR_PRESETS = Object.freeze([
+  Object.freeze({
+    id: "1",
+    name: "Trail Spark",
+    requirement: Object.freeze({ rank: "Adventurer", note: "Adventurer rank" })
+  }),
+  Object.freeze({
+    id: "2",
+    name: "Ember Crest",
+    requirement: Object.freeze({ rank: "Adventurer", note: "Adventurer rank" })
+  }),
+  Object.freeze({
+    id: "3",
+    name: "Explorer Beacon",
+    requirement: Object.freeze({ rank: "Explorer", note: "Explorer rank" })
+  }),
+  Object.freeze({
+    id: "4",
+    name: "Sky Marker",
+    requirement: Object.freeze({ rank: "Explorer", note: "Explorer rank" })
+  }),
+  Object.freeze({
+    id: "5",
+    name: "Week Flame",
+    requirement: Object.freeze({
+      rank: "Explorer",
+      achievementId: "week_streak",
+      achievementName: "Week Streak",
+      hiddenAchievement: false,
+      note: "Explorer + Week Streak"
+    })
+  }),
+  Object.freeze({
+    id: "6",
+    name: "Settled Signal",
+    requirement: Object.freeze({
+      rank: "Experienced",
+      achievementId: "site_20_minutes",
+      achievementName: "Settled In",
+      hiddenAchievement: false,
+      note: "Experienced + Settled In"
+    })
+  }),
+  Object.freeze({
+    id: "7",
+    name: "Crew Link",
+    requirement: Object.freeze({
+      rank: "Experienced",
+      achievementId: "three_friends",
+      achievementName: "Small Crew",
+      hiddenAchievement: false,
+      note: "Experienced + Small Crew"
+    })
+  }),
+  Object.freeze({
+    id: "8",
+    name: "Veteran Crest",
+    requirement: Object.freeze({
+      rank: "Veteran",
+      achievementId: "achievement_collector",
+      achievementName: "Achievement Collector",
+      hiddenAchievement: false,
+      note: "Veteran + Achievement Collector"
+    })
+  }),
+  Object.freeze({
+    id: "9",
+    name: "Year Crown",
+    requirement: Object.freeze({
+      rank: "Veteran",
+      achievementId: "year_streak",
+      achievementName: "Year Streak",
+      hiddenAchievement: false,
+      note: "Veteran + Year Streak"
+    })
+  }),
+  Object.freeze({
+    id: "10",
+    name: "Midnight Relic",
+    requirement: Object.freeze({
+      rank: "Veteran",
+      achievementId: "nocturnal",
+      achievementName: "Secret achievement",
+      hiddenAchievement: true,
+      note: "Veteran + secret achievement"
+    })
+  })
+]);
+
+export const AVATAR_PRESET_IDS = Object.freeze(AVATAR_PRESETS.map((preset) => preset.id));
+const AVATAR_PRESET_MAP = new Map(AVATAR_PRESETS.map((preset) => [preset.id, preset]));
+
+export const AVATAR_PRESET_REQUIREMENTS = Object.freeze(
+  Object.fromEntries(AVATAR_PRESETS.map((preset) => [preset.id, preset.requirement]))
+);
 
 export function getRankFromXp(xp) {
   if (Number(xp || 0) >= 30) return "Veteran";
@@ -124,6 +209,10 @@ export function getRankFromXp(xp) {
 
 export function doesRankMeetRequirement(rank, requiredRank) {
   return (RANK_LEVELS[rank] ?? 0) >= (RANK_LEVELS[requiredRank] ?? 0);
+}
+
+export function getAvatarPresetName(presetId) {
+  return AVATAR_PRESET_MAP.get(String(presetId || "1"))?.name || AVATAR_PRESET_MAP.get("1")?.name || "Trail Spark";
 }
 
 export function getAvatarPresetRequirement(presetId) {
@@ -167,14 +256,14 @@ function lockedAvatarReason(profile, presetId) {
   const requirement = getAvatarPresetRequirement(presetId);
   const currentRank = getRankFromXp(profile?.xp || 0);
   if (!doesRankMeetRequirement(currentRank, requirement.rank)) {
-    return `Preset ${presetId} unlocks at ${requirement.rank} rank.`;
+    return `${getAvatarPresetName(presetId)} unlocks at ${requirement.rank} rank.`;
   }
   if (requirement.achievementId) {
     return requirement.hiddenAchievement
-      ? `Preset ${presetId} also needs a secret achievement.`
-      : `Preset ${presetId} also needs the "${requirement.achievementName}" achievement.`;
+      ? `${getAvatarPresetName(presetId)} also needs a secret achievement.`
+      : `${getAvatarPresetName(presetId)} also needs the "${requirement.achievementName}" achievement.`;
   }
-  return `Preset ${presetId} is locked.`;
+  return `${getAvatarPresetName(presetId)} is locked.`;
 }
 
 function svgDataUrl(svg) {
@@ -204,13 +293,24 @@ export function getDefaultAvatarDataUrl() {
 function presetAvatarDataUrl(presetId) {
   const id = String(presetId || "1");
 
+  if (id === "1") {
+    return svgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0ea5e9"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <circle cx="64" cy="64" r="40" fill="rgba(255,255,255,0.12)"/>
+        <path d="M64 24 76 49l28 4-20 19 5 28-25-13-25 13 5-28-20-19 28-4z" fill="rgba(255,255,255,0.96)"/>
+      </svg>
+    `);
+  }
+
   if (id === "2") {
     return svgDataUrl(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#ef4444"/><stop offset="1" stop-color="#f59e0b"/></linearGradient></defs>
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#f97316"/><stop offset="1" stop-color="#ef4444"/></linearGradient></defs>
         <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <path d="M64 18 84 42l26 6-17 22 1 28-30-11-30 11 1-28-17-22 26-6z" fill="rgba(255,255,255,0.92)"/>
-        <path d="M64 38 76 54l18 4-12 16 1 18-19-7-19 7 1-18-12-16 18-4z" fill="rgba(239,68,68,0.55)"/>
+        <path d="M64 18 87 36l23 16-8 29-21 21H47L26 81l-8-29 23-16z" fill="rgba(255,255,255,0.94)"/>
+        <path d="M64 38 77 50l12 9-5 18-13 13H57L44 77l-5-18 12-9z" fill="rgba(249,115,22,0.42)"/>
       </svg>
     `);
   }
@@ -220,8 +320,9 @@ function presetAvatarDataUrl(presetId) {
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
         <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0f766e"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
         <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <circle cx="64" cy="64" r="36" fill="rgba(255,255,255,0.12)"/>
-        <path d="M64 28 76 53h28L81 72l9 28-26-17-26 17 9-28-23-19h28z" fill="rgba(255,255,255,0.94)"/>
+        <circle cx="64" cy="64" r="44" fill="rgba(255,255,255,0.08)"/>
+        <path d="M64 22 75 50l30 2-23 18 8 28-26-16-26 16 8-28-23-18 30-2z" fill="rgba(255,255,255,0.96)"/>
+        <circle cx="64" cy="60" r="8" fill="rgba(15,118,110,0.4)"/>
       </svg>
     `);
   }
@@ -231,9 +332,8 @@ function presetAvatarDataUrl(presetId) {
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
         <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#2563eb"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
         <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <circle cx="64" cy="64" r="40" fill="rgba(255,255,255,0.12)"/>
-        <path d="M64 24c15 10 26 24 26 39 0 19-14 31-26 41-12-10-26-22-26-41 0-15 11-29 26-39z" fill="rgba(255,255,255,0.94)"/>
-        <path d="M64 40c8 6 13 13 13 22 0 11-7 18-13 24-6-6-13-13-13-24 0-9 5-16 13-22z" fill="rgba(37,99,235,0.55)"/>
+        <path d="M64 20c18 10 30 26 30 43 0 21-15 34-30 46-15-12-30-25-30-46 0-17 12-33 30-43z" fill="rgba(255,255,255,0.96)"/>
+        <circle cx="64" cy="60" r="12" fill="rgba(37,99,235,0.45)"/>
       </svg>
     `);
   }
@@ -241,10 +341,11 @@ function presetAvatarDataUrl(presetId) {
   if (id === "5") {
     return svgDataUrl(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#6366f1"/></linearGradient></defs>
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#16a34a"/><stop offset="1" stop-color="#22c55e"/></linearGradient></defs>
         <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <circle cx="64" cy="64" r="42" fill="rgba(255,255,255,0.09)"/>
-        <path d="M64 20 84 36l24 2-15 19 5 23-22-8-12 20-12-20-22 8 5-23-15-19 24-2z" fill="rgba(255,255,255,0.94)"/>
+        <rect x="26" y="28" width="76" height="72" rx="18" fill="rgba(255,255,255,0.92)"/>
+        <path d="M43 20v20m42-20v20" stroke="rgba(255,255,255,0.92)" stroke-width="8" stroke-linecap="round"/>
+        <path d="M44 60h14m12 0h14m-26 18h26" stroke="rgba(22,163,74,0.65)" stroke-width="8" stroke-linecap="round"/>
       </svg>
     `);
   }
@@ -252,11 +353,11 @@ function presetAvatarDataUrl(presetId) {
   if (id === "6") {
     return svgDataUrl(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#1d4ed8"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#4338ca"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
         <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <path d="M64 18 86 34l24 6-14 23 2 26-24-11-10 22-10-22-24 11 2-26-14-23 24-6z" fill="rgba(255,255,255,0.94)"/>
-        <circle cx="64" cy="58" r="12" fill="rgba(29,78,216,0.48)"/>
-        <path d="M64 40v36" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+        <path d="M64 18 90 44v52l-26 14-26-14V44z" fill="rgba(255,255,255,0.94)"/>
+        <path d="M64 38v42" stroke="rgba(67,56,202,0.52)" stroke-width="8" stroke-linecap="round"/>
+        <path d="M50 54h28" stroke="rgba(67,56,202,0.52)" stroke-width="8" stroke-linecap="round"/>
       </svg>
     `);
   }
@@ -264,10 +365,12 @@ function presetAvatarDataUrl(presetId) {
   if (id === "7") {
     return svgDataUrl(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#7c2d12"/><stop offset="1" stop-color="#f59e0b"/></linearGradient></defs>
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#1d4ed8"/><stop offset="1" stop-color="#0ea5e9"/></linearGradient></defs>
         <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <path d="M64 16 88 32l24 16-8 31-24 17H48L24 79l-8-31 24-16z" fill="rgba(255,255,255,0.94)"/>
-        <path d="M40 52h48v10H40zm8 18h32v10H48z" fill="rgba(124,45,18,0.42)"/>
+        <circle cx="40" cy="48" r="14" fill="rgba(255,255,255,0.94)"/>
+        <circle cx="88" cy="48" r="14" fill="rgba(255,255,255,0.94)"/>
+        <circle cx="64" cy="84" r="16" fill="rgba(255,255,255,0.94)"/>
+        <path d="M48 56 58 72M80 56 70 72M54 84h20" stroke="rgba(29,78,216,0.48)" stroke-width="8" stroke-linecap="round"/>
       </svg>
     `);
   }
@@ -275,22 +378,43 @@ function presetAvatarDataUrl(presetId) {
   if (id === "8") {
     return svgDataUrl(`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#431407"/><stop offset="1" stop-color="#facc15"/></linearGradient></defs>
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#7c2d12"/><stop offset="1" stop-color="#f59e0b"/></linearGradient></defs>
         <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <path d="M64 18 86 44l28 4-20 21 5 29-35-16-35 16 5-29-20-21 28-4z" fill="rgba(255,255,255,0.95)"/>
-        <circle cx="64" cy="58" r="11" fill="rgba(250,204,21,0.68)"/>
+        <path d="M64 16 92 34l10 28-12 34-26 16-26-16-12-34 10-28z" fill="rgba(255,255,255,0.95)"/>
+        <path d="M64 34 74 56h24L79 71l7 23-22-12-22 12 7-23-19-15h24z" fill="rgba(124,45,18,0.5)"/>
       </svg>
     `);
   }
 
-  return svgDataUrl(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-      <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#f97316"/><stop offset="1" stop-color="#facc15"/></linearGradient></defs>
-      <rect width="128" height="128" rx="64" fill="url(#g)"/>
-      <path d="M64 24 78 52h28L83 70l8 26-27-13-27 13 8-26-23-18h28z" fill="rgba(255,255,255,0.94)"/>
-      <circle cx="64" cy="60" r="10" fill="rgba(249,115,22,0.48)"/>
-    </svg>
-  `);
+  if (id === "9") {
+    return svgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#64748b"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <path d="M38 86c8 0 14-7 14-15-8 0-14 7-14 15zm52-15c0 8 6 15 14 15 0-8-6-15-14-15z" fill="rgba(255,255,255,0.88)"/>
+        <path d="M34 58 48 72l16-30 16 30 14-14v18c0 14-12 28-30 28S34 90 34 76z" fill="rgba(255,255,255,0.95)"/>
+        <circle cx="64" cy="42" r="10" fill="rgba(100,116,139,0.45)"/>
+      </svg>
+    `);
+  }
+
+  if (id === "10") {
+    return svgDataUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <circle cx="64" cy="64" r="44" fill="rgba(255,255,255,0.06)"/>
+        <path d="M64 18 76 46l30 4-22 18 7 28-27-14-27 14 7-28-22-18 30-4z" fill="rgba(255,255,255,0.95)"/>
+        <circle cx="64" cy="62" r="9" fill="rgba(67,56,202,0.6)"/>
+      </svg>
+    `);
+  }
+
+  return presetAvatarDataUrl("1");
+}
+
+export function getAvatarPresetPreviewUrl(presetId) {
+  return presetAvatarDataUrl(presetId);
 }
 
 function letterAvatarDataUrl(letter) {
@@ -532,6 +656,7 @@ async function touchLastLoginOnce(user) {
 }
 
 export async function createAccount(email, password, username) {
+  await authReady;
   const cleanName = cleanText(username).slice(0, 20);
   const cleanMail = cleanEmail(email);
   const cleanPass = String(password || "");
@@ -559,6 +684,7 @@ export async function createAccount(email, password, username) {
 }
 
 export async function login(email, password) {
+  await authReady;
   const cleanMail = cleanEmail(email);
   const cleanPass = String(password || "");
 
@@ -577,6 +703,7 @@ export async function login(email, password) {
 }
 
 export async function loginWithGoogle() {
+  await authReady;
   if (window.location.protocol === "file:") {
     throw new Error("Google sign-in needs the site to run from localhost or a real domain, not directly as a file.");
   }
@@ -593,6 +720,7 @@ export async function loginWithGoogle() {
 }
 
 export async function logout() {
+  await authReady;
   localStorage.removeItem("ptg_logged_in");
   return signOut(auth);
 }
@@ -734,6 +862,7 @@ export async function resendVerificationEmail() {
 }
 
 export async function refreshCurrentUserSession() {
+  await authReady;
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
@@ -961,21 +1090,36 @@ export async function deleteAccount(password) {
 }
 
 export function watchAuth(callback) {
-  return onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      localStorage.removeItem("ptg_logged_in");
-      callback(null, null);
-      return;
-    }
+  let unsub = null;
+  let cancelled = false;
 
-    try {
-      localStorage.setItem("ptg_logged_in", "1");
-      const profile = await ensureUserProfile(user);
-      await touchLastLoginOnce(user);
-      callback(user, profile);
-    } catch (error) {
-      console.error("Auth watch error:", error);
-      callback(user, null);
-    }
+  authReady.then(() => {
+    if (cancelled) return;
+
+    unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        localStorage.removeItem("ptg_logged_in");
+        callback(null, null);
+        return;
+      }
+
+      try {
+        localStorage.setItem("ptg_logged_in", "1");
+        const profile = await ensureUserProfile(user);
+        await touchLastLoginOnce(user);
+        callback(user, profile);
+      } catch (error) {
+        console.error("Auth watch error:", error);
+        callback(user, null);
+      }
+    });
+  }).catch((error) => {
+    console.error("Auth bootstrap error:", error);
+    callback(null, null);
   });
+
+  return () => {
+    cancelled = true;
+    if (typeof unsub === "function") unsub();
+  };
 }

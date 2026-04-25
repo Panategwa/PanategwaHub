@@ -1319,9 +1319,11 @@ function startRealtime() {
 
     listenerErrors.clear();
     socialState.user = user;
+    socialState.socialError = null;
+    emit();
+
     socialState.profile = await ensureUserProfile(user);
     socialState.settings = { ...DEFAULT_SETTINGS, ...(socialState.profile?.socialSettings || {}) };
-    socialState.socialError = null;
     socialState.friends = unique(socialState.profile?.friends);
     socialState.blocked = unique(socialState.profile?.blocked);
     socialState.selectedProfile = publicProfile(socialState.profile, user.uid);

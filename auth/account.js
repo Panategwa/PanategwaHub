@@ -9,6 +9,7 @@ import {
   watchAuth,
   getProfile
 } from "./auth.js";
+import { auth, authReady } from "./firebase-config.js";
 
 import {
   subscribeSocial,
@@ -48,6 +49,7 @@ let copiedUserIdValue = null;
 let copiedUserIdUntil = 0;
 let copiedUserIdTimer = null;
 let lastAchievementSignature = "";
+let authHydrated = false;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -128,6 +130,14 @@ function isVerifiedState(user, profile = null) {
   return !!(user?.emailVerified || profile?.verified);
 }
 
+function resolvedUser(state = currentState) {
+  return state?.user || auth.currentUser || null;
+}
+
+function resolvedProfile(state = currentState) {
+  return state?.profile || null;
+}
+
 function normalizeAccountSection(section = "info") {
   const nextSection = String(section || "info").trim().toLowerCase();
   return nextSection === "friends" ? "messages" : nextSection;
@@ -200,7 +210,7 @@ function syncMessagesTabBadge(state) {
   if (!button) return;
 
   const unread = Number(state.unreadCount || 0);
-  const canUseMessages = isVerifiedState(state.user, state.profile);
+  const canUseMessages = isVerifiedState(resolvedUser(state), resolvedProfile(state));
   button.classList.toggle("has-dot", canUseMessages && unread > 0);
   button.setAttribute("aria-label", canUseMessages && unread > 0 ? `Friends (${unread} unread)` : "Friends");
   button.title = canUseMessages && unread > 0 ? `${unread} unread chat${unread === 1 ? "" : "s"}` : "Friends";
@@ -212,11 +222,33 @@ function setVisible(id, visible) {
   el.classList.toggle("section-hidden", !visible);
 }
 
-function updateLockedPanel(prefix, loggedIn, verified) {
+function isAuthRestoring() {
+  return !authHydrated;
+}
+
+function updateLockedPanel(prefix, loggedIn, verified, restoring = false) {
   const title = $(`${prefix}-locked-title`);
   const copy = $(`${prefix}-locked-copy`);
   const refreshBtn = $(`${prefix}-locked-refresh-btn`);
   const resendBtn = $(`${prefix}-locked-resend-btn`);
+
+  if (restoring) {
+    if (title) {
+      title.textContent = prefix === "messages"
+        ? "Loading your friends system"
+        : "Loading your account";
+    }
+
+    if (copy) {
+      copy.textContent = prefix === "messages"
+        ? "Your chats, friend requests, and friend list are syncing now."
+        : "Your profile, settings, and account tools are syncing now.";
+    }
+
+    setVisible(`${prefix}-locked-refresh-btn`, false);
+    setVisible(`${prefix}-locked-resend-btn`, false);
+    return;
+  }
 
   if (title) {
     title.textContent = !loggedIn
@@ -325,20 +357,28 @@ function showSettingsSubsection(name = "account") {
 }
 
 function applyAuthGuards() {
-  const loggedIn = !!currentState.user;
-  const verified = isVerifiedState(currentState.user, currentState.profile);
+  const user = resolvedUser(currentState);
+  const profile = resolvedProfile(currentState);
+  const restoring = isAuthRestoring();
+  const loggedIn = !!user;
+  const verified = isVerifiedState(user, profile);
   const unlocked = loggedIn && verified;
 
-  setVisible("settings-locked", !unlocked);
-  setVisible("settings-content", unlocked);
-  setVisible("messages-locked", !unlocked);
-  setVisible("messages-content", unlocked);
-  updateLockedPanel("settings", loggedIn, verified);
-  updateLockedPanel("messages", loggedIn, verified);
+  setVisible("settings-locked", restoring || !unlocked);
+  setVisible("settings-content", !restoring && unlocked);
+  setVisible("friends-locked", restoring || !unlocked);
+  setVisible("friends-content", !restoring && unlocked);
+  setVisible("messages-locked", restoring || !unlocked);
+  setVisible("messages-content", !restoring && unlocked);
+  updateLockedPanel("settings", loggedIn, verified, restoring);
+  updateLockedPanel("friends", loggedIn, verified, restoring);
+  updateLockedPanel("messages", loggedIn, verified, restoring);
 
   const progressHint = $("progress-login-hint");
   if (progressHint) {
-    progressHint.textContent = !loggedIn
+    progressHint.textContent = restoring
+      ? "Checking your account and synced progress..."
+      : !loggedIn
       ? "Log in to sync achievements and XP to your account."
       : (verified
         ? "Achievements and XP sync automatically while you explore the site."
@@ -405,8 +445,8 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
 };
 
 function renderAuth(state) {
-  const user = state.user;
-  const profile = state.profile || {};
+  const user = resolvedUser(state);
+  const profile = resolvedProfile(state) || {};
   const authCard = $("auth-card");
   const accountCard = $("account-card");
   const info = $("user-info");
@@ -495,7 +535,7 @@ function renderAuth(state) {
 }
 
 function renderProgress(state) {
-  const profile = state.profile || {};
+  const profile = resolvedProfile(state) || {};
   const xp = typeof profile.xp === "number" ? profile.xp : 0;
   const info = getRankInfo(xp);
   const unlockedCount = Array.isArray(profile.achievements) ? profile.achievements.length : 0;
@@ -515,16 +555,19 @@ function renderAchievements(state) {
   const list = $("achievements-list");
   if (!list) return;
 
+  const user = resolvedUser(state);
+  const profile = resolvedProfile(state);
+
   const signature = JSON.stringify({
-    uid: state.user?.uid || "",
-    xp: typeof state.profile?.xp === "number" ? state.profile.xp : 0,
-    achievements: [...new Set(state.profile?.achievements || [])].sort()
+    uid: user?.uid || "",
+    xp: typeof profile?.xp === "number" ? profile.xp : 0,
+    achievements: [...new Set(profile?.achievements || [])].sort()
   });
 
   if (signature === lastAchievementSignature) return;
   lastAchievementSignature = signature;
 
-  const unlocked = new Set(state.profile?.achievements || []);
+  const unlocked = new Set(profile?.achievements || []);
   const ordered = [...ACHIEVEMENTS].sort((a, b) => {
     const unlockedDiff = Number(unlocked.has(b.id)) - Number(unlocked.has(a.id));
     return unlockedDiff !== 0 ? unlockedDiff : a.name.localeCompare(b.name);
@@ -552,7 +595,8 @@ function renderSelectedProfile(state) {
   const container = $("friend-profile-view");
   if (!container) return;
 
-  if (!state.user) {
+  const user = resolvedUser(state);
+  if (!user) {
     container.innerHTML = `
       <div class="friend-profile-card">
         <div class="subsection-head"><h3>Profile preview</h3></div>
@@ -562,13 +606,14 @@ function renderSelectedProfile(state) {
     return;
   }
 
-  const profile = state.selectedProfile || state.profile || {};
+  const profile = state.selectedProfile || resolvedProfile(state) || {};
   const username = profile.username || "Player";
-  const isSelf = profile.uid === state.user.uid;
+  const isSelf = profile.uid === user.uid;
   const canViewProfile = isSelf || profile.canViewProfile !== false;
+  const resolvedStateProfile = resolvedProfile(state) || {};
   const rank = profile.currentRank ?? (isSelf ? getRank(profile.xp || 0) : null);
-  const streakCurrent = profile.streakCurrent ?? (isSelf ? (state.profile?.streak?.current || 0) : null);
-  const streakLongest = profile.streakLongest ?? (isSelf ? (state.profile?.longestStreak || state.profile?.streak?.longest || streakCurrent || 0) : null);
+  const streakCurrent = profile.streakCurrent ?? (isSelf ? (resolvedStateProfile?.streak?.current || 0) : null);
+  const streakLongest = profile.streakLongest ?? (isSelf ? (resolvedStateProfile?.longestStreak || resolvedStateProfile?.streak?.longest || streakCurrent || 0) : null);
   const avatar = `<img src="${escapeHtml(profile.photoURL || getDefaultAvatarDataUrl())}" alt="${escapeHtml(username)} avatar" class="profile-avatar-large" />`;
 
   if (!canViewProfile) {
@@ -769,17 +814,20 @@ function renderFriends(state) {
 }
 
 function renderAll(state) {
+  const user = resolvedUser(state);
+  const profile = resolvedProfile(state) || {};
   const authSignature = JSON.stringify({
-    uid: state.user?.uid || "",
-    username: state.profile?.username || "",
-    email: state.user?.email || state.profile?.email || "",
-    verified: isVerifiedState(state.user, state.profile),
-    photoURL: state.profile?.photoURL || "",
-    xp: state.profile?.xp || 0,
-    streak: state.profile?.streak?.current || 0,
-    longest: state.profile?.longestStreak || state.profile?.streak?.longest || 0,
-    createdAt: formatDateOnly(state.profile?.createdAt),
-    copied: isUserIdCopied(state.user?.uid || "")
+    authHydrated,
+    uid: user?.uid || "",
+    username: profile?.username || "",
+    email: user?.email || profile?.email || "",
+    verified: isVerifiedState(user, profile),
+    photoURL: profile?.photoURL || "",
+    xp: profile?.xp || 0,
+    streak: profile?.streak?.current || 0,
+    longest: profile?.longestStreak || profile?.streak?.longest || 0,
+    createdAt: formatDateOnly(profile?.createdAt),
+    copied: isUserIdCopied(user?.uid || "")
   });
   if (renderAll.lastAuthSignature !== authSignature) {
     renderAuth(state);
@@ -787,9 +835,9 @@ function renderAll(state) {
   }
 
   const progressSignature = JSON.stringify({
-    uid: state.user?.uid || "",
-    xp: state.profile?.xp || 0,
-    achievements: [...new Set(state.profile?.achievements || [])].sort()
+    uid: user?.uid || "",
+    xp: profile?.xp || 0,
+    achievements: [...new Set(profile?.achievements || [])].sort()
   });
   if (renderAll.lastProgressSignature !== progressSignature) {
     renderProgress(state);
@@ -797,11 +845,36 @@ function renderAll(state) {
     renderAll.lastProgressSignature = progressSignature;
   }
 
+  const friendsSignature = JSON.stringify({
+    authHydrated,
+    uid: user?.uid || "",
+    verified: isVerifiedState(user, profile),
+    socialError: state.socialError || "",
+    friends: [...new Set(state.friends || [])].sort(),
+    blocked: [...new Set(state.blocked || [])].sort(),
+    incoming: (state.incomingRequests || []).map((entry) => `${entry.id || ""}:${entry.status || "pending"}`).sort(),
+    outgoing: (state.outgoingRequests || []).map((entry) => `${entry.id || ""}:${entry.status || "pending"}`).sort(),
+    selectedProfileId: state.selectedProfileId || "",
+    friendProfiles: Object.entries(state.friendProfiles || {}).map(([uid, info]) => [
+      uid,
+      info?.username || "",
+      info?.photoURL || "",
+      info?.currentRank || "",
+      info?.streakCurrent ?? "",
+      info?.streakLongest ?? ""
+    ])
+  });
+  if (renderAll.lastFriendsSignature !== friendsSignature) {
+    renderFriends(state);
+    renderAll.lastFriendsSignature = friendsSignature;
+  }
+
   applyAuthGuards();
   syncMessagesTabBadge(state);
 }
 renderAll.lastAuthSignature = "";
 renderAll.lastProgressSignature = "";
+renderAll.lastFriendsSignature = "";
 
 async function copyText(value) {
   try {
@@ -1035,6 +1108,33 @@ function start() {
   applyInitialAccountArea();
   setStatus("Checking account...", "info");
 
+  authReady
+    .then(async () => {
+      authHydrated = true;
+
+      if (auth.currentUser && !currentState.user) {
+        currentState.user = auth.currentUser;
+      }
+
+      if (auth.currentUser && !currentState.profile) {
+        try {
+          currentState.profile = await getProfile(auth.currentUser.uid);
+        } catch (error) {
+          console.error("Could not hydrate account profile:", error);
+        }
+      }
+
+      renderAll(currentState);
+      if (typeof window.PanategwaMessagesRender === "function") {
+        window.PanategwaMessagesRender();
+      }
+    })
+    .catch((error) => {
+      authHydrated = true;
+      console.error("Auth restore failed:", error);
+      renderAll(currentState);
+    });
+
   watchAuth(async (user, profile) => {
     if (!user || copiedUserIdValue !== user.uid) {
       copiedUserIdValue = null;
@@ -1063,7 +1163,15 @@ function start() {
   });
 
   subscribeSocial((state) => {
-    currentState = { ...currentState, ...state };
+    const authUser = auth.currentUser || currentState.user || null;
+    const loggedOut = !auth.currentUser && !state.user;
+
+    currentState = {
+      ...currentState,
+      ...state,
+      user: loggedOut ? null : (state.user || authUser),
+      profile: loggedOut ? null : (state.profile || currentState.profile)
+    };
     renderAll(currentState);
   });
 }

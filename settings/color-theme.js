@@ -2,53 +2,53 @@ const THEMES = [
   {
     name: "Panategwa Mode (Default)",
     vars: {
-      "--bg-color": "rgb(25, 25, 50)",
-      "--text-color": "#e0e0e0",
-      "--menu-bg": "rgba(25, 20, 25, 0.75)",
-      "--menu-button": "rgba(96, 165, 250, 0.18)",
-      "--link-color": "#9cc8ff",
+      "--bg-color": "#0f172a",
+      "--text-color": "#e5edf8",
+      "--menu-bg": "rgba(15, 23, 42, 0.72)",
+      "--menu-button": "rgba(148, 163, 184, 0.14)",
+      "--link-color": "#b8dcff",
       "--button-text": "#f8fafc",
-      "--preview-bg": "rgba(25, 25, 50, 0.92)",
-      "--preview-text": "#e0e0e0"
+      "--preview-bg": "#0f172a",
+      "--preview-text": "#e5edf8"
     }
   },
   {
     name: "Dark Mode",
     vars: {
-      "--bg-color": "rgb(10, 10, 15)",
-      "--text-color": "#f0f0f0",
-      "--menu-bg": "rgba(20, 20, 25, 0.9)",
-      "--menu-button": "rgba(80, 80, 80, 0.4)",
-      "--link-color": "rgb(120, 180, 255)",
+      "--bg-color": "#090d16",
+      "--text-color": "#eef2f8",
+      "--menu-bg": "rgba(9, 13, 22, 0.82)",
+      "--menu-button": "rgba(148, 163, 184, 0.12)",
+      "--link-color": "#94c9ff",
       "--button-text": "#ffffff",
-      "--preview-bg": "rgb(10, 10, 15)",
-      "--preview-text": "#f0f0f0"
+      "--preview-bg": "#090d16",
+      "--preview-text": "#eef2f8"
     }
   },
   {
     name: "Light Mode",
     vars: {
-      "--bg-color": "#ffffff",
-      "--text-color": "#111111",
-      "--menu-bg": "rgba(240, 240, 240, 0.9)",
-      "--menu-button": "rgba(200, 200, 200, 0.5)",
-      "--link-color": "rgb(0, 100, 200)",
-      "--button-text": "#000000",
-      "--preview-bg": "#ffffff",
-      "--preview-text": "#111111"
+      "--bg-color": "#f6f8fb",
+      "--text-color": "#0f172a",
+      "--menu-bg": "rgba(255, 255, 255, 0.78)",
+      "--menu-button": "rgba(148, 163, 184, 0.16)",
+      "--link-color": "#2563eb",
+      "--button-text": "#0f172a",
+      "--preview-bg": "#f6f8fb",
+      "--preview-text": "#0f172a"
     }
   },
   {
     name: "Ocean",
     vars: {
-      "--bg-color": "#061a2b",
-      "--text-color": "#d0f0ff",
-      "--menu-bg": "rgba(0, 60, 100, 0.6)",
-      "--menu-button": "rgba(0, 140, 180, 0.3)",
-      "--link-color": "#4dd0e1",
-      "--button-text": "#e0f7ff",
-      "--preview-bg": "#061a2b",
-      "--preview-text": "#d0f0ff"
+      "--bg-color": "#0a2233",
+      "--text-color": "#d9efff",
+      "--menu-bg": "rgba(10, 34, 51, 0.72)",
+      "--menu-button": "rgba(103, 232, 249, 0.14)",
+      "--link-color": "#67e8f9",
+      "--button-text": "#eafaff",
+      "--preview-bg": "#0a2233",
+      "--preview-text": "#d9efff"
     }
   },
   {
@@ -67,14 +67,14 @@ const THEMES = [
   {
     name: "Space",
     vars: {
-      "--bg-color": "#0b0f1a",
-      "--text-color": "#c7d2ff",
-      "--menu-bg": "rgba(20, 25, 45, 0.8)",
-      "--menu-button": "rgba(90, 100, 180, 0.3)",
-      "--link-color": "#9bbcff",
+      "--bg-color": "#0c1222",
+      "--text-color": "#d4ddff",
+      "--menu-bg": "rgba(12, 18, 34, 0.78)",
+      "--menu-button": "rgba(129, 140, 248, 0.14)",
+      "--link-color": "#a5b4fc",
       "--button-text": "#ffffff",
-      "--preview-bg": "#0b0f1a",
-      "--preview-text": "#c7d2ff"
+      "--preview-bg": "#0c1222",
+      "--preview-text": "#d4ddff"
     }
   },
   {
@@ -137,6 +137,9 @@ function applyTheme(theme) {
   }
 
   localStorage.setItem("theme", theme.name);
+  window.dispatchEvent(new CustomEvent("panategwa:themechange", {
+    detail: { theme: theme.name }
+  }));
 }
 
 function syncThemeUrl(name) {

@@ -1,4 +1,4 @@
-import { db } from "./firebase-config.js";
+import { auth, db } from "./firebase-config.js";
 import { watchAuth, ensureUserProfile } from "./auth.js";
 import { ensurePanategwaToast } from "./toast.js";
 
@@ -34,6 +34,15 @@ const KNOWN_IDS = new Set(ACHIEVEMENTS.map((achievement) => achievement.id));
 
 let started = false;
 let profileUnsub = null;
+let syncTimer = null;
+let syncInFlight = null;
+let trackedUser = null;
+let trackedProfile = null;
+let lastSyncAt = 0;
+let interactionSyncTimer = null;
+
+const SYNC_INTERVAL_MS = 8000;
+const MIN_SYNC_GAP_MS = 4000;
 
 function pageId() {
   return (window.location.pathname.split("/").pop() || "index.html").toLowerCase();
@@ -121,7 +130,7 @@ function computeUnlocks(user, profile, pages) {
 
   add("profile_name", hasResetBaseline ? (!!currentUsername && currentUsername !== baseline.username) : !!currentUsername);
   add("verified_email", hasResetBaseline ? (!!user.emailVerified && !baseline.verified) : !!user.emailVerified);
-  add("thrinsachelom_history", page === "panategwa-d-thrinsachelom-history.html");
+  add("thrinsachelom_history", page === "thrinsachelom-history-page.html");
 
   add("all_planets", [
     "panategwa-page.html",
@@ -186,13 +195,30 @@ export async function syncAchievementProgress(user, profile) {
     const mergedAchievements = uniqueKnown([...currentAchievements, ...pending]);
     const addedReward = pending.reduce((sum, id) => sum + rewardForId(id), 0);
     const xp = (typeof data.xp === "number" ? data.xp : currentAchievements.length) + addedReward;
+    const nextUsername = data.username || user.displayName || "";
+    const nextEmail = user.email || data.email || "";
+    const nextEmailLower = String(nextEmail || "").toLowerCase();
+    const nextVerified = !!user.emailVerified;
+    const pagesVisited = nextVisited.length;
+    const shouldWrite =
+      !snap.exists() ||
+      !data.createdAt ||
+      data.uid !== user.uid ||
+      String(data.email || "") !== nextEmail ||
+      String(data.emailLower || "") !== nextEmailLower ||
+      String(data.username || "") !== nextUsername ||
+      !!data.verified !== nextVerified ||
+      currentVisited.length !== nextVisited.length ||
+      currentAchievements.length !== mergedAchievements.length ||
+      (typeof data.xp === "number" ? data.xp : currentAchievements.length) !== xp ||
+      Number(data?.stats?.pagesVisited || 0) !== pagesVisited;
 
     const nextDoc = {
       uid: user.uid,
-      email: user.email || data.email || "",
-      emailLower: String(user.email || data.email || "").toLowerCase(),
-      username: data.username || user.displayName || "",
-      verified: !!user.emailVerified,
+      email: nextEmail,
+      emailLower: nextEmailLower,
+      username: nextUsername,
+      verified: nextVerified,
       achievements: mergedAchievements,
       visitedPages: nextVisited,
       xp,
@@ -201,11 +227,14 @@ export async function syncAchievementProgress(user, profile) {
         pagesVisited: nextVisited.length
       },
       createdAt: data.createdAt || serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      lastLoginAt: serverTimestamp()
+      updatedAt: shouldWrite ? serverTimestamp() : (data.updatedAt || null),
+      lastLoginAt: data.lastLoginAt || serverTimestamp()
     };
 
-    tx.set(ref, nextDoc, { merge: true });
+    if (shouldWrite) {
+      tx.set(ref, nextDoc, { merge: true });
+    }
+
     result = { profile: nextDoc, newlyUnlocked: pending };
   });
 
@@ -263,28 +292,82 @@ function emitAchievementToasts(user, newlyUnlocked) {
 
     window.PanategwaToast({
       title: "Achievement unlocked",
-      body: `${achievement.name} - +${achievement.reward} XP`,
+      body: `${achievement.name} <br> +${achievement.reward} XP`,
       href: "account-page.html?tab=progress"
     });
   });
 }
 
+function clearSyncTimer() {
+  if (!syncTimer) return;
+  window.clearTimeout(syncTimer);
+  syncTimer = null;
+}
+
+async function runAchievementSync(force = false) {
+  clearSyncTimer();
+
+  const user = trackedUser || auth.currentUser || null;
+  if (!user) {
+    trackedUser = null;
+    trackedProfile = null;
+    renderAchievements(null);
+    return;
+  }
+
+  const now = Date.now();
+  if (!force && now - lastSyncAt < MIN_SYNC_GAP_MS) {
+    scheduleAchievementSync(MIN_SYNC_GAP_MS - (now - lastSyncAt));
+    return;
+  }
+
+  if (syncInFlight) {
+    if (force) {
+      syncInFlight.finally(() => scheduleAchievementSync(120, true));
+    }
+    return syncInFlight;
+  }
+
+  syncInFlight = (async () => {
+    try {
+      trackedUser = user;
+      trackedProfile = trackedProfile || await ensureUserProfile(user);
+      const result = await syncAchievementProgress(user, trackedProfile);
+      trackedProfile = result.profile || trackedProfile;
+      lastSyncAt = Date.now();
+      renderAchievements(trackedProfile);
+      emitAchievementToasts(user, result.newlyUnlocked || []);
+    } catch (error) {
+      console.error("Achievement tracker error:", error);
+      renderAchievements(trackedProfile || null);
+    } finally {
+      syncInFlight = null;
+    }
+  })();
+
+  return syncInFlight;
+}
+
+function scheduleAchievementSync(delay = 0, force = false) {
+  clearSyncTimer();
+  syncTimer = window.setTimeout(() => {
+    runAchievementSync(force);
+  }, Math.max(0, Number(delay) || 0));
+}
+
 function startAccountWatcher() {
-  watchAuth(async (user, profile) => {
+  watchAuth((user, profile) => {
     if (!user) {
+      trackedUser = null;
+      trackedProfile = null;
+      clearSyncTimer();
       renderAchievements(null);
       return;
     }
 
-    try {
-      await ensureUserProfile(user);
-      const result = await syncAchievementProgress(user, profile);
-      renderAchievements(result.profile || profile);
-      emitAchievementToasts(user, result.newlyUnlocked);
-    } catch (error) {
-      console.error("Achievement tracker error:", error);
-      renderAchievements(profile || null);
-    }
+    trackedUser = user;
+    trackedProfile = profile || trackedProfile;
+    scheduleAchievementSync(0, true);
   });
 }
 
@@ -298,9 +381,62 @@ function startLiveProfileListener() {
     if (!user) return;
 
     profileUnsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
-      renderAchievements(snap.exists() ? snap.data() : null);
+      const freshProfile = snap.exists() ? snap.data() : null;
+      trackedProfile = freshProfile;
+      renderAchievements(freshProfile);
+
+      if (!trackedUser || !freshProfile) return;
+
+      const normalizedProfile = {
+        ...freshProfile,
+        uid: trackedUser.uid,
+        email: trackedUser.email || freshProfile.email || "",
+        username: freshProfile.username || trackedUser.displayName || "",
+        verified: !!trackedUser.emailVerified,
+        achievements: uniqueKnown(freshProfile.achievements || []),
+        visitedPages: visitedPages(freshProfile),
+        xp: typeof freshProfile.xp === "number" ? freshProfile.xp : uniqueKnown(freshProfile.achievements || []).length
+      };
+
+      if (computeUnlocks(trackedUser, normalizedProfile, normalizedProfile.visitedPages).length) {
+        scheduleAchievementSync(200, true);
+      }
     });
   });
+}
+
+function startReactiveSyncTriggers() {
+  const scheduleSoon = () => scheduleAchievementSync(250, true);
+  const scheduleSoft = () => scheduleAchievementSync(600, false);
+  const scheduleAfterInteraction = () => {
+    if (interactionSyncTimer) {
+      window.clearTimeout(interactionSyncTimer);
+    }
+
+    interactionSyncTimer = window.setTimeout(() => {
+      interactionSyncTimer = null;
+      scheduleAchievementSync(0, false);
+    }, 900);
+  };
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) scheduleSoon();
+  });
+
+  window.addEventListener("focus", scheduleSoon);
+  window.addEventListener("pageshow", scheduleSoon);
+  window.addEventListener("panategwa:themechange", scheduleSoft);
+  window.addEventListener("panategwa:textsizechange", scheduleSoft);
+  window.addEventListener("panategwa:achievement-sync", scheduleSoon);
+  document.addEventListener("click", scheduleAfterInteraction, true);
+  document.addEventListener("change", scheduleAfterInteraction, true);
+  document.addEventListener("keyup", scheduleAfterInteraction, true);
+
+  window.setInterval(() => {
+    if (!document.hidden) {
+      scheduleAchievementSync(0, false);
+    }
+  }, SYNC_INTERVAL_MS);
 }
 
 function startAchievementSystem() {
@@ -310,6 +446,8 @@ function startAchievementSystem() {
   ensurePanategwaToast();
   startAccountWatcher();
   startLiveProfileListener();
+  startReactiveSyncTriggers();
+  [900, 2500, 5000].forEach((delay) => scheduleAchievementSync(delay, true));
 }
 
 if (document.readyState === "loading") {

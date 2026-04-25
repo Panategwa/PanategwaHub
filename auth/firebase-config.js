@@ -2,6 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/fireba
 import {
   getAuth,
   setPersistence,
+  indexedDBLocalPersistence,
   browserLocalPersistence,
   GoogleAuthProvider
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
@@ -25,6 +26,28 @@ const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
 auth.useDeviceLanguage();
-setPersistence(auth, browserLocalPersistence).catch(console.error);
 
-export { app, auth, db, googleProvider };
+const authReady = (async () => {
+  try {
+    await setPersistence(auth, indexedDBLocalPersistence);
+  } catch (indexedDbError) {
+    console.warn("IndexedDB auth persistence unavailable, falling back to browserLocalPersistence.", indexedDbError);
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+    } catch (localError) {
+      console.error("Could not enable local auth persistence.", localError);
+    }
+  }
+
+  try {
+    if (typeof auth.authStateReady === "function") {
+      await auth.authStateReady();
+    }
+  } catch (error) {
+    console.warn("Auth state restore check failed.", error);
+  }
+
+  return auth;
+})();
+
+export { app, auth, authReady, db, googleProvider };

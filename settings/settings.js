@@ -13,6 +13,8 @@
     "color-theme.js"
   ].map(file => new URL(file, BASE_URL).href);
 
+  const ACHIEVEMENTS_MODULE = new URL("../auth/achievements.js", BASE_URL).href;
+
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const script = document.createElement("script");
@@ -22,6 +24,21 @@
       script.onerror = () => reject(new Error(`Failed to load ${src}`));
       document.head.appendChild(script);
     });
+  }
+
+  function ensureModule(src, marker) {
+    const existing = [...document.querySelectorAll("script[type='module']")].some((script) => {
+      const current = script.getAttribute("src") || "";
+      return current === src || current.endsWith("/auth/achievements.js") || script.dataset[marker] === "true";
+    });
+
+    if (existing) return;
+
+    const script = document.createElement("script");
+    script.type = "module";
+    script.src = src;
+    script.dataset[marker] = "true";
+    document.head.appendChild(script);
   }
 
   function whenReady(fn) {
@@ -36,6 +53,8 @@
     for (const src of MODULES) {
       await loadScript(src);
     }
+
+    ensureModule(ACHIEVEMENTS_MODULE, "panategwaAchievements");
 
     whenReady(() => {
       if (typeof initTextSize === "function") initTextSize();

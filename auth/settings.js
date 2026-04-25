@@ -3,8 +3,12 @@ import {
   changeEmail,
   changePassword,
   setAvatarPreset,
-  AVATAR_PRESET_REQUIREMENTS,
+  AVATAR_PRESET_IDS,
+  getAvatarPresetRequirement,
   getAvatarPresetRequirementText,
+  getAvatarPresetName,
+  getAvatarPresetPreviewUrl,
+  getDefaultAvatarDataUrl,
   isAvatarPresetUnlocked,
   useDefaultProfilePicture,
   updatePrivacySettings,
@@ -18,7 +22,7 @@ import {
 } from "./auth.js";
 
 const $ = (id) => document.getElementById(id);
-const PRESET_IDS = ["1", "2", "3", "4", "5", "6", "7", "8"];
+const PRESET_IDS = [...AVATAR_PRESET_IDS];
 
 function setStatus(message, kind = "info") {
   const el = $("auth-status");
@@ -56,19 +60,36 @@ function syncForm(profile, user) {
 }
 
 function syncAvatarPresetLocks(profile) {
+  const currentAvatarType = String(profile?.avatarType || "default");
+  const currentAvatarPreset = String(profile?.avatarPreset || "default");
+
   for (const presetId of PRESET_IDS) {
     const button = $(`avatar-preset-${presetId}-btn`);
     if (!button) continue;
 
-    const requirement = AVATAR_PRESET_REQUIREMENTS[presetId] || AVATAR_PRESET_REQUIREMENTS["1"];
     const unlocked = isAvatarPresetUnlocked(profile, presetId);
+    const requirement = getAvatarPresetRequirement(presetId);
     const note = button.querySelector("[data-avatar-rank-note]");
+    const name = button.querySelector("[data-avatar-name]");
+    const image = button.querySelector("img");
+    const selected = currentAvatarType === "preset" && currentAvatarPreset === presetId;
 
     button.disabled = !unlocked;
     button.dataset.locked = unlocked ? "false" : "true";
+    button.classList.toggle("current", selected);
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
     button.title = unlocked
       ? `Unlocked: ${getAvatarPresetRequirementText(presetId, true)}`
       : `Locked: ${getAvatarPresetRequirementText(presetId, false)}`;
+
+    if (image) {
+      image.src = getAvatarPresetPreviewUrl(presetId);
+      image.alt = `${getAvatarPresetName(presetId)} avatar preset`;
+    }
+
+    if (name) {
+      name.textContent = getAvatarPresetName(presetId);
+    }
 
     if (note) {
       note.textContent = getAvatarPresetRequirementText(presetId, unlocked);
@@ -79,6 +100,19 @@ function syncAvatarPresetLocks(profile) {
     } else {
       delete button.dataset.secretRequirement;
     }
+  }
+
+  const defaultButton = $("avatar-default-btn");
+  if (defaultButton) {
+    const image = defaultButton.querySelector("img");
+    const selected = currentAvatarType !== "preset";
+    if (image) {
+      image.src = getDefaultAvatarDataUrl();
+      image.alt = "Default pfp";
+    }
+    defaultButton.dataset.selected = selected ? "true" : "false";
+    defaultButton.classList.toggle("current", selected);
+    defaultButton.setAttribute("aria-pressed", selected ? "true" : "false");
   }
 }
 
@@ -245,6 +279,7 @@ function bindButtons() {
 
 function start() {
   bindButtons();
+  syncAvatarPresetLocks({});
 
   watchAuth(async (user, profile) => {
     if (!user) {

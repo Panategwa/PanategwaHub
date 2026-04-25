@@ -52,6 +52,9 @@ function applyFontSize(size) {
   );
 
   localStorage.setItem("textsize", valid);
+  window.dispatchEvent(new CustomEvent("panategwa:textsizechange", {
+    detail: { size: valid }
+  }));
 }
 
 function setActiveTextSizeButton(size) {

@@ -23,26 +23,5 @@ service cloud.firestore {
       allow create: if isParticipant(request.resource.data.participants);
       allow update, delete: if isParticipant(resource.data.participants);
     }
-
-    match /groupChats/{chatId} {
-      allow read: if isParticipant(resource.data.members);
-      allow create: if signedIn()
-        && request.auth.uid == request.resource.data.ownerUid
-        && isParticipant(request.resource.data.members);
-      allow update, delete: if isParticipant(resource.data.members);
-
-      match /messages/{messageId} {
-        allow read, create, update, delete: if signedIn()
-          && request.auth.uid in get(/databases/$(database)/documents/groupChats/$(chatId)).data.members;
-      }
-    }
-
-    match /groupChatInvites/{inviteId} {
-      allow read: if signedIn()
-        && (request.auth.uid == resource.data.toUid || request.auth.uid == resource.data.fromUid);
-      allow create: if signedIn() && request.auth.uid == request.resource.data.fromUid;
-      allow update, delete: if signedIn()
-        && (request.auth.uid == resource.data.toUid || request.auth.uid == resource.data.fromUid);
-    }
   }
 }

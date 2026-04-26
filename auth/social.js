@@ -10,7 +10,6 @@ import {
   setDoc,
   updateDoc,
   addDoc,
-  deleteDoc,
   onSnapshot,
   query,
   where,
@@ -21,11 +20,7 @@ import {
 
 const DEFAULT_SETTINGS = {
   systemEnabled: true,
-  requestsEnabled: true,
-  chatEnabled: true,
-  groupChatsEnabled: true,
-  showNonFriendGroupMessages: true,
-  profileHidden: false
+  requestsEnabled: true
 };
 
 function normalizePrivacySettings(settings = {}) {
@@ -51,21 +46,11 @@ const socialState = {
   outgoingRequests: [],
   messages: [],
   unreadCount: 0,
-  friendProfiles: {},
-  selectedProfile: null,
-  selectedProfileId: null,
-  selectedConversationId: null,
-  selectedGroupChatId: null,
-  groupChats: [],
-  groupMessagesByChat: {},
-  groupInvites: []
+  friendProfiles: {}
 };
 
 let unsubProfile = null;
 let unsubMessages = null;
-let unsubGroupChats = null;
-let unsubGroupInvites = null;
-const groupMessageUnsubs = new Map();
 const listenerErrors = new Map();
 const TOAST_STORAGE_LIMIT = 160;
 
@@ -77,17 +62,12 @@ function cloneState() {
     incomingRequests: [...socialState.incomingRequests],
     outgoingRequests: [...socialState.outgoingRequests],
     messages: [...socialState.messages],
-    groupChats: [...socialState.groupChats],
-    groupInvites: [...socialState.groupInvites],
-    groupMessagesByChat: Object.fromEntries(
-      Object.entries(socialState.groupMessagesByChat).map(([k, v]) => [k, [...v]])
-    ),
     friendProfiles: { ...socialState.friendProfiles }
   };
 }
 
 function emit() {
-  listeners.forEach(fn => fn(cloneState()));
+  listeners.forEach((fn) => fn(cloneState()));
 }
 
 function subscribeSocial(callback) {
@@ -167,8 +147,8 @@ function buildAccountHref(section, sub = null, targetId = null) {
   if (section) params.set("tab", normalizeAccountSection(section));
   if (sub) params.set("sub", sub);
   if (targetId) params.set("target", targetId);
-  const query = params.toString();
-  return query ? `account-page.html?${query}` : "account-page.html";
+  const queryString = params.toString();
+  return queryString ? `account-page.html?${queryString}` : "account-page.html";
 }
 
 function userRef(uid) {
@@ -194,10 +174,7 @@ function syncUnreadCount() {
   }
 
   socialState.unreadCount = (socialState.messages || []).filter((message) => {
-    return cleanUid(message.toUid) === uid
-      && message.kind !== "chat"
-      && message.kind !== "group-invite"
-      && isUnreadForUser(message, uid);
+    return cleanUid(message.toUid) === uid && isUnreadForUser(message, uid);
   }).length;
 }
 
@@ -211,6 +188,7 @@ function longestStreakOf(profile) {
 
 function publicProfile(profile, viewerUid) {
   if (!profile) return null;
+
   const self = profile.uid === viewerUid;
   const friends = unique(profile.friends);
   const blocked = unique(profile.blocked);
@@ -229,7 +207,7 @@ function publicProfile(profile, viewerUid) {
       createdAt: null,
       friends: [],
       blocked: [],
-      socialSettings: { ...(profile.socialSettings || DEFAULT_SETTINGS), profileHidden: true },
+      socialSettings: { ...(profile.socialSettings || DEFAULT_SETTINGS) },
       privacySettings: privacy,
       stats: {},
       canViewProfile: false,
@@ -258,7 +236,7 @@ function publicProfile(profile, viewerUid) {
     privacySettings: privacy,
     stats: profile.stats || {},
     canViewProfile: true,
-    friendsOnly: true,
+    friendsOnly: false,
     currentRank: canShowRank ? rankFromXp(profile.xp || 0) : null,
     streakCurrent: canShowStreaks ? currentStreakOf(profile) : null,
     streakLongest: canShowStreaks ? longestStreakOf(profile) : null
@@ -283,6 +261,7 @@ async function loadFriendProfiles(ids) {
   for (const [uid, data] of pairs) {
     if (data) map[uid] = publicProfile(data, socialState.user?.uid);
   }
+
   socialState.friendProfiles = map;
   emit();
 }
@@ -300,7 +279,7 @@ function firstListenerError() {
 }
 
 function permissionSetupMessage() {
-  return "Firestore rules are blocking part of the social system. Allow signed-in users to access their own user document plus message docs where their UID is in participants.";
+  return "Firestore rules are blocking part of the friends system. Allow signed-in users to access their own user document plus notification docs where their UID is in participants.";
 }
 
 function friendlyBootstrapError(error) {
@@ -315,9 +294,7 @@ function friendlyBootstrapError(error) {
 function friendlyRealtimeError(scope, error) {
   const code = String(error?.code || "");
   if (code === "permission-denied") {
-    return scope.startsWith("group")
-      ? "Firestore rules are blocking group chat data. Friends can still work, but group chats and invites need matching Firestore permissions."
-      : permissionSetupMessage();
+    return permissionSetupMessage();
   }
 
   return `Could not load ${scope}.`;
@@ -369,7 +346,7 @@ function friendlyActionError(error) {
     return permissionSetupMessage();
   }
 
-  return error?.message || "Social action failed.";
+  return error?.message || "Friend action failed.";
 }
 
 function isUnreadForUser(message, uid) {
@@ -381,7 +358,7 @@ function isUnreadForUser(message, uid) {
 function shortenToastBody(value, max = 120) {
   const text = String(value || "").trim().replace(/\s+/g, " ");
   if (!text) return "";
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  return text.length > max ? `${text.slice(0, max - 3)}...` : text;
 }
 
 function toastConfigForMessage(message) {
@@ -428,101 +405,40 @@ function toastConfigForMessage(message) {
   }
 
   return {
-    title: message.title || "New message",
+    title: message.title || "Notification",
     body: shortenToastBody(message.body || ""),
-    href: buildAccountHref(message.targetSection || "messages", message.targetSubSection || null, message.targetId || null)
+    href: buildAccountHref("messages")
   };
 }
 
 function maybeToastNewMessages(messages) {
   const currentUid = socialState.user?.uid;
-
-  if (!currentUid) {
-    return;
-  }
+  if (!currentUid) return;
 
   ensurePanategwaToast();
+  const toastFn = window.PanategwaToast;
+  if (typeof toastFn !== "function") return;
 
   const seenIds = loadSeenToastIds(currentUid, "messages");
-  const freshIncoming = (messages || []).filter(message =>
-    message.toUid === currentUid &&
-    !seenIds.has(message.id) &&
-    !unique(message.readBy).includes(currentUid)
-  );
-
-  if (typeof window.PanategwaToast !== "function") return;
-
-  const toastable = freshIncoming.filter((message) => {
-    return ["friend-request", "friend-accepted", "friend-declined", "friend-removed", "friend-blocked"].includes(message.kind)
-      && !!toastConfigForMessage(message);
-  });
-  if (!toastable.length) return;
-
-  toastable
-    .slice()
-    .reverse()
-    .forEach(message => {
-      const config = toastConfigForMessage(message);
-      if (config) window.PanategwaToast(config);
-    });
-
-  toastable.forEach(message => seenIds.add(message.id));
-  saveSeenToastIds(currentUid, seenIds, "messages");
-}
-
-function maybeToastPendingGroupInvites(invites) {
-  return;
-  const currentUid = socialState.user?.uid;
-  ensurePanategwaToast();
-  if (!currentUid || typeof window.PanategwaToast !== "function") return;
-
-  const seenIds = loadSeenToastIds(currentUid, "group-invites");
-  const fresh = (invites || []).filter((invite) => invite.status === "pending" && !seenIds.has(invite.id));
-  if (!fresh.length) return;
-
-  fresh
-    .slice()
-    .reverse()
-    .forEach((invite) => {
-      window.PanategwaToast({
-        title: "Group invite",
-        body: `${invite.fromName || invite.fromUid || "Someone"} invited you to "${invite.chatName || "Group chat"}".`,
-        href: buildAccountHref("messages", "groups", invite.chatId || null)
-      });
-      seenIds.add(invite.id);
-    });
-
-  saveSeenToastIds(currentUid, seenIds, "group-invites");
-}
-
-function maybeToastNewGroupMessages(chat, messages) {
-  return;
-  const currentUid = socialState.user?.uid;
-  ensurePanategwaToast();
-  if (!currentUid || typeof window.PanategwaToast !== "function" || !chat?.id) return;
-
-  const seenIds = loadSeenToastIds(currentUid, "group-messages");
-  const fresh = (messages || []).filter((message) => {
-    const toastId = `${chat.id}:${message.id}`;
-    return cleanUid(message.fromUid) !== currentUid && !seenIds.has(toastId);
+  const freshIncoming = (messages || []).filter((message) => {
+    return cleanUid(message.toUid) === currentUid
+      && !seenIds.has(message.id)
+      && !unique(message.deletedFor).includes(currentUid)
+      && isUnreadForUser(message, currentUid);
   });
 
-  if (!fresh.length) return;
+  if (!freshIncoming.length) return;
 
-  fresh
+  freshIncoming
     .slice()
     .reverse()
     .forEach((message) => {
-      const toastId = `${chat.id}:${message.id}`;
-      window.PanategwaToast({
-        title: `${message.fromName || "Someone"} in ${chat.name || "Group chat"}`,
-        body: shortenToastBody(message.body || ""),
-        href: buildAccountHref("messages", "groups", chat.id)
-      });
-      seenIds.add(toastId);
+      const config = toastConfigForMessage(message);
+      if (config) toastFn(config);
     });
 
-  saveSeenToastIds(currentUid, seenIds, "group-messages");
+  freshIncoming.forEach((message) => seenIds.add(message.id));
+  saveSeenToastIds(currentUid, seenIds, "messages");
 }
 
 function relationshipTargetUid(message, currentUid) {
@@ -546,7 +462,7 @@ async function syncRelationshipSignals(messages) {
   const toRemove = new Set();
 
   for (const message of messages || []) {
-    if (message.toUid !== user.uid) continue;
+    if (cleanUid(message.toUid) !== user.uid) continue;
 
     const otherUid = relationshipTargetUid(message, user.uid);
     if (!otherUid) continue;
@@ -603,7 +519,9 @@ async function sendFriendRequestById(targetUid, note = "") {
     if (!meSettings.systemEnabled || !meSettings.requestsEnabled) throw new Error("Friend requests are turned off.");
     if (!targetSettings.systemEnabled || !targetSettings.requestsEnabled) throw new Error("That user is not accepting friend requests.");
     if (unique(me?.friends).includes(id)) throw new Error("You are already friends with that user.");
-    if (unique(me?.blocked).includes(id) || unique(target?.blocked).includes(user.uid)) throw new Error("You cannot send a request to this user.");
+    if (unique(me?.blocked).includes(id) || unique(target?.blocked).includes(user.uid)) {
+      throw new Error("You cannot send a request to this user.");
+    }
 
     const pendingBetween = await findPendingFriendRequestsWithUser(id);
     const outgoingPending = pendingBetween.find((request) => request.fromUid === user.uid && request.toUid === id);
@@ -642,32 +560,36 @@ async function respondToFriendRequest(requestId, action) {
     const snap = await getDoc(ref);
     if (!snap.exists()) throw new Error("Request not found.");
 
-    const req = snap.data();
-    if (req.kind !== "friend-request") throw new Error("That is not a friend request.");
-    if (req.toUid !== user.uid) throw new Error("You cannot edit this request.");
-    if ((req.status || "pending") !== "pending") throw new Error("That request is no longer pending.");
+    const request = snap.data();
+    if (request.kind !== "friend-request") throw new Error("That is not a friend request.");
+    if (cleanUid(request.toUid) !== user.uid) throw new Error("You cannot edit this request.");
+    if ((request.status || "pending") !== "pending") throw new Error("That request is no longer pending.");
 
-    const receiverRef = userRef(req.toUid);
+    const receiverRef = userRef(request.toUid);
     const me = await loadUser(user.uid);
-    const sender = await loadUser(req.fromUid);
+    const sender = await loadUser(request.fromUid);
     const currentName = usernameOf(me);
     const senderName = usernameOf(sender);
 
     if (action === "accept") {
-      await setDoc(receiverRef, { friends: arrayUnion(req.fromUid), blocked: arrayRemove(req.fromUid), updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(receiverRef, {
+        friends: arrayUnion(request.fromUid),
+        blocked: arrayRemove(request.fromUid),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
       await updateDoc(ref, { status: "accepted", readBy: arrayUnion(user.uid), updatedAt: serverTimestamp() });
 
       await createMessage({
         fromUid: user.uid,
-        toUid: req.fromUid,
-        participants: [user.uid, req.fromUid],
+        toUid: request.fromUid,
+        participants: [user.uid, request.fromUid],
         fromName: currentName,
         toName: senderName,
         kind: "friend-accepted",
         title: "Friend request accepted",
         body: `${currentName} accepted your friend request.`,
         targetSection: "messages",
-        targetSubSection: "direct",
+        targetSubSection: "requests",
         targetId: user.uid,
         readBy: [user.uid]
       });
@@ -683,8 +605,8 @@ async function respondToFriendRequest(requestId, action) {
       await updateDoc(ref, { status: "declined", readBy: arrayUnion(user.uid), updatedAt: serverTimestamp() });
       await createMessage({
         fromUid: user.uid,
-        toUid: req.fromUid,
-        participants: [user.uid, req.fromUid],
+        toUid: request.fromUid,
+        participants: [user.uid, request.fromUid],
         fromName: currentName,
         toName: senderName,
         kind: "friend-declined",
@@ -692,67 +614,40 @@ async function respondToFriendRequest(requestId, action) {
         body: `${currentName} declined your friend request.`,
         targetSection: "messages",
         targetSubSection: "requests",
-        targetId: null,
+        targetId: user.uid,
         readBy: [user.uid]
       });
       return;
     }
 
     if (action === "block") {
-      await setDoc(receiverRef, { blocked: arrayUnion(req.fromUid), friends: arrayRemove(req.fromUid), updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(receiverRef, {
+        blocked: arrayUnion(request.fromUid),
+        friends: arrayRemove(request.fromUid),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
       await updateDoc(ref, { status: "blocked", readBy: arrayUnion(user.uid), updatedAt: serverTimestamp() });
       await createMessage({
         fromUid: user.uid,
-        toUid: req.fromUid,
-        participants: [user.uid, req.fromUid],
+        toUid: request.fromUid,
+        participants: [user.uid, request.fromUid],
         fromName: currentName,
         toName: senderName,
         kind: "friend-blocked",
         title: "Blocked",
         body: `${currentName} blocked you.`,
         targetSection: "messages",
-        targetSubSection: "direct",
+        targetSubSection: "requests",
         targetId: user.uid,
         readBy: [user.uid]
       });
+      return;
     }
+
+    throw new Error("Unknown friend request action.");
   } catch (error) {
     throw new Error(friendlyActionError(error));
   }
-}
-
-async function sendChatMessage(friendUid, text) {
-  const { user } = await requireSocialUser("direct messages");
-  const id = cleanUid(friendUid);
-  const body = String(text || "").trim();
-
-  if (!id) throw new Error("Pick a friend first.");
-  if (!body) throw new Error("Type a message first.");
-
-  const me = await loadUser(user.uid);
-  const target = await loadUser(id);
-  if (!target) throw new Error("That user was not found.");
-  if (!unique(me?.friends).includes(id)) throw new Error("That user is not in your friends list.");
-
-  const meSettings = { ...DEFAULT_SETTINGS, ...(me?.socialSettings || {}) };
-  const targetSettings = { ...DEFAULT_SETTINGS, ...(target?.socialSettings || {}) };
-  if (!meSettings.systemEnabled || !meSettings.chatEnabled) throw new Error("Chat is turned off.");
-  if (!targetSettings.systemEnabled || !targetSettings.chatEnabled) throw new Error("That user is not accepting chats.");
-
-  await createMessage({
-    fromUid: user.uid,
-    toUid: id,
-    participants: [user.uid, id],
-    fromName: usernameOf(me),
-    toName: usernameOf(target),
-    kind: "chat",
-    title: `Message from ${usernameOf(me)}`,
-    body,
-    targetSection: "messages",
-    targetSubSection: "direct",
-    conversationUid: id,
-    readBy: [user.uid]
-  });
 }
 
 async function removeFriend(friendUid) {
@@ -764,7 +659,10 @@ async function removeFriend(friendUid) {
     const me = await loadUser(user.uid);
     const target = await loadUser(id);
 
-    await setDoc(userRef(user.uid), { friends: arrayRemove(id), updatedAt: serverTimestamp() }, { merge: true });
+    await setDoc(userRef(user.uid), {
+      friends: arrayRemove(id),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
 
     if (target) {
       await createMessage({
@@ -777,7 +675,7 @@ async function removeFriend(friendUid) {
         title: "Friend removed",
         body: `${usernameOf(me)} removed you from their friends list.`,
         targetSection: "messages",
-        targetSubSection: "direct",
+        targetSubSection: "friends",
         targetId: user.uid,
         readBy: [user.uid]
       });
@@ -796,7 +694,11 @@ async function blockUser(targetUid) {
     const me = await loadUser(user.uid);
     const target = await loadUser(id);
 
-    await setDoc(userRef(user.uid), { blocked: arrayUnion(id), friends: arrayRemove(id), updatedAt: serverTimestamp() }, { merge: true });
+    await setDoc(userRef(user.uid), {
+      blocked: arrayUnion(id),
+      friends: arrayRemove(id),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
 
     if (target) {
       await createMessage({
@@ -809,7 +711,7 @@ async function blockUser(targetUid) {
         title: "Blocked",
         body: `${usernameOf(me)} blocked you.`,
         targetSection: "messages",
-        targetSubSection: "direct",
+        targetSubSection: "blocked",
         targetId: user.uid,
         readBy: [user.uid]
       });
@@ -819,425 +721,28 @@ async function blockUser(targetUid) {
   }
 }
 
-async function toggleRequestsEnabled(enabled) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  await updateDoc(userRef(user.uid), {
-    "socialSettings.requestsEnabled": !!enabled,
-    updatedAt: serverTimestamp()
-  });
-}
-
-async function toggleChatEnabled(enabled) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  await updateDoc(userRef(user.uid), {
-    "socialSettings.chatEnabled": !!enabled,
-    updatedAt: serverTimestamp()
-  });
-}
-
-async function toggleGroupChatsEnabled(enabled) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  await updateDoc(userRef(user.uid), {
-    "socialSettings.groupChatsEnabled": !!enabled,
-    updatedAt: serverTimestamp()
-  });
-}
-
-async function toggleShowNonFriendGroupMessages(enabled) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  await updateDoc(userRef(user.uid), {
-    "socialSettings.showNonFriendGroupMessages": !!enabled,
-    updatedAt: serverTimestamp()
-  });
-}
-
-async function toggleProfileHidden(hidden) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  await updateDoc(userRef(user.uid), {
-    "socialSettings.profileHidden": !!hidden,
-    updatedAt: serverTimestamp()
-  });
-}
-
-async function disableSocialSystem(mode = "keep") {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-
-  const snap = await getDoc(userRef(user.uid));
-  const data = snap.data() || {};
-
-  const backup = {
-    friends: unique(data.friends),
-    blocked: unique(data.blocked),
-    timestamp: Date.now()
-  };
-
-  const payload = {
-    socialBackup: backup,
-    socialSettings: {
-      ...(data.socialSettings || DEFAULT_SETTINGS),
-      systemEnabled: false,
-      requestsEnabled: false,
-      chatEnabled: false,
-      groupChatsEnabled: false
-    },
-    updatedAt: serverTimestamp()
-  };
-
-  if (mode === "clear") {
-    payload.friends = [];
-    payload.blocked = [];
-  }
-
-  await setDoc(userRef(user.uid), payload, { merge: true });
-}
-
-async function enableSocialSystem(mode = "restore") {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  const snap = await getDoc(userRef(user.uid));
-  const data = snap.data() || {};
-  const backup = data.socialBackup || { friends: [], blocked: [] };
-
-  let friends = unique(data.friends);
-  let blocked = unique(data.blocked);
-
-  if (mode === "restore") {
-    friends = unique([...backup.friends, ...friends]);
-    blocked = unique([...backup.blocked, ...blocked]);
-  }
-
-  if (mode === "fresh") {
-    friends = [];
-    blocked = [];
-  }
-
-  await setDoc(userRef(user.uid), {
-    friends,
-    blocked,
-    socialSettings: {
-      ...(data.socialSettings || DEFAULT_SETTINGS),
-      systemEnabled: true,
-      requestsEnabled: true,
-      chatEnabled: true,
-      groupChatsEnabled: true
-    },
-    updatedAt: serverTimestamp()
-  }, { merge: true });
-}
-
-async function createGroupChat(name, emoji = "👥", memberIds = []) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-
-  const cleanName = String(name || "").trim();
-  if (!cleanName) throw new Error("Group chat name is required.");
-
-  const members = unique([user.uid, ...memberIds.map(v => String(v || "").trim())]);
-  if (members.length < 2) throw new Error("Add at least one other person.");
-  const fromName = usernameOf(await loadUser(user.uid));
-
-  const ref = await addDoc(collection(db, "groupChats"), {
-    name: cleanName,
-    emoji: String(emoji || "👥").trim().slice(0, 4) || "👥",
-    ownerUid: user.uid,
-    members,
-    deleted: false,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    lastMessage: ""
-  });
-
-  for (const uid of members) {
-    if (uid === user.uid) continue;
-    await addDoc(collection(db, "groupChatInvites"), {
-      chatId: ref.id,
-      chatName: cleanName,
-      chatEmoji: String(emoji || "👥").trim().slice(0, 4) || "👥",
-      fromUid: user.uid,
-      fromName,
-      toUid: uid,
-      status: "pending",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-  }
-
-  return ref.id;
-}
-
-async function joinGroupChatById(chatId) {
-  const user = auth.currentUser;
-  const id = cleanUid(chatId);
-  if (!user) throw new Error("Not logged in.");
-  if (!id) throw new Error("Enter a group chat ID.");
-
-  const ref = doc(db, "groupChats", id);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error("Group chat not found.");
-
-  const chat = snap.data();
-  if (chat.deleted) throw new Error("That chat was deleted.");
-
-  await updateDoc(ref, {
-    members: arrayUnion(user.uid),
-    updatedAt: serverTimestamp()
-  });
-}
-
-async function updateGroupChatInfo(chatId, updates = {}) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  const ref = doc(db, "groupChats", chatId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error("Group chat not found.");
-
-  const chat = snap.data();
-  if (!unique(chat.members).includes(user.uid)) throw new Error("You are not in that group.");
-
-  const payload = { updatedAt: serverTimestamp() };
-  if (typeof updates.name === "string") payload.name = updates.name.trim() || chat.name || "Group chat";
-  if (typeof updates.emoji === "string") payload.emoji = updates.emoji.trim().slice(0, 4) || chat.emoji || "👥";
-
-  await updateDoc(ref, payload);
-}
-
-async function addMembersToGroupChat(chatId, memberIds = []) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-
-  const ref = doc(db, "groupChats", chatId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error("Group chat not found.");
-
-  const chat = snap.data();
-  if (!unique(chat.members).includes(user.uid)) throw new Error("You are not in that group.");
-
-  const members = unique(memberIds.map(v => String(v || "").trim())).filter(uid => uid && uid !== user.uid && !unique(chat.members).includes(uid));
-  const fromName = usernameOf(await loadUser(user.uid));
-  for (const uid of members) {
-    await addDoc(collection(db, "groupChatInvites"), {
-      chatId,
-      chatName: chat.name || "Group chat",
-      chatEmoji: chat.emoji || "👥",
-      fromUid: user.uid,
-      fromName,
-      toUid: uid,
-      status: "pending",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-  }
-}
-
-async function deleteGroupChat(chatId) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-
-  const ref = doc(db, "groupChats", chatId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error("Group chat not found.");
-
-  const chat = snap.data();
-  if (chat.ownerUid !== user.uid) throw new Error("Only the owner can delete the group chat.");
-
-  await updateDoc(ref, {
-    deleted: true,
-    members: [],
-    updatedAt: serverTimestamp()
-  });
-}
-
-async function inviteToGroupChat(chatId, targetUid) {
-  const user = auth.currentUser;
-  const id = cleanUid(targetUid);
-  if (!user) throw new Error("Not logged in.");
-  if (!id) throw new Error("Enter a user ID.");
-
-  const ref = doc(db, "groupChats", chatId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error("Group chat not found.");
-
-  const chat = snap.data();
-  if (!unique(chat.members).includes(user.uid)) throw new Error("You are not in that group.");
-  if (unique(chat.members).includes(id)) throw new Error("That user is already in the group.");
-
-  await addDoc(collection(db, "groupChatInvites"), {
-    chatId,
-    chatName: chat.name || "Group chat",
-    chatEmoji: chat.emoji || "👥",
-    fromUid: user.uid,
-    fromName: usernameOf(await loadUser(user.uid)),
-    toUid: id,
-    status: "pending",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  });
-
-  await createMessage({
-    fromUid: user.uid,
-    toUid: id,
-    participants: [user.uid, id],
-    fromName: usernameOf(await loadUser(user.uid)),
-    toName: usernameOf(await loadUser(id)),
-    kind: "group-invite",
-    title: "Group invite",
-    body: `${usernameOf(await loadUser(user.uid))} invited you to "${chat.name || "Group chat"}".`,
-    targetSection: "messages",
-    targetSubSection: "groups",
-    targetId: chatId,
-    groupChatId: chatId,
-    readBy: [user.uid]
-  });
-}
-
-async function respondToGroupInvite(inviteId, action) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-
-  const ref = doc(db, "groupChatInvites", inviteId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error("Invite not found.");
-
-  const invite = snap.data();
-  if (invite.toUid !== user.uid) throw new Error("You cannot edit this invite.");
-
-  const chatRef = doc(db, "groupChats", invite.chatId);
-
-  if (action === "accept") {
-    await updateDoc(ref, { status: "accepted", updatedAt: serverTimestamp() });
-    await updateDoc(chatRef, { members: arrayUnion(user.uid), updatedAt: serverTimestamp() });
-  }
-
-  if (action === "decline") {
-    await updateDoc(ref, { status: "declined", updatedAt: serverTimestamp() });
-  }
-}
-
-async function sendGroupMessage(chatId, text) {
-  const user = auth.currentUser;
-  const body = String(text || "").trim();
-
-  if (!user) throw new Error("Not logged in.");
-  if (!body) throw new Error("Type a message first.");
-
-  const ref = doc(db, "groupChats", chatId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error("Group chat not found.");
-
-  const chat = snap.data();
-  if (chat.deleted) throw new Error("This group chat was deleted.");
-  if (!unique(chat.members).includes(user.uid)) throw new Error("You are not in that group.");
-
-  await addDoc(collection(db, "groupChats", chatId, "messages"), {
-    chatId,
-    fromUid: user.uid,
-    fromName: usernameOf(await loadUser(user.uid)),
-    body,
-    createdAt: serverTimestamp(),
-    readBy: [user.uid]
-  });
-
-  await updateDoc(ref, {
-    lastMessage: body,
-    updatedAt: serverTimestamp()
-  });
-}
-
-async function leaveGroupChat(chatId) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-  await updateDoc(doc(db, "groupChats", chatId), {
-    members: arrayRemove(user.uid),
-    updatedAt: serverTimestamp()
-  });
-}
-
 async function markMessageRead(messageId, read = true) {
-  const { user } = await requireSocialUser("direct messages");
+  const { user } = await requireSocialUser("notifications");
   const ref = doc(db, "messages", messageId);
   const snap = await getDoc(ref);
   if (!snap.exists()) return;
+
   const data = snap.data();
-  if (data.toUid !== user.uid) return;
+  if (cleanUid(data.toUid) !== user.uid) return;
 
   if (read) {
     await updateDoc(ref, { readBy: arrayUnion(user.uid), readAt: serverTimestamp() });
-  } else {
-    await updateDoc(ref, { readBy: arrayRemove(user.uid), readAt: null });
-  }
-}
-
-async function setMessagesReadState(messageIds = [], read = true) {
-  const { user } = await requireSocialUser("direct messages");
-
-  const uniqueIds = [...new Set((Array.isArray(messageIds) ? messageIds : []).map((value) => cleanUid(value)).filter(Boolean))];
-  if (!uniqueIds.length) return;
-
-  const messageMap = new Map((socialState.messages || []).map((message) => [message.id, message]));
-
-  for (const messageId of uniqueIds) {
-    const data = messageMap.get(messageId);
-    if (!data || cleanUid(data.toUid) !== user.uid) continue;
-
-    const alreadyRead = unique(data.readBy).includes(user.uid);
-    if (read && alreadyRead) continue;
-    if (!read && !alreadyRead) continue;
-
-    await updateDoc(doc(db, "messages", messageId), read
-      ? { readBy: arrayUnion(user.uid), readAt: serverTimestamp() }
-      : { readBy: arrayRemove(user.uid), readAt: null });
-  }
-}
-
-async function markAllMessagesRead() {
-  const { user } = await requireSocialUser("direct messages");
-  const ids = (socialState.messages || [])
-    .filter((message) => cleanUid(message.toUid) === user.uid && isUnreadForUser(message, user.uid))
-    .map((message) => message.id);
-  await setMessagesReadState(ids, true);
-}
-
-async function markAllMessagesUnread() {
-  const { user } = await requireSocialUser("direct messages");
-  const ids = (socialState.messages || [])
-    .filter((message) => cleanUid(message.toUid) === user.uid && !isUnreadForUser(message, user.uid))
-    .map((message) => message.id);
-  await setMessagesReadState(ids, false);
-}
-
-async function deleteMessageForCurrentUser(messageId) {
-  const { user } = await requireSocialUser("direct messages");
-
-  const id = cleanUid(messageId);
-  if (!id) throw new Error("Message not found.");
-
-  const ref = doc(db, "messages", id);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return;
-
-  const data = snap.data();
-  const participants = unique(data.participants);
-  if (!participants.includes(user.uid) && cleanUid(data.toUid) !== user.uid && cleanUid(data.fromUid) !== user.uid) {
-    throw new Error("You cannot delete that message.");
+    return;
   }
 
-  await updateDoc(ref, {
-    deletedFor: arrayUnion(user.uid),
-    updatedAt: serverTimestamp()
-  });
+  await updateDoc(ref, { readBy: arrayRemove(user.uid), readAt: null });
 }
 
 async function setMessageDeletedForCurrentUser(messageId, deleted = true) {
   const { user } = await requireSocialUser("notifications");
 
   const id = cleanUid(messageId);
-  if (!id) throw new Error("Message not found.");
+  if (!id) throw new Error("Notification not found.");
 
   const ref = doc(db, "messages", id);
   const snap = await getDoc(ref);
@@ -1254,88 +759,38 @@ async function setMessageDeletedForCurrentUser(messageId, deleted = true) {
     : { deletedFor: arrayRemove(user.uid), updatedAt: serverTimestamp() });
 }
 
-async function viewProfileById(uid) {
-  const data = await loadUser(uid);
-  socialState.selectedProfileId = cleanUid(uid) || null;
-  socialState.selectedProfile = publicProfile(data, socialState.user?.uid);
+function resetSocialState() {
+  listenerErrors.clear();
+  socialState.ready = true;
+  socialState.user = null;
+  socialState.profile = null;
+  socialState.settings = { ...DEFAULT_SETTINGS };
+  socialState.socialError = null;
+  socialState.friends = [];
+  socialState.blocked = [];
+  socialState.incomingRequests = [];
+  socialState.outgoingRequests = [];
+  socialState.messages = [];
+  socialState.unreadCount = 0;
+  socialState.friendProfiles = {};
   emit();
-  return socialState.selectedProfile;
-}
-
-function setSelectedConversation(uid) {
-  socialState.selectedConversationId = cleanUid(uid) || null;
-  emit();
-}
-
-function setSelectedGroupChatId(chatId) {
-  socialState.selectedGroupChatId = cleanUid(chatId) || null;
-  emit();
-}
-
-function getConversationMessages(uid) {
-  const id = cleanUid(uid);
-  if (!id) return [];
-  return (socialState.messages || []).filter(m =>
-    m.kind === "chat" &&
-    ((m.fromUid === socialState.user?.uid && m.toUid === id) || (m.fromUid === id && m.toUid === socialState.user?.uid))
-  );
-}
-
-function getGroupChatMessages(chatId) {
-  return socialState.groupMessagesByChat?.[cleanUid(chatId)] || [];
-}
-
-function getUnreadIncomingCount() {
-  return socialState.unreadCount || 0;
-}
-
-function teardownGroupListeners() {
-  for (const unsub of groupMessageUnsubs.values()) {
-    try { unsub(); } catch {}
-  }
-  groupMessageUnsubs.clear();
-
-  if (unsubGroupChats) {
-    try { unsubGroupChats(); } catch {}
-    unsubGroupChats = null;
-  }
-
-  if (unsubGroupInvites) {
-    try { unsubGroupInvites(); } catch {}
-    unsubGroupInvites = null;
-  }
 }
 
 function startRealtime() {
   ensurePanategwaToast();
+
   watchAuth(async (user) => {
-    if (unsubProfile) { try { unsubProfile(); } catch {} unsubProfile = null; }
-    if (unsubMessages) { try { unsubMessages(); } catch {} unsubMessages = null; }
-    teardownGroupListeners();
+    if (unsubProfile) {
+      try { unsubProfile(); } catch {}
+      unsubProfile = null;
+    }
+    if (unsubMessages) {
+      try { unsubMessages(); } catch {}
+      unsubMessages = null;
+    }
 
     if (!user) {
-      listenerErrors.clear();
-      socialState.ready = true;
-      socialState.user = null;
-      socialState.profile = null;
-      socialState.settings = { ...DEFAULT_SETTINGS };
-      socialState.socialError = null;
-      socialState.friends = [];
-      socialState.blocked = [];
-      socialState.incomingRequests = [];
-      socialState.outgoingRequests = [];
-      socialState.messages = [];
-      socialState.unreadCount = 0;
-      socialState.friendProfiles = {};
-      socialState.selectedProfile = null;
-      socialState.selectedProfileId = null;
-      socialState.selectedConversationId = null;
-      socialState.selectedGroupChatId = null;
-      socialState.groupChats = [];
-      socialState.groupMessagesByChat = {};
-      socialState.groupInvites = [];
-      syncUnreadCount();
-      emit();
+      resetSocialState();
       return;
     }
 
@@ -1350,8 +805,6 @@ function startRealtime() {
       socialState.settings = { ...DEFAULT_SETTINGS, ...(socialState.profile?.socialSettings || {}) };
       socialState.friends = unique(socialState.profile?.friends);
       socialState.blocked = unique(socialState.profile?.blocked);
-      socialState.selectedProfile = publicProfile(socialState.profile, user.uid);
-      socialState.selectedProfileId = user.uid;
       await loadFriendProfiles([...socialState.friends, ...socialState.blocked]);
       socialState.ready = true;
       emit();
@@ -1363,9 +816,6 @@ function startRealtime() {
         socialState.settings = { ...DEFAULT_SETTINGS, ...(fresh?.socialSettings || {}) };
         socialState.friends = unique(fresh?.friends);
         socialState.blocked = unique(fresh?.blocked);
-        socialState.selectedProfile = socialState.selectedProfileId
-          ? (socialState.selectedProfileId === user.uid ? publicProfile(fresh, user.uid) : socialState.friendProfiles[socialState.selectedProfileId] || socialState.selectedProfile)
-          : publicProfile(fresh, user.uid);
         await loadFriendProfiles([...socialState.friends, ...socialState.blocked]);
         socialState.ready = true;
         emit();
@@ -1374,36 +824,39 @@ function startRealtime() {
         setListenerError("profile", "profile", error);
       });
 
-      unsubMessages = onSnapshot(query(collection(db, "messages"), where("participants", "array-contains", user.uid)), async (snap) => {
-        clearListenerError("messages");
-        const all = [];
-        snap.forEach(d => all.push({ id: d.id, ...d.data() }));
-        const sorted = sortNewestFirst(all);
-        maybeToastNewMessages(sorted);
-        const visible = sorted.filter((message) => !unique(message.deletedFor).includes(user.uid));
-        socialState.messages = visible;
-        socialState.incomingRequests = sortNewestFirst(visible.filter(m => m.kind === "friend-request" && m.toUid === user.uid && (m.status || "pending") === "pending"));
-        socialState.outgoingRequests = sortNewestFirst(visible.filter(m => m.kind === "friend-request" && m.fromUid === user.uid && (m.status || "pending") === "pending"));
-        syncUnreadCount();
-        await syncRelationshipSignals(sorted);
-        socialState.ready = true;
-        emit();
-      }, (error) => {
-        socialState.ready = true;
-        setListenerError("messages", "messages", error, () => {
-          socialState.messages = [];
-          socialState.incomingRequests = [];
-          socialState.outgoingRequests = [];
-          syncUnreadCount();
-        });
-      });
+      unsubMessages = onSnapshot(
+        query(collection(db, "messages"), where("participants", "array-contains", user.uid)),
+        async (snap) => {
+          clearListenerError("messages");
+          const all = [];
+          snap.forEach((docSnap) => all.push({ id: docSnap.id, ...docSnap.data() }));
 
-      socialState.groupChats = [];
-      socialState.groupMessagesByChat = {};
-      socialState.groupInvites = [];
-      socialState.selectedGroupChatId = null;
-      syncUnreadCount();
-      emit();
+          const sorted = sortNewestFirst(all);
+          maybeToastNewMessages(sorted);
+
+          const visible = sorted.filter((message) => !unique(message.deletedFor).includes(user.uid));
+          socialState.messages = visible;
+          socialState.incomingRequests = sortNewestFirst(
+            visible.filter((message) => message.kind === "friend-request" && cleanUid(message.toUid) === user.uid && (message.status || "pending") === "pending")
+          );
+          socialState.outgoingRequests = sortNewestFirst(
+            visible.filter((message) => message.kind === "friend-request" && cleanUid(message.fromUid) === user.uid && (message.status || "pending") === "pending")
+          );
+          syncUnreadCount();
+          await syncRelationshipSignals(sorted);
+          socialState.ready = true;
+          emit();
+        },
+        (error) => {
+          socialState.ready = true;
+          setListenerError("messages", "messages", error, () => {
+            socialState.messages = [];
+            socialState.incomingRequests = [];
+            socialState.outgoingRequests = [];
+            syncUnreadCount();
+          });
+        }
+      );
     } catch (error) {
       console.error("Social bootstrap error:", error);
       socialState.ready = true;
@@ -1419,36 +872,9 @@ export {
   subscribeSocial,
   sendFriendRequestById,
   respondToFriendRequest,
-  sendChatMessage,
   removeFriend,
   blockUser,
-  toggleRequestsEnabled,
-  toggleChatEnabled,
-  toggleGroupChatsEnabled,
-  toggleShowNonFriendGroupMessages,
-  toggleProfileHidden,
-  disableSocialSystem,
-  enableSocialSystem,
-  createGroupChat,
-  joinGroupChatById,
-  updateGroupChatInfo,
-  addMembersToGroupChat,
-  deleteGroupChat,
-  inviteToGroupChat,
-  respondToGroupInvite,
-  sendGroupMessage,
-  leaveGroupChat,
   markMessageRead,
-  setMessagesReadState,
-  markAllMessagesRead,
-  markAllMessagesUnread,
-  deleteMessageForCurrentUser,
   setMessageDeletedForCurrentUser,
-  viewProfileById,
-  setSelectedConversation,
-  setSelectedGroupChatId,
-  getConversationMessages,
-  getGroupChatMessages,
-  getUnreadIncomingCount,
   socialState
 };

@@ -467,11 +467,7 @@ function baseProfile(user) {
     blocked: [],
     socialSettings: {
       systemEnabled: true,
-      requestsEnabled: true,
-      chatEnabled: true,
-      groupChatsEnabled: true,
-      showNonFriendGroupMessages: true,
-      profileHidden: false
+      requestsEnabled: true
     },
     socialBackup: {
       friends: [],
@@ -501,11 +497,7 @@ function baseProfile(user) {
 function normalizeSocialSettings(settings = {}) {
   return {
     systemEnabled: settings.systemEnabled !== false,
-    requestsEnabled: settings.requestsEnabled !== false,
-    chatEnabled: settings.chatEnabled !== false,
-    groupChatsEnabled: settings.groupChatsEnabled !== false,
-    showNonFriendGroupMessages: settings.showNonFriendGroupMessages !== false,
-    profileHidden: !!settings.profileHidden
+    requestsEnabled: settings.requestsEnabled !== false
   };
 }
 
@@ -906,42 +898,6 @@ async function sendRelationshipResetMessage(user, targetUid, targetProfile, kind
   });
 }
 
-async function removeUserFromGroups(uid) {
-  const chatsSnap = await getDocs(query(collection(db, "groupChats"), where("members", "array-contains", uid)));
-  for (const chatDoc of chatsSnap.docs) {
-    const chat = chatDoc.data() || {};
-    const members = uniqueStrings(chat.members).filter((memberUid) => memberUid !== uid);
-    const payload = {
-      members,
-      updatedAt: serverTimestamp()
-    };
-
-    if (!members.length) {
-      payload.deleted = true;
-    } else if (chat.ownerUid === uid) {
-      payload.ownerUid = members[0];
-    }
-
-    await updateDoc(chatDoc.ref, payload);
-  }
-
-  const inviteQueries = await Promise.all([
-    getDocs(query(collection(db, "groupChatInvites"), where("toUid", "==", uid))),
-    getDocs(query(collection(db, "groupChatInvites"), where("fromUid", "==", uid)))
-  ]);
-
-  for (const inviteSnap of inviteQueries) {
-    for (const invite of inviteSnap.docs) {
-      const data = invite.data() || {};
-      if ((data.status || "pending") !== "pending") continue;
-      await updateDoc(invite.ref, {
-        status: "cancelled",
-        updatedAt: serverTimestamp()
-      });
-    }
-  }
-}
-
 function otherParticipantFromMessage(data, currentUid) {
   const fromUid = String(data?.fromUid || "").trim();
   const toUid = String(data?.toUid || "").trim();
@@ -1051,7 +1007,6 @@ export async function resetAccountData(mode = "progress") {
           user.uid
         );
       }
-      await removeUserFromGroups(user.uid);
     }
   }
 

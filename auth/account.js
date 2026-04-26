@@ -42,8 +42,6 @@ let currentState = {
   incomingRequests: [],
   outgoingRequests: [],
   friendProfiles: {},
-  selectedProfile: null,
-  selectedProfileId: null,
   messages: [],
   unreadCount: 0,
   localNotifications: []
@@ -931,11 +929,7 @@ function socialNotificationItems(state) {
   if (!user) return [];
 
   return (state.messages || [])
-    .filter((message) => {
-      return String(message?.toUid || "").trim() === user.uid
-        && message.kind !== "chat"
-        && message.kind !== "group-invite";
-    })
+    .filter((message) => String(message?.toUid || "").trim() === user.uid)
     .filter((message) => message.kind !== "friend-request" || String(message.status || "pending") === "pending")
     .map((message) => ({
       id: `social:${message.id}`,
@@ -1222,7 +1216,6 @@ function renderAll(state) {
     blocked: [...new Set(state.blocked || [])].sort(),
     incoming: (state.incomingRequests || []).map((entry) => `${entry.id || ""}:${entry.status || "pending"}`).sort(),
     outgoing: (state.outgoingRequests || []).map((entry) => `${entry.id || ""}:${entry.status || "pending"}`).sort(),
-    selectedProfileId: state.selectedProfileId || "",
     friendProfiles: Object.entries(state.friendProfiles || {}).map(([uid, info]) => [
       uid,
       info?.username || "",
@@ -1247,7 +1240,6 @@ function renderAll(state) {
     redoDepth: notificationRedoStack.length,
     local: (state.localNotifications || []).map((entry) => `${entry.id || ""}:${entry.read ? "1" : "0"}:${entry.createdAt || 0}`),
     social: (state.messages || [])
-      .filter((message) => String(message.kind || "") !== "chat" && String(message.kind || "") !== "group-invite")
       .filter((message) => String(message.kind || "") !== "friend-request" || String(message.status || "pending") === "pending")
       .map((message) => `${message.id || ""}:${(Array.isArray(message.readBy) ? message.readBy : []).includes(user?.uid || "") ? "1" : "0"}:${toMs(message.createdAt)}`)
   });

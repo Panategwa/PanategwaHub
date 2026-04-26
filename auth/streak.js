@@ -303,7 +303,10 @@ async function claimStreak() {
       window.PanategwaToast({
         title: "Streak",
         body: "You already claimed today.",
-        href: "streak-page.html"
+        href: "streak-page.html",
+        duration: 5000,
+        persist: false,
+        kind: "streak"
       });
     }
     return;
@@ -353,7 +356,11 @@ async function claimStreak() {
     window.PanategwaToast({
       title: "Streak claimed",
       body: `You claimed ${reward} XP from your day ${nextDay} streak.`,
-      href: "streak-page.html"
+      href: "streak-page.html",
+      duration: 5000,
+      persist: true,
+      kind: "streak",
+      notificationId: `streak:${today}`
     });
   }
 }

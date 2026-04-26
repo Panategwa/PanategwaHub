@@ -23,6 +23,8 @@ import {
 
 const $ = (id) => document.getElementById(id);
 const PRESET_IDS = [...AVATAR_PRESET_IDS];
+let currentUser = null;
+let currentProfile = null;
 
 function setStatus(message, kind = "info") {
   const el = $("auth-status");
@@ -38,6 +40,7 @@ function syncForm(profile, user) {
   const showRank = $("privacy-show-rank");
   const showJoined = $("privacy-show-joined");
   const showStreaks = $("privacy-show-streaks");
+  const showSiteAge = $("privacy-show-site-age");
 
   if (usernameInput && document.activeElement !== usernameInput) {
     usernameInput.value = profile?.username || user.displayName || "";
@@ -57,6 +60,7 @@ function syncForm(profile, user) {
   if (showRank) showRank.checked = profile?.privacySettings?.showRank !== false;
   if (showJoined) showJoined.checked = profile?.privacySettings?.showJoined !== false;
   if (showStreaks) showStreaks.checked = profile?.privacySettings?.showStreaks !== false;
+  if (showSiteAge) showSiteAge.checked = profile?.privacySettings?.showSiteAge !== false;
 }
 
 function syncAvatarPresetLocks(profile) {
@@ -116,6 +120,13 @@ function syncAvatarPresetLocks(profile) {
   }
 }
 
+async function refreshSettingsProfileView() {
+  if (!currentUser) return;
+  currentProfile = (await getProfile(currentUser.uid)) || currentProfile || {};
+  syncForm(currentProfile, currentUser);
+  syncAvatarPresetLocks(currentProfile);
+}
+
 async function applyUsername() {
   const value = String($("profile-username")?.value || "").trim().slice(0, 20);
   if (!value) {
@@ -125,6 +136,7 @@ async function applyUsername() {
 
   try {
     await saveUsername(value);
+    await refreshSettingsProfileView();
     setStatus("Username updated.", "success");
   } catch (error) {
     console.error(error);
@@ -135,6 +147,7 @@ async function applyUsername() {
 async function applyAvatarPreset(presetId) {
   try {
     await setAvatarPreset(presetId);
+    await refreshSettingsProfileView();
     setStatus("Profile picture updated.", "success");
   } catch (error) {
     console.error(error);
@@ -145,6 +158,7 @@ async function applyAvatarPreset(presetId) {
 async function applyDefaultAvatar() {
   try {
     await useDefaultProfilePicture();
+    await refreshSettingsProfileView();
     setStatus("Default pfp restored.", "success");
   } catch (error) {
     console.error(error);
@@ -155,6 +169,7 @@ async function applyDefaultAvatar() {
 async function applyPrivacySetting(key, value) {
   try {
     await updatePrivacySettings({ [key]: !!value });
+    await refreshSettingsProfileView();
     setStatus("Privacy settings updated.", "success");
   } catch (error) {
     console.error(error);
@@ -168,6 +183,7 @@ async function applyEmailChange() {
 
   try {
     await changeEmail(nextEmail, currentPassword);
+    await refreshSettingsProfileView();
     setStatus("Email updated. Check the new inbox for verification if needed.", "success");
   } catch (error) {
     console.error(error);
@@ -239,11 +255,16 @@ function bindButtons() {
 
   $("reset-data-btn")?.addEventListener("click", async () => {
     const mode = String($("reset-data-select")?.value || "progress");
-    const label = mode === "all" ? "all social and progress data" : mode;
-    if (!window.confirm(`Delete ${label} from this account?`)) return;
+    const label = mode === "all"
+      ? "all social and progress data"
+      : mode === "friends"
+        ? "your friends list, requests, blocked list, and saved friend history"
+        : "your XP, achievements, streak, and progress history";
+    if (!window.confirm(`Permanently delete ${label}? There is no going back after this.`)) return;
 
     try {
       await resetAccountData(mode);
+      await refreshSettingsProfileView();
       setStatus("Selected account data deleted.", "success");
     } catch (error) {
       console.error(error);
@@ -253,7 +274,7 @@ function bindButtons() {
 
   $("delete-account-btn")?.addEventListener("click", async () => {
     const password = String($("delete-password")?.value || "");
-    if (!window.confirm("Delete your account permanently?")) return;
+    if (!window.confirm("Delete your account permanently? There is no going back after this.")) return;
 
     try {
       await deleteAccount(password);
@@ -275,6 +296,10 @@ function bindButtons() {
   $("privacy-show-streaks")?.addEventListener("change", (event) => {
     applyPrivacySetting("showStreaks", event.target.checked);
   });
+
+  $("privacy-show-site-age")?.addEventListener("change", (event) => {
+    applyPrivacySetting("showSiteAge", event.target.checked);
+  });
 }
 
 function start() {
@@ -282,12 +307,15 @@ function start() {
   syncAvatarPresetLocks({});
 
   watchAuth(async (user, profile) => {
+    currentUser = user || null;
     if (!user) {
+      currentProfile = null;
       setStatus("Not logged in.", "info");
       return;
     }
 
     const nextProfile = profile || (await getProfile(user.uid)) || {};
+    currentProfile = nextProfile;
     syncForm(nextProfile, user);
     syncAvatarPresetLocks(nextProfile);
     setStatus(user.emailVerified ? "Settings ready." : "Verify your email to unlock settings.", "info");

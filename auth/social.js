@@ -32,13 +32,15 @@ function normalizePrivacySettings(settings = {}) {
   return {
     showRank: settings.showRank !== false,
     showJoined: settings.showJoined !== false,
-    showStreaks: settings.showStreaks !== false
+    showStreaks: settings.showStreaks !== false,
+    showSiteAge: settings.showSiteAge !== false
   };
 }
 
 const listeners = new Set();
 
 const socialState = {
+  ready: false,
   user: null,
   profile: null,
   settings: { ...DEFAULT_SETTINGS },
@@ -157,7 +159,7 @@ function saveSeenToastIds(uid, ids, channel = "messages") {
 }
 
 function normalizeAccountSection(section) {
-  return String(section || "info").trim().toLowerCase() === "friends" ? "messages" : String(section || "info").trim().toLowerCase();
+  return String(section || "info").trim().toLowerCase();
 }
 
 function buildAccountHref(section, sub = null, targetId = null) {
@@ -191,8 +193,12 @@ function syncUnreadCount() {
     return;
   }
 
-  const unreadDirect = (socialState.messages || []).filter((message) => message.kind === "chat" && isUnreadForUser(message, uid)).length;
-  socialState.unreadCount = unreadDirect + Number(socialState.incomingRequests?.length || 0);
+  socialState.unreadCount = (socialState.messages || []).filter((message) => {
+    return cleanUid(message.toUid) === uid
+      && message.kind !== "chat"
+      && message.kind !== "group-invite"
+      && isUnreadForUser(message, uid);
+  }).length;
 }
 
 function currentStreakOf(profile) {
@@ -297,6 +303,15 @@ function permissionSetupMessage() {
   return "Firestore rules are blocking part of the social system. Allow signed-in users to access their own user document plus message docs where their UID is in participants.";
 }
 
+function friendlyBootstrapError(error) {
+  const code = String(error?.code || "");
+  if (code === "permission-denied") {
+    return permissionSetupMessage();
+  }
+
+  return error?.message || "Could not load your friends right now.";
+}
+
 function friendlyRealtimeError(scope, error) {
   const code = String(error?.code || "");
   if (code === "permission-denied") {
@@ -376,7 +391,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Friend request",
       body: message.body || `${message.fromName || "Someone"} sent you a friend request.`,
-      href: buildAccountHref("messages", "requests", message.fromUid || message.targetId || null)
+      href: buildAccountHref("messages")
     };
   }
 
@@ -384,7 +399,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Friend request accepted",
       body: message.body || `${message.fromName || "Someone"} accepted your friend request.`,
-      href: buildAccountHref("messages", "direct", message.fromUid || message.targetId || null)
+      href: buildAccountHref("messages")
     };
   }
 
@@ -392,7 +407,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Friend request declined",
       body: message.body || `${message.fromName || "Someone"} declined your friend request.`,
-      href: buildAccountHref("messages", "requests")
+      href: buildAccountHref("messages")
     };
   }
 
@@ -400,7 +415,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Friend removed",
       body: message.body || `${message.fromName || "Someone"} removed you from their friends list.`,
-      href: buildAccountHref("messages", "direct", message.fromUid || message.targetId || null)
+      href: buildAccountHref("messages")
     };
   }
 
@@ -408,31 +423,14 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Blocked",
       body: message.body || `${message.fromName || "Someone"} blocked you.`,
-      href: buildAccountHref("messages", "direct", message.fromUid || message.targetId || null)
-    };
-  }
-
-  if (message.kind === "group-invite") {
-    return {
-      title: message.title || "Group invite",
-      body: message.body || `${message.fromName || "Someone"} invited you to a group chat.`,
-      href: buildAccountHref("messages", "groups", message.groupChatId || message.targetId || null)
-    };
-  }
-
-  if (message.kind === "chat") {
-    const targetUid = cleanUid(message.fromUid || message.targetId || message.conversationUid);
-    return {
-      title: message.title || `Message from ${message.fromName || "Someone"}`,
-      body: shortenToastBody(message.body || ""),
-      href: buildAccountHref("messages", "direct", targetUid || null)
+      href: buildAccountHref("messages")
     };
   }
 
   return {
     title: message.title || "New message",
     body: shortenToastBody(message.body || ""),
-    href: buildAccountHref(message.targetSection || "messages", message.targetSubSection || "direct", message.targetId || null)
+    href: buildAccountHref(message.targetSection || "messages", message.targetSubSection || null, message.targetId || null)
   };
 }
 
@@ -455,7 +453,7 @@ function maybeToastNewMessages(messages) {
   if (typeof window.PanategwaToast !== "function") return;
 
   const toastable = freshIncoming.filter((message) => {
-    return ["chat", "friend-request", "friend-accepted", "friend-declined", "friend-removed", "friend-blocked"].includes(message.kind)
+    return ["friend-request", "friend-accepted", "friend-declined", "friend-removed", "friend-blocked"].includes(message.kind)
       && !!toastConfigForMessage(message);
   });
   if (!toastable.length) return;
@@ -473,6 +471,7 @@ function maybeToastNewMessages(messages) {
 }
 
 function maybeToastPendingGroupInvites(invites) {
+  return;
   const currentUid = socialState.user?.uid;
   ensurePanategwaToast();
   if (!currentUid || typeof window.PanategwaToast !== "function") return;
@@ -497,6 +496,7 @@ function maybeToastPendingGroupInvites(invites) {
 }
 
 function maybeToastNewGroupMessages(chat, messages) {
+  return;
   const currentUid = socialState.user?.uid;
   ensurePanategwaToast();
   if (!currentUid || typeof window.PanategwaToast !== "function" || !chat?.id) return;
@@ -1233,6 +1233,27 @@ async function deleteMessageForCurrentUser(messageId) {
   });
 }
 
+async function setMessageDeletedForCurrentUser(messageId, deleted = true) {
+  const { user } = await requireSocialUser("notifications");
+
+  const id = cleanUid(messageId);
+  if (!id) throw new Error("Message not found.");
+
+  const ref = doc(db, "messages", id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+
+  const data = snap.data();
+  const participants = unique(data.participants);
+  if (!participants.includes(user.uid) && cleanUid(data.toUid) !== user.uid && cleanUid(data.fromUid) !== user.uid) {
+    throw new Error("You cannot change that notification.");
+  }
+
+  await updateDoc(ref, deleted
+    ? { deletedFor: arrayUnion(user.uid), updatedAt: serverTimestamp() }
+    : { deletedFor: arrayRemove(user.uid), updatedAt: serverTimestamp() });
+}
+
 async function viewProfileById(uid) {
   const data = await loadUser(uid);
   socialState.selectedProfileId = cleanUid(uid) || null;
@@ -1294,6 +1315,7 @@ function startRealtime() {
 
     if (!user) {
       listenerErrors.clear();
+      socialState.ready = true;
       socialState.user = null;
       socialState.profile = null;
       socialState.settings = { ...DEFAULT_SETTINGS };
@@ -1318,63 +1340,76 @@ function startRealtime() {
     }
 
     listenerErrors.clear();
+    socialState.ready = false;
     socialState.user = user;
     socialState.socialError = null;
     emit();
 
-    socialState.profile = await ensureUserProfile(user);
-    socialState.settings = { ...DEFAULT_SETTINGS, ...(socialState.profile?.socialSettings || {}) };
-    socialState.friends = unique(socialState.profile?.friends);
-    socialState.blocked = unique(socialState.profile?.blocked);
-    socialState.selectedProfile = publicProfile(socialState.profile, user.uid);
-    socialState.selectedProfileId = user.uid;
-    await loadFriendProfiles([...socialState.friends, ...socialState.blocked]);
-    emit();
-
-    unsubProfile = onSnapshot(userRef(user.uid), async (snap) => {
-      clearListenerError("profile");
-      const fresh = snap.exists() ? snap.data() : null;
-      socialState.profile = fresh;
-      socialState.settings = { ...DEFAULT_SETTINGS, ...(fresh?.socialSettings || {}) };
-      socialState.friends = unique(fresh?.friends);
-      socialState.blocked = unique(fresh?.blocked);
-      socialState.selectedProfile = socialState.selectedProfileId
-        ? (socialState.selectedProfileId === user.uid ? publicProfile(fresh, user.uid) : socialState.friendProfiles[socialState.selectedProfileId] || socialState.selectedProfile)
-        : publicProfile(fresh, user.uid);
+    try {
+      socialState.profile = await ensureUserProfile(user);
+      socialState.settings = { ...DEFAULT_SETTINGS, ...(socialState.profile?.socialSettings || {}) };
+      socialState.friends = unique(socialState.profile?.friends);
+      socialState.blocked = unique(socialState.profile?.blocked);
+      socialState.selectedProfile = publicProfile(socialState.profile, user.uid);
+      socialState.selectedProfileId = user.uid;
       await loadFriendProfiles([...socialState.friends, ...socialState.blocked]);
+      socialState.ready = true;
       emit();
-    }, (error) => {
-      setListenerError("profile", "profile", error);
-    });
 
-    unsubMessages = onSnapshot(query(collection(db, "messages"), where("participants", "array-contains", user.uid)), async (snap) => {
-      clearListenerError("messages");
-      const all = [];
-      snap.forEach(d => all.push({ id: d.id, ...d.data() }));
-      const sorted = sortNewestFirst(all);
-      maybeToastNewMessages(sorted);
-      const visible = sorted.filter((message) => !unique(message.deletedFor).includes(user.uid));
-      socialState.messages = visible;
-      socialState.incomingRequests = sortNewestFirst(visible.filter(m => m.kind === "friend-request" && m.toUid === user.uid && (m.status || "pending") === "pending"));
-      socialState.outgoingRequests = sortNewestFirst(visible.filter(m => m.kind === "friend-request" && m.fromUid === user.uid && (m.status || "pending") === "pending"));
-      syncUnreadCount();
-      await syncRelationshipSignals(sorted);
-      emit();
-    }, (error) => {
-      setListenerError("messages", "messages", error, () => {
-        socialState.messages = [];
-        socialState.incomingRequests = [];
-        socialState.outgoingRequests = [];
-        syncUnreadCount();
+      unsubProfile = onSnapshot(userRef(user.uid), async (snap) => {
+        clearListenerError("profile");
+        const fresh = snap.exists() ? snap.data() : null;
+        socialState.profile = fresh;
+        socialState.settings = { ...DEFAULT_SETTINGS, ...(fresh?.socialSettings || {}) };
+        socialState.friends = unique(fresh?.friends);
+        socialState.blocked = unique(fresh?.blocked);
+        socialState.selectedProfile = socialState.selectedProfileId
+          ? (socialState.selectedProfileId === user.uid ? publicProfile(fresh, user.uid) : socialState.friendProfiles[socialState.selectedProfileId] || socialState.selectedProfile)
+          : publicProfile(fresh, user.uid);
+        await loadFriendProfiles([...socialState.friends, ...socialState.blocked]);
+        socialState.ready = true;
+        emit();
+      }, (error) => {
+        socialState.ready = true;
+        setListenerError("profile", "profile", error);
       });
-    });
 
-    socialState.groupChats = [];
-    socialState.groupMessagesByChat = {};
-    socialState.groupInvites = [];
-    socialState.selectedGroupChatId = null;
-    syncUnreadCount();
-    emit();
+      unsubMessages = onSnapshot(query(collection(db, "messages"), where("participants", "array-contains", user.uid)), async (snap) => {
+        clearListenerError("messages");
+        const all = [];
+        snap.forEach(d => all.push({ id: d.id, ...d.data() }));
+        const sorted = sortNewestFirst(all);
+        maybeToastNewMessages(sorted);
+        const visible = sorted.filter((message) => !unique(message.deletedFor).includes(user.uid));
+        socialState.messages = visible;
+        socialState.incomingRequests = sortNewestFirst(visible.filter(m => m.kind === "friend-request" && m.toUid === user.uid && (m.status || "pending") === "pending"));
+        socialState.outgoingRequests = sortNewestFirst(visible.filter(m => m.kind === "friend-request" && m.fromUid === user.uid && (m.status || "pending") === "pending"));
+        syncUnreadCount();
+        await syncRelationshipSignals(sorted);
+        socialState.ready = true;
+        emit();
+      }, (error) => {
+        socialState.ready = true;
+        setListenerError("messages", "messages", error, () => {
+          socialState.messages = [];
+          socialState.incomingRequests = [];
+          socialState.outgoingRequests = [];
+          syncUnreadCount();
+        });
+      });
+
+      socialState.groupChats = [];
+      socialState.groupMessagesByChat = {};
+      socialState.groupInvites = [];
+      socialState.selectedGroupChatId = null;
+      syncUnreadCount();
+      emit();
+    } catch (error) {
+      console.error("Social bootstrap error:", error);
+      socialState.ready = true;
+      socialState.socialError = friendlyBootstrapError(error);
+      emit();
+    }
   });
 }
 
@@ -1408,6 +1443,7 @@ export {
   markAllMessagesRead,
   markAllMessagesUnread,
   deleteMessageForCurrentUser,
+  setMessageDeletedForCurrentUser,
   viewProfileById,
   setSelectedConversation,
   setSelectedGroupChatId,

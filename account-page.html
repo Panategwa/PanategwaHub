@@ -11,21 +11,19 @@
   <script src="menu-loader.js" defer></script>
   <script src="settings/settings.js" defer></script>
 
-  <script type="module" src="auth/messages.js"></script>
   <script type="module" src="auth/settings.js"></script>
   <script type="module" src="auth/social.js"></script>
   <script type="module" src="auth/account.js"></script>
 <script>
     (function () {
       function normalizeSection(section) {
-        var next = String(section || "info").toLowerCase();
-        return next === "friends" ? "messages" : next;
+        return String(section || "info").toLowerCase();
       }
 
       function isFriendsView(section, sub) {
         var next = String(section || "info").toLowerCase();
         var nextSub = String(sub || "").toLowerCase();
-        return next === "messages" || next === "friends" || nextSub === "direct" || nextSub === "chat" || nextSub === "groups" || nextSub === "requests" || nextSub === "blocked";
+        return next === "friends" || nextSub === "friends" || nextSub === "requests" || nextSub === "blocked";
       }
 
       function isSettingsView(section, sub) {
@@ -69,7 +67,7 @@
       window.openAccountArea = function (section, sub, targetId) {
         var requestedSection = String(section || "info").toLowerCase();
         var nextSection = normalizeSection(requestedSection);
-        var nextSub = isFriendsView(requestedSection, sub) ? (sub || "direct") : sub;
+        var nextSub = isFriendsView(requestedSection, sub) ? (sub || "friends") : sub;
 
         document.querySelectorAll(".account-section").forEach(function (panel) {
           panel.classList.toggle("active", panel.dataset.section === nextSection);
@@ -78,6 +76,10 @@
         document.querySelectorAll(".tab-button").forEach(function (button) {
           button.classList.toggle("active", button.dataset.target === nextSection);
         });
+
+        if (isFriendsView(requestedSection, sub)) {
+          baseShowFriendsSubsection(nextSub || "friends");
+        }
 
         if (isSettingsView(requestedSection, sub)) {
           baseShowSettingsSubsection(nextSub || "account");
@@ -107,7 +109,7 @@
         if (copy) {
           copy.textContent = nextMode === "login"
             ? "Use your email and password or Google to sign in."
-            : "Create your account to unlock friends, messages, and synced progress.";
+            : "Create your account to unlock friends, notifications, and synced progress.";
         }
         if (switchCopy) switchCopy.textContent = nextMode === "login" ? "Don't have an account?" : "Already have an account?";
         if (switchButton) switchButton.textContent = nextMode === "login" ? "Create one" : "Log in";
@@ -137,7 +139,7 @@
   <div class="account-wrap">
     <div class="page-head">
       <h1>Account</h1>
-      <p class="page-subtitle">Profile, friends, progress, and messages all in one place.</p>
+      <p class="page-subtitle">Profile, friends, progress, and notifications all in one place.</p>
     </div>
 
     <p id="auth-status" class="status" data-kind="info">Checking account...</p>
@@ -146,7 +148,8 @@
       <button type="button" class="tab-button active" id="tab-info" data-target="info" onclick="window.openAccountArea('info')">Profile</button>
       <button type="button" class="tab-button" id="tab-settings" data-target="settings" onclick="window.openAccountArea('settings')">Account settings</button>
       <button type="button" class="tab-button" id="tab-progress" data-target="progress" onclick="window.openAccountArea('progress')">Progress</button>
-      <button type="button" class="tab-button" id="tab-messages" data-target="messages" onclick="window.openAccountArea('messages', 'direct')">Friends</button>
+      <button type="button" class="tab-button" id="tab-friends" data-target="friends" onclick="window.openAccountArea('friends', 'friends')">Friends</button>
+      <button type="button" class="tab-button" id="tab-messages" data-target="messages" onclick="window.openAccountArea('messages')">Notifications</button>
     </div>
 
     <section class="account-section active" data-section="info">
@@ -241,15 +244,15 @@
             <div class="auth-helper-list">
               <div class="auth-helper-item">
                 <strong>Friends and requests</strong>
-                Send requests, accept them from your inbox, and view friend profiles.
+                Send requests, accept them, and view friend profiles.
               </div>
               <div class="auth-helper-item">
-                <strong>Direct messages</strong>
-                Chat with friends, review requests, and open profiles from one place.
+                <strong>Notifications</strong>
+                See friend requests, achievement unlocks, and streak updates in one inbox.
               </div>
               <div class="auth-helper-item">
                 <strong>Saved progress</strong>
-                Sync achievements, XP, streak-related messages, and profile settings to your account.
+                Sync achievements, XP, streak updates, and profile settings to your account.
               </div>
             </div>
           </aside>
@@ -399,7 +402,7 @@
 
               <div class="setting-card danger-zone-card">
                 <div class="setting-title">Danger zone</div>
-                <p class="setting-desc">Reset selected parts of your account without deleting the login itself.</p>
+                <p class="setting-desc">These resets are permanent. There is no going back after they are done.</p>
                 <div class="field-row">
                   <select id="reset-data-select">
                     <option value="progress">Delete progress</option>
@@ -455,7 +458,21 @@
                       <small>Friends can see your current and longest streak.</small>
                     </span>
                   </label>
+
+                  <label class="privacy-toggle">
+                    <input id="privacy-show-site-age" type="checkbox" />
+                    <span>
+                      <strong>Show time on site</strong>
+                      <small>Friends can see how long you have been on the site.</small>
+                    </span>
+                  </label>
                 </div>
+              </div>
+
+              <div class="setting-card privacy-preview-host">
+                <div class="setting-title">Friend view preview</div>
+                <p class="setting-desc">This is how your profile looks to people in your friends list.</p>
+                <div id="privacy-profile-preview"></div>
               </div>
             </div>
           </div>
@@ -496,20 +513,22 @@
       </div>
     </section>
 
-    <section class="account-section section-hidden" data-section="legacy-social" aria-hidden="true">
+    <section class="account-section" data-section="friends">
       <div class="card">
         <div class="subsection-head">
           <div>
-            <h2>Friends and requests</h2>
-            <p class="section-note">Your profile, friend list, requests, and profile previews now live in the same tab.</p>
+            <h2>Friends</h2>
+            <p class="section-note">Manage your friend list, review requests, and block users.</p>
           </div>
         </div>
 
         <div id="friends-locked" class="locked-state">
-          <h3>Log in to use the friends system</h3>
-          <p>You need an account to send requests, accept them, open friend chats, and view saved profiles.</p>
+          <h3 id="friends-locked-title">Log in to use the friends system</h3>
+          <p id="friends-locked-copy">You need an account to send requests, review them, and manage your friends list.</p>
           <div class="button-row">
             <button type="button" class="tab-chip" data-open-section="info" onclick="window.openAccountArea('info')">Go to login</button>
+            <button id="friends-locked-refresh-btn" type="button" class="tab-chip section-hidden">I've verified my email</button>
+            <button id="friends-locked-resend-btn" type="button" class="tab-chip section-hidden">Resend verification email</button>
           </div>
         </div>
 
@@ -531,9 +550,9 @@
           </div>
 
           <div class="friends-subtabs">
-            <button type="button" class="tab-chip active" data-friends-subtab="friends" onclick="window.openAccountArea('info', 'friends')">Friends</button>
-            <button type="button" class="tab-chip" data-friends-subtab="requests" onclick="window.openAccountArea('info', 'requests')">Requests</button>
-            <button type="button" class="tab-chip" data-friends-subtab="blocked" onclick="window.openAccountArea('info', 'blocked')">Blocked</button>
+            <button type="button" class="tab-chip active" data-friends-subtab="friends" onclick="window.openAccountArea('friends', 'friends')">Friends</button>
+            <button type="button" class="tab-chip" data-friends-subtab="requests" onclick="window.openAccountArea('friends', 'requests')">Requests</button>
+            <button type="button" class="tab-chip" data-friends-subtab="blocked" onclick="window.openAccountArea('friends', 'blocked')">Blocked</button>
           </div>
         </div>
 
@@ -550,8 +569,6 @@
 
               <div id="friends-list" class="friend-list-stack"></div>
             </div>
-
-            <div id="friend-profile-view"></div>
           </div>
         </div>
 
@@ -570,14 +587,14 @@
       <div class="card">
         <div class="subsection-head">
           <div>
-            <h2>Friends</h2>
-            <p class="section-note">Direct chats, requests, and your friends list all live together here.</p>
+            <h2>Notifications</h2>
+            <p class="section-note">Friend activity, achievements, and streak updates appear here.</p>
           </div>
         </div>
 
         <div id="messages-locked" class="locked-state">
-          <h3 id="messages-locked-title">Log in to use the friends system</h3>
-          <p id="messages-locked-copy">Your friends, chats, and requests only load after you sign in.</p>
+          <h3 id="messages-locked-title">Log in to use notifications</h3>
+          <p id="messages-locked-copy">Your account notifications load after you sign in.</p>
           <div class="button-row">
             <button type="button" class="tab-chip" data-open-section="info" onclick="window.openAccountArea('info')">Go to login</button>
             <button id="messages-locked-refresh-btn" type="button" class="tab-chip section-hidden">I've verified my email</button>
@@ -586,7 +603,16 @@
         </div>
 
         <div id="messages-content">
-          <div id="messages-root"></div>
+          <div class="notifications-toolbar">
+            <div id="notifications-summary" class="notifications-summary">No notifications yet.</div>
+            <div class="notification-bulk-actions">
+              <button id="notifications-read-all-btn" type="button" class="tab-chip">Read all</button>
+              <button id="notifications-unread-all-btn" type="button" class="tab-chip">Unread all</button>
+              <button id="notifications-undo-btn" type="button" class="tab-chip" disabled>Undo</button>
+              <button id="notifications-redo-btn" type="button" class="tab-chip" disabled>Redo</button>
+            </div>
+          </div>
+          <div id="notifications-root"></div>
         </div>
       </div>
     </section>

@@ -54,7 +54,8 @@ function normalizePrivacySettings(settings = {}) {
   return {
     showRank: settings.showRank !== false,
     showJoined: settings.showJoined !== false,
-    showStreaks: settings.showStreaks !== false
+    showStreaks: settings.showStreaks !== false,
+    showSiteAge: settings.showSiteAge !== false
   };
 }
 
@@ -1055,6 +1056,13 @@ export async function resetAccountData(mode = "progress") {
   }
 
   await setDoc(userRef(user.uid), updates, { merge: true });
+
+  if (nextMode === "progress" || nextMode === "all") {
+    try {
+      localStorage.removeItem(`ptg_notifications_${user.uid}`);
+    } catch {}
+  }
+
   localStorage.removeItem(`ptg_streak_${user.uid}`);
   try {
     sessionStorage.removeItem(`ptg_last_login_${user.uid}`);

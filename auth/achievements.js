@@ -292,8 +292,12 @@ function emitAchievementToasts(user, newlyUnlocked) {
 
     window.PanategwaToast({
       title: "Achievement unlocked",
-      body: `${achievement.name} <br> +${achievement.reward} XP`,
-      href: "account-page.html?tab=progress"
+      body: `${achievement.name}\n+${achievement.reward} XP`,
+      href: "account-page.html?tab=progress",
+      duration: 5000,
+      persist: true,
+      kind: "achievement",
+      notificationId: `achievement:${id}`
     });
   });
 }

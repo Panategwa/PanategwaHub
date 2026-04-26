@@ -17,18 +17,25 @@ import {
   respondToFriendRequest,
   removeFriend,
   blockUser,
-  viewProfileById,
-  getUnreadIncomingCount
+  markMessageRead,
+  setMessageDeletedForCurrentUser
 } from "./social.js";
 
 import { ACHIEVEMENTS } from "./achievements.js";
+import {
+  getStoredNotifications,
+  pushStoredNotification,
+  setStoredNotificationRead,
+  deleteStoredNotification,
+  subscribeStoredNotifications
+} from "./toast.js";
 
 const $ = (id) => document.getElementById(id);
-const AUTH_REQUIRED_SECTIONS = new Set(["settings", "friends", "messages"]);
 
 let currentState = {
   user: null,
   profile: null,
+  ready: false,
   socialError: null,
   friends: [],
   blocked: [],
@@ -36,7 +43,10 @@ let currentState = {
   outgoingRequests: [],
   friendProfiles: {},
   selectedProfile: null,
-  selectedProfileId: null
+  selectedProfileId: null,
+  messages: [],
+  unreadCount: 0,
+  localNotifications: []
 };
 
 let authMode = "login";
@@ -50,6 +60,10 @@ let copiedUserIdUntil = 0;
 let copiedUserIdTimer = null;
 let lastAchievementSignature = "";
 let authHydrated = false;
+const MAX_NOTIFICATION_HISTORY = 20;
+let notificationUndoStack = [];
+let notificationRedoStack = [];
+let notificationHistoryUserId = "";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -72,6 +86,26 @@ function copyIcon() {
       <path fill="currentColor" d="M8 7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2z"/>
       <path fill="currentColor" d="M6 3h9v2H6a1 1 0 0 0-1 1v9H3V6a3 3 0 0 1 3-3z"/>
     </svg>
+  `;
+}
+
+function verifiedBadgeMarkup(verified) {
+  if (!verified) return "";
+  return `
+    <span class="avatar-verified-badge" aria-label="Verified account" title="Verified account">
+      <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+        <path fill="currentColor" d="M9.55 18.2 4.8 13.45l1.4-1.4 3.35 3.35 8.25-8.25 1.4 1.4z"/>
+      </svg>
+    </span>
+  `;
+}
+
+function avatarMarkup(src, alt, className, verified = false) {
+  return `
+    <span class="avatar-shell ${verified ? "verified" : ""}">
+      <img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" class="${escapeHtml(className)}" />
+      ${verifiedBadgeMarkup(verified)}
+    </span>
   `;
 }
 
@@ -126,6 +160,76 @@ function relativeSince(value) {
   return `${Math.floor(diff / year)} years`;
 }
 
+function toMs(value) {
+  if (!value) return 0;
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  if (typeof value === "number") return value;
+  if (value instanceof Date) return value.getTime();
+  return 0;
+}
+
+function relativeTime(value) {
+  const ms = toMs(value);
+  if (!ms) return "Just now";
+
+  const diff = Math.max(0, Date.now() - ms);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const week = 7 * day;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  if (diff < minute) return "Just now";
+  if (diff < hour) {
+    const amount = Math.floor(diff / minute);
+    return `${amount} min${amount === 1 ? "" : "s"} ago`;
+  }
+  if (diff < day) {
+    const amount = Math.floor(diff / hour);
+    return `${amount} hour${amount === 1 ? "" : "s"} ago`;
+  }
+  if (diff < week) {
+    const amount = Math.floor(diff / day);
+    return `${amount} day${amount === 1 ? "" : "s"} ago`;
+  }
+  if (diff < month) {
+    const amount = Math.floor(diff / week);
+    return `${amount} week${amount === 1 ? "" : "s"} ago`;
+  }
+  if (diff < year) {
+    const amount = Math.floor(diff / month);
+    return `${amount} month${amount === 1 ? "" : "s"} ago`;
+  }
+
+  const amount = Math.floor(diff / year);
+  return `${amount} year${amount === 1 ? "" : "s"} ago`;
+}
+
+function stripHtml(value) {
+  return String(value || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter((line, index, list) => line || index < list.length - 1)
+    .join("\n")
+    .trim();
+}
+
+function formatAchievementBody(text) {
+  return String(text || "").replace(/\s-\s(\+\d+\sXP\b)/i, "\n$1");
+}
+
+function formatNotificationBody(kind, value) {
+  const text = stripHtml(value || "");
+  if (String(kind || "") === "achievement") {
+    return formatAchievementBody(text);
+  }
+  return text;
+}
+
 function isVerifiedState(user, profile = null) {
   return !!(user?.emailVerified || profile?.verified);
 }
@@ -139,14 +243,13 @@ function resolvedProfile(state = currentState) {
 }
 
 function normalizeAccountSection(section = "info") {
-  const nextSection = String(section || "info").trim().toLowerCase();
-  return nextSection === "friends" ? "messages" : nextSection;
+  return String(section || "info").trim().toLowerCase();
 }
 
 function isFriendsView(section = "info", sub = null) {
   const rawSection = String(section || "info").trim().toLowerCase();
   const nextSub = String(sub || "").trim().toLowerCase();
-  return rawSection === "messages" || rawSection === "friends" || ["direct", "chat", "groups", "requests", "blocked"].includes(nextSub);
+  return rawSection === "friends" || FRIENDS_SUBSECTIONS.has(nextSub);
 }
 
 function isSettingsView(section = "info", sub = null) {
@@ -209,11 +312,11 @@ function syncMessagesTabBadge(state) {
   const button = $("tab-messages");
   if (!button) return;
 
-  const unread = Number(state.unreadCount || 0);
+  const unread = Number(state.unreadCount || 0) + (Array.isArray(state.localNotifications) ? state.localNotifications.filter((entry) => !entry.read).length : 0);
   const canUseMessages = isVerifiedState(resolvedUser(state), resolvedProfile(state));
   button.classList.toggle("has-dot", canUseMessages && unread > 0);
-  button.setAttribute("aria-label", canUseMessages && unread > 0 ? `Friends (${unread} unread)` : "Friends");
-  button.title = canUseMessages && unread > 0 ? `${unread} unread chat${unread === 1 ? "" : "s"}` : "Friends";
+  button.setAttribute("aria-label", canUseMessages && unread > 0 ? `Notifications (${unread} unread)` : "Notifications");
+  button.title = canUseMessages && unread > 0 ? `${unread} unread notification${unread === 1 ? "" : "s"}` : "Notifications";
 }
 
 function setVisible(id, visible) {
@@ -223,7 +326,7 @@ function setVisible(id, visible) {
 }
 
 function isAuthRestoring() {
-  return !authHydrated;
+  return !authHydrated && !resolvedUser(currentState);
 }
 
 function updateLockedPanel(prefix, loggedIn, verified, restoring = false) {
@@ -235,14 +338,18 @@ function updateLockedPanel(prefix, loggedIn, verified, restoring = false) {
   if (restoring) {
     if (title) {
       title.textContent = prefix === "messages"
-        ? "Loading your friends system"
-        : "Loading your account";
+        ? "Loading your notifications"
+        : prefix === "friends"
+          ? "Loading your friends"
+          : "Loading your account";
     }
 
     if (copy) {
       copy.textContent = prefix === "messages"
-        ? "Your chats, friend requests, and friend list are syncing now."
-        : "Your profile, settings, and account tools are syncing now.";
+        ? "Your friend activity, achievements, and streak updates are syncing now."
+        : prefix === "friends"
+          ? "Your friend list, requests, and blocks are syncing now."
+          : "Your profile, settings, and account tools are syncing now.";
     }
 
     setVisible(`${prefix}-locked-refresh-btn`, false);
@@ -252,17 +359,29 @@ function updateLockedPanel(prefix, loggedIn, verified, restoring = false) {
 
   if (title) {
     title.textContent = !loggedIn
-      ? (prefix === "messages" ? "Log in to use the friends system" : "Log in to edit your settings")
-      : (prefix === "messages" ? "Verify your email to unlock friends" : "Verify your email to unlock settings");
+      ? (prefix === "messages"
+        ? "Log in to use notifications"
+        : prefix === "friends"
+          ? "Log in to use the friends system"
+          : "Log in to edit your settings")
+      : (prefix === "messages"
+        ? "Verify your email to unlock notifications"
+        : prefix === "friends"
+          ? "Verify your email to unlock friends"
+          : "Verify your email to unlock settings");
   }
 
   if (copy) {
     copy.textContent = !loggedIn
       ? (prefix === "messages"
-        ? "Your friends, chats, and requests only load after you sign in."
+        ? "Your notifications only load after you sign in."
+        : prefix === "friends"
+          ? "Your friends, requests, and saved profiles only load after you sign in."
         : "Your profile, password, avatar, and account actions are available after you sign in.")
       : (prefix === "messages"
-        ? "Direct messages, friend requests, and friend actions unlock after your email is verified."
+        ? "Friend activity, achievements, and streak notifications unlock after your email is verified."
+        : prefix === "friends"
+          ? "Friend requests, blocked users, and your friends list unlock after your email is verified."
         : "Profile edits, avatars, privacy settings, and account actions unlock after your email is verified.");
   }
 
@@ -276,10 +395,8 @@ async function handleVerificationRefresh() {
     const refreshed = await refreshCurrentUserSession();
     currentState.user = refreshed.user;
     currentState.profile = refreshed.profile || currentState.profile;
+    refreshLocalNotifications(refreshed.user?.uid || "");
     renderAll(currentState);
-    if (typeof window.PanategwaMessagesRender === "function") {
-      window.PanategwaMessagesRender();
-    }
     setStatus(isVerifiedState(refreshed.user, refreshed.profile)
       ? "Email verified. Everything is unlocked now."
       : "Your email still looks unverified. Check the inbox link, then try again.", isVerifiedState(refreshed.user, refreshed.profile) ? "success" : "info");
@@ -318,7 +435,7 @@ function setAuthMode(mode = "login") {
   if (copy) {
     copy.textContent = loginActive
       ? "Use your email and password or Google to sign in."
-      : "Create your account to unlock friends, messages, and synced progress.";
+      : "Create your account to unlock friends, notifications, and synced progress.";
   }
   if (switchCopy) switchCopy.textContent = loginActive ? "Don't have an account?" : "Already have an account?";
   if (switchButton) switchButton.textContent = loginActive ? "Create one" : "Log in";
@@ -403,7 +520,7 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
   try {
     const requestedSection = String(section || "info").toLowerCase();
     const nextSection = normalizeAccountSection(requestedSection);
-    const nextSub = isFriendsView(requestedSection, sub) ? (sub || "direct") : sub;
+    const nextSub = isFriendsView(requestedSection, sub) ? (sub || "friends") : sub;
     let finalSub = nextSub || null;
 
     document.querySelectorAll(".account-section").forEach((el) => {
@@ -415,15 +532,13 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
     });
 
     if (isFriendsView(requestedSection, sub)) {
-      finalSub = nextSub || "direct";
-      if (typeof window.PanategwaMessagesOpen === "function") {
-        window.PanategwaMessagesOpen(finalSub, targetId || null);
-      } else if (typeof window.PanategwaMessagesRender === "function") {
-        window.PanategwaMessagesRender();
-      }
+      finalSub = nextSub || "friends";
+      showFriendsSubsection(finalSub);
     } else if (nextSection === "settings") {
       finalSub = nextSub || "account";
       showSettingsSubsection(finalSub);
+    } else if (nextSection === "messages") {
+      finalSub = null;
     }
 
     if (nextSection === "progress" && targetId) {
@@ -472,12 +587,12 @@ function renderAuth(state) {
   const longestStreak = profile?.longestStreak || profile?.streak?.longest || streak || 0;
   const memberFor = relativeSince(profile.createdAt);
   const avatarUrl = profile.photoURL || getDefaultAvatarDataUrl();
-  const avatar = `<img src="${escapeHtml(avatarUrl)}" alt="Avatar" class="account-avatar" />`;
+  const avatar = avatarMarkup(avatarUrl, "Avatar", "account-avatar", isVerifiedState(user, profile));
   const copied = isUserIdCopied(user.uid);
   const verifyNotice = !isVerifiedState(user, profile) ? `
     <div class="verify-callout">
       <strong>Verify your email to unlock account features</strong>
-      <p>Friends, direct messages, avatars, privacy controls, and the rest of your account tools open as soon as your email is verified.</p>
+      <p>Friends, notifications, avatars, privacy controls, and the rest of your account tools open as soon as your email is verified.</p>
       <div class="button-row">
         <button id="inline-refresh-verification-btn" type="button">I've verified my email</button>
         <button id="inline-resend-verification-btn" type="button">Resend verification email</button>
@@ -495,7 +610,6 @@ function renderAuth(state) {
     </div>
 
     <div class="info-grid">
-      <div class="info-row"><span>Status</span><strong>Logged in</strong></div>
       <div class="info-row"><span>Verified</span><strong>${verified}</strong></div>
       <div class="info-row"><span>Username</span><strong>${escapeHtml(username)}</strong></div>
       <div class="info-row"><span>Email</span><strong>${escapeHtml(email)}</strong></div>
@@ -591,58 +705,44 @@ function renderAchievements(state) {
   }).join("");
 }
 
-function renderSelectedProfile(state) {
-  const container = $("friend-profile-view");
+function renderPrivacyProfilePreview(state) {
+  const container = $("privacy-profile-preview");
   if (!container) return;
 
   const user = resolvedUser(state);
   if (!user) {
     container.innerHTML = `
       <div class="friend-profile-card">
-        <div class="subsection-head"><h3>Profile preview</h3></div>
-        <div class="msg-empty">Log in to preview profiles.</div>
+        <div class="subsection-head"><h3>Friend view preview</h3></div>
+        <div class="msg-empty">Log in to preview what friends can see.</div>
       </div>
     `;
     return;
   }
 
-  const profile = state.selectedProfile || resolvedProfile(state) || {};
+  const profile = resolvedProfile(state) || {};
   const username = profile.username || "Player";
-  const isSelf = profile.uid === user.uid;
-  const canViewProfile = isSelf || profile.canViewProfile !== false;
-  const resolvedStateProfile = resolvedProfile(state) || {};
-  const rank = profile.currentRank ?? (isSelf ? getRank(profile.xp || 0) : null);
-  const streakCurrent = profile.streakCurrent ?? (isSelf ? (resolvedStateProfile?.streak?.current || 0) : null);
-  const streakLongest = profile.streakLongest ?? (isSelf ? (resolvedStateProfile?.longestStreak || resolvedStateProfile?.streak?.longest || streakCurrent || 0) : null);
-  const avatar = `<img src="${escapeHtml(profile.photoURL || getDefaultAvatarDataUrl())}" alt="${escapeHtml(username)} avatar" class="profile-avatar-large" />`;
-
-  if (!canViewProfile) {
-    container.innerHTML = `
-      <div class="friend-profile-card">
-        <div class="subsection-head">
-          <h3>${isSelf ? "Your profile" : "Profile preview"}</h3>
-          <span class="profile-badge">${isSelf ? "You" : "Friends only"}</span>
-        </div>
-
-        <div class="profile-hero">
-          ${avatar}
-          <div>
-            <div class="profile-name">${escapeHtml(username)}</div>
-            <div class="friend-entry-meta">ID: ${escapeHtml(profile.uid || "--")}</div>
-          </div>
-        </div>
-
-        <div class="msg-empty">Only friends can view this account. Accept each other first to unlock full profile info.</div>
-      </div>
-    `;
-    return;
-  }
+  const privacy = profile?.privacySettings || {};
+  const showRank = privacy.showRank !== false;
+  const showJoined = privacy.showJoined !== false;
+  const showStreaks = privacy.showStreaks !== false;
+  const showSiteAge = privacy.showSiteAge !== false;
+  const rank = showRank ? getRank(profile.xp || 0) : null;
+  const streakCurrent = showStreaks ? (profile?.streak?.current || 0) : null;
+  const streakLongest = showStreaks ? (profile?.longestStreak || profile?.streak?.longest || streakCurrent || 0) : null;
+  const siteAge = showSiteAge ? relativeSince(profile.createdAt) : null;
+  const avatar = avatarMarkup(
+    profile.photoURL || getDefaultAvatarDataUrl(),
+    `${username} avatar`,
+    "profile-avatar-large",
+    isVerifiedState(user, profile)
+  );
 
   container.innerHTML = `
     <div class="friend-profile-card">
       <div class="subsection-head">
-        <h3>${isSelf ? "Your profile" : "Profile preview"}</h3>
-        <span class="profile-badge">${isSelf ? "You" : "Friend"}</span>
+        <h3>Friend view preview</h3>
+        <span class="profile-badge">Friends only</span>
       </div>
 
       <div class="profile-hero">
@@ -657,35 +757,39 @@ function renderSelectedProfile(state) {
         <div><span>Rank</span><strong>${escapeHtml(rank || "Hidden")}</strong></div>
         <div><span>Friends</span><strong>${escapeHtml(String((profile.friends || []).length || 0))}</strong></div>
         <div><span>Current streak</span><strong>${streakCurrent == null ? "Hidden" : `${streakCurrent} day${streakCurrent === 1 ? "" : "s"}`}</strong></div>
-        <div><span>Longest streak</span><strong>${streakLongest == null ? "Hidden" : `${streakLongest} day${streakLongest === 1 ? "" : "s"}`}</strong></div>
+        <div><span>On the site for</span><strong>${escapeHtml(siteAge || "Hidden")}</strong></div>
       </div>
 
       <div class="info-grid">
         <div class="info-row"><span>Username</span><strong>${escapeHtml(username)}</strong></div>
         <div class="info-row"><span>Rank</span><strong>${escapeHtml(rank || "Hidden")}</strong></div>
-        <div class="info-row"><span>Joined</span><strong>${profile.createdAt ? escapeHtml(formatDateOnly(profile.createdAt)) : "Hidden"}</strong></div>
-        <div class="info-row"><span>Status</span><strong>${isSelf ? "Your account" : "Friend profile"}</strong></div>
-        <div class="info-row"><span>Current streak</span><strong>${streakCurrent == null ? "Hidden" : `${streakCurrent} day${streakCurrent === 1 ? "" : "s"}`}</strong></div>
+        <div class="info-row"><span>Joined</span><strong>${showJoined && profile.createdAt ? escapeHtml(formatDateOnly(profile.createdAt)) : "Hidden"}</strong></div>
         <div class="info-row"><span>Longest streak</span><strong>${streakLongest == null ? "Hidden" : `${streakLongest} day${streakLongest === 1 ? "" : "s"}`}</strong></div>
       </div>
 
-      <div class="profile-body-note">${escapeHtml(isSelf ? "Only friends can view your account. Privacy controls below decide which details they can see." : "Only friends can view this account. Some details may be hidden by your friend's privacy settings.")}</div>
+      <div class="profile-body-note">Only friends can view your account. The toggles above decide which details they can see.</div>
     </div>
   `;
 }
 
 function profileAvatarMarkup(profile) {
-  return `<img src="${escapeHtml(profile.photoURL || getDefaultAvatarDataUrl())}" alt="" style="width: 46px; height: 46px; border-radius: 50%; object-fit: cover;" />`;
+  return avatarMarkup(
+    profile.photoURL || getDefaultAvatarDataUrl(),
+    "",
+    "friend-avatar-img",
+    !!profile?.verified
+  );
 }
 
 function renderFriends(state) {
+  const user = resolvedUser(state);
   const friendsStatus = $("friends-status");
   const friendsWarning = $("friends-warning");
   const friendsList = $("friends-list");
   const blockedList = $("blocked-list");
   const requestsList = $("requests-list");
 
-  if (!state.user) {
+  if (!user) {
     if (friendsWarning) {
       friendsWarning.textContent = "";
       friendsWarning.classList.add("section-hidden");
@@ -694,7 +798,19 @@ function renderFriends(state) {
     if (friendsList) friendsList.innerHTML = `<div class="msg-empty">Log in to see your friend list.</div>`;
     if (blockedList) blockedList.innerHTML = `<div class="msg-empty">Log in to manage blocked users.</div>`;
     if (requestsList) requestsList.innerHTML = `<div class="msg-empty">Log in to view friend requests.</div>`;
-    renderSelectedProfile(state);
+    return;
+  }
+
+  const socialReady = state.ready !== false;
+  if (!socialReady) {
+    if (friendsWarning) {
+      friendsWarning.textContent = "";
+      friendsWarning.classList.add("section-hidden");
+    }
+    if (friendsStatus) friendsStatus.textContent = "Loading your friends...";
+    if (friendsList) friendsList.innerHTML = `<div class="msg-empty">Your friend list is syncing now.</div>`;
+    if (blockedList) blockedList.innerHTML = `<div class="msg-empty">Blocked users are syncing now.</div>`;
+    if (requestsList) requestsList.innerHTML = `<div class="msg-empty">Friend requests are syncing now.</div>`;
     return;
   }
 
@@ -715,7 +831,7 @@ function renderFriends(state) {
   const blockedProfiles = blocked.map((uid) => state.friendProfiles?.[uid] || { uid, username: uid });
 
   if (friendsStatus) {
-    friendsStatus.textContent = `${friends.length} friends. ${incoming.length} incoming requests. ${getUnreadIncomingCount()} unread messages.`;
+    friendsStatus.textContent = `${friends.length} friends. ${incoming.length} incoming requests. ${outgoing.length} outgoing requests.`;
   }
 
   if (friendsWarning) {
@@ -726,7 +842,7 @@ function renderFriends(state) {
   if (friendsList) {
     friendsList.innerHTML = friendProfiles.length ? friendProfiles.map((friend) => `
       <div class="friend-entry">
-        <button class="friend-entry-button ${state.selectedProfileId === friend.uid ? "active" : ""}" type="button" data-action="friend-view" data-uid="${escapeHtml(friend.uid)}">
+        <div class="friend-entry-button friend-entry-static">
           <span class="friend-entry-main">
             <span class="friend-entry-avatar">${profileAvatarMarkup(friend)}</span>
             <span class="friend-entry-text">
@@ -734,12 +850,11 @@ function renderFriends(state) {
               <span class="friend-entry-meta">${escapeHtml(friend.uid || "")}</span>
             </span>
           </span>
-        </button>
+        </div>
 
         <details class="friend-entry-menu">
           <summary aria-label="Friend actions">&#8942;</summary>
           <div class="friend-entry-popover">
-            <button type="button" data-action="friend-message" data-uid="${escapeHtml(friend.uid)}">Message</button>
             <button type="button" data-action="friend-copy" data-uid="${escapeHtml(friend.uid)}">Copy ID</button>
             <button type="button" data-action="friend-remove" data-uid="${escapeHtml(friend.uid)}">Unfriend</button>
             <button type="button" data-action="friend-block" data-uid="${escapeHtml(friend.uid)}">Block</button>
@@ -785,7 +900,6 @@ function renderFriends(state) {
                 <button type="button" data-action="request-accept" data-id="${escapeHtml(request.id)}" data-uid="${escapeHtml(request.fromUid || "")}">Accept</button>
                 <button type="button" data-action="request-ignore" data-id="${escapeHtml(request.id)}" data-uid="${escapeHtml(request.fromUid || "")}">Ignore</button>
                 <button type="button" data-action="request-decline" data-id="${escapeHtml(request.id)}" data-uid="${escapeHtml(request.fromUid || "")}">Decline</button>
-                <button type="button" data-action="request-view-profile" data-uid="${escapeHtml(request.fromUid || "")}">View profile</button>
               </div>
             </div>
           `).join("") : `<div class="msg-empty">No incoming requests.</div>`}
@@ -810,7 +924,241 @@ function renderFriends(state) {
     `;
   }
 
-  renderSelectedProfile(state);
+}
+
+function socialNotificationItems(state) {
+  const user = resolvedUser(state);
+  if (!user) return [];
+
+  return (state.messages || [])
+    .filter((message) => {
+      return String(message?.toUid || "").trim() === user.uid
+        && message.kind !== "chat"
+        && message.kind !== "group-invite";
+    })
+    .filter((message) => message.kind !== "friend-request" || String(message.status || "pending") === "pending")
+    .map((message) => ({
+      id: `social:${message.id}`,
+      source: "social",
+      rawId: message.id,
+      kind: String(message.kind || "social"),
+      title: String(message.title || "Notification"),
+      body: formatNotificationBody(message.kind, message.body || ""),
+      href: "account-page.html?tab=messages",
+      createdAt: toMs(message.createdAt),
+      unread: !(Array.isArray(message.readBy) ? message.readBy : []).includes(user.uid),
+      uid: String(message.fromUid || message.targetId || "").trim(),
+      message
+    }));
+}
+
+function localNotificationItems(state) {
+  return (state.localNotifications || []).map((entry) => ({
+    id: `local:${entry.id}`,
+    source: "local",
+    rawId: entry.id,
+    kind: String(entry.kind || "general"),
+    title: String(entry.title || "Notification"),
+    body: formatNotificationBody(entry.kind, entry.body || ""),
+    href: String(entry.href || ""),
+    createdAt: Number(entry.createdAt || 0),
+    unread: !entry.read,
+    uid: "",
+    message: entry
+  }));
+}
+
+function notificationItemsFromState(state) {
+  return [...socialNotificationItems(state), ...localNotificationItems(state)]
+    .sort((left, right) => Number(right.createdAt || 0) - Number(left.createdAt || 0));
+}
+
+function notificationTag(kind) {
+  if (kind === "friend-request") return "Request";
+  if (kind === "friend-accepted") return "Accepted";
+  if (kind === "friend-declined") return "Declined";
+  if (kind === "friend-removed") return "Removed";
+  if (kind === "friend-blocked") return "Blocked";
+  if (kind === "achievement") return "Achievement";
+  if (kind === "streak") return "Streak";
+  return "Notification";
+}
+
+function notificationActions(item) {
+  const actions = [];
+
+  if (item.source === "social" && item.kind === "friend-request") {
+    actions.push(`<button type="button" data-notification-action="accept-request" data-id="${escapeHtml(item.rawId)}" data-uid="${escapeHtml(item.uid)}">Accept</button>`);
+    actions.push(`<button type="button" data-notification-action="ignore-request" data-id="${escapeHtml(item.rawId)}" data-uid="${escapeHtml(item.uid)}">Ignore</button>`);
+    actions.push(`<button type="button" data-notification-action="decline-request" data-id="${escapeHtml(item.rawId)}" data-uid="${escapeHtml(item.uid)}">Decline</button>`);
+  }
+
+  if (item.href) {
+    actions.push(`<button type="button" data-notification-action="open-link" data-href="${escapeHtml(item.href)}">Open</button>`);
+  }
+
+  actions.push(`<button type="button" data-notification-action="${item.unread ? "mark-read" : "mark-unread"}" data-source="${escapeHtml(item.source)}" data-id="${escapeHtml(item.rawId)}">${item.unread ? "Mark read" : "Mark unread"}</button>`);
+  actions.push(`<button type="button" data-notification-action="delete" data-source="${escapeHtml(item.source)}" data-id="${escapeHtml(item.rawId)}">Delete</button>`);
+
+  return actions.join("");
+}
+
+function syncNotificationHistoryButtons() {
+  $("notifications-undo-btn")?.toggleAttribute("disabled", notificationUndoStack.length < 1);
+  $("notifications-redo-btn")?.toggleAttribute("disabled", notificationRedoStack.length < 1);
+}
+
+function rememberNotificationHistory(undoOps = [], redoOps = []) {
+  if (!undoOps.length || !redoOps.length) return;
+  notificationUndoStack.push({ undoOps, redoOps });
+  if (notificationUndoStack.length > MAX_NOTIFICATION_HISTORY) {
+    notificationUndoStack = notificationUndoStack.slice(-MAX_NOTIFICATION_HISTORY);
+  }
+  notificationRedoStack = [];
+  syncNotificationHistoryButtons();
+}
+
+function notificationReadOp(item, read) {
+  if (item.source === "social") {
+    return { type: "social-read", id: item.rawId, read: !!read };
+  }
+
+  return { type: "local-read", id: item.rawId, read: !!read };
+}
+
+function notificationDeleteUndoOp(item) {
+  if (item.source === "social") {
+    return { type: "social-hidden", id: item.rawId, hidden: false };
+  }
+
+  return { type: "local-upsert", entry: { ...(item.message || {}), id: item.rawId } };
+}
+
+function notificationDeleteRedoOp(item) {
+  if (item.source === "social") {
+    return { type: "social-hidden", id: item.rawId, hidden: true };
+  }
+
+  return { type: "local-delete", id: item.rawId };
+}
+
+function findNotificationItem(source, id, state = currentState) {
+  return notificationItemsFromState(state).find((item) => item.source === source && item.rawId === id) || null;
+}
+
+async function applyNotificationOps(ops = []) {
+  let touchedLocal = false;
+
+  for (const op of Array.isArray(ops) ? ops : []) {
+    if (!op?.type) continue;
+
+    if (op.type === "social-read") {
+      await markMessageRead(op.id, op.read);
+      continue;
+    }
+
+    if (op.type === "social-hidden") {
+      await setMessageDeletedForCurrentUser(op.id, op.hidden);
+      continue;
+    }
+
+    if (op.type === "local-read") {
+      touchedLocal = true;
+      setStoredNotificationRead(op.id, op.read);
+      continue;
+    }
+
+    if (op.type === "local-delete") {
+      touchedLocal = true;
+      deleteStoredNotification(op.id);
+      continue;
+    }
+
+    if (op.type === "local-upsert" && op.entry) {
+      touchedLocal = true;
+      pushStoredNotification(op.entry);
+    }
+  }
+
+  if (touchedLocal) {
+    refreshLocalNotifications();
+  }
+
+  renderAll(currentState);
+}
+
+async function runNotificationHistory(direction = "undo") {
+  const fromStack = direction === "redo" ? notificationRedoStack : notificationUndoStack;
+  const toStack = direction === "redo" ? notificationUndoStack : notificationRedoStack;
+  const entry = fromStack.pop();
+  if (!entry) return;
+
+  try {
+    await applyNotificationOps(direction === "redo" ? entry.redoOps : entry.undoOps);
+    toStack.push(entry);
+    syncNotificationHistoryButtons();
+  } catch (error) {
+    if (direction === "redo") notificationRedoStack.push(entry);
+    else notificationUndoStack.push(entry);
+    syncNotificationHistoryButtons();
+    throw error;
+  }
+}
+
+function renderNotifications(state) {
+  const root = $("notifications-root");
+  const summary = $("notifications-summary");
+  const readAllBtn = $("notifications-read-all-btn");
+  const unreadAllBtn = $("notifications-unread-all-btn");
+  if (!root) return;
+
+  const user = resolvedUser(state);
+  if (!user) {
+    if (summary) summary.textContent = "Log in to see your notifications.";
+    readAllBtn?.toggleAttribute("disabled", true);
+    unreadAllBtn?.toggleAttribute("disabled", true);
+    root.innerHTML = `<div class="msg-empty">Log in to see your notifications.</div>`;
+    syncNotificationHistoryButtons();
+    return;
+  }
+
+  const items = notificationItemsFromState(state);
+  const unreadCount = items.filter((item) => item.unread).length;
+  readAllBtn?.toggleAttribute("disabled", unreadCount < 1);
+  unreadAllBtn?.toggleAttribute("disabled", items.length < 1 || unreadCount === items.length);
+  if (summary) {
+    summary.textContent = `${items.length} notification${items.length === 1 ? "" : "s"}. ${unreadCount} unread.`;
+  }
+
+  if (!items.length) {
+    syncNotificationHistoryButtons();
+    root.innerHTML = `<div class="msg-empty">No notifications yet.</div>`;
+    return;
+  }
+
+  root.innerHTML = `
+    <div class="notification-stack">
+      ${items.map((item) => `
+        <article class="notification-card ${item.unread ? "unread" : ""}">
+          <div class="notification-card-top">
+            <div>
+              <div class="notification-title-row">
+                <strong>${escapeHtml(item.title)}</strong>
+                <span class="notification-tag">${escapeHtml(notificationTag(item.kind))}</span>
+              </div>
+              <div class="notification-meta">${escapeHtml(relativeTime(item.createdAt))}</div>
+            </div>
+            ${item.unread ? `<span class="notification-dot" aria-hidden="true"></span>` : ""}
+          </div>
+          <p class="notification-body">${escapeHtml(item.body || "")}</p>
+          <div class="notification-actions">
+            ${notificationActions(item)}
+          </div>
+        </article>
+      `).join("")}
+    </div>
+  `;
+  syncNotificationHistoryButtons();
 }
 
 function renderAll(state) {
@@ -845,10 +1193,30 @@ function renderAll(state) {
     renderAll.lastProgressSignature = progressSignature;
   }
 
+  const settingsSignature = JSON.stringify({
+    uid: user?.uid || "",
+    username: profile?.username || "",
+    photoURL: profile?.photoURL || "",
+    xp: profile?.xp || 0,
+    createdAt: formatDateOnly(profile?.createdAt),
+    streak: profile?.streak?.current || 0,
+    longest: profile?.longestStreak || profile?.streak?.longest || 0,
+    privacyShowRank: profile?.privacySettings?.showRank !== false,
+    privacyShowJoined: profile?.privacySettings?.showJoined !== false,
+    privacyShowStreaks: profile?.privacySettings?.showStreaks !== false,
+    privacyShowSiteAge: profile?.privacySettings?.showSiteAge !== false,
+    friends: [...new Set(profile?.friends || [])].sort()
+  });
+  if (renderAll.lastSettingsSignature !== settingsSignature) {
+    renderPrivacyProfilePreview(state);
+    renderAll.lastSettingsSignature = settingsSignature;
+  }
+
   const friendsSignature = JSON.stringify({
     authHydrated,
     uid: user?.uid || "",
     verified: isVerifiedState(user, profile),
+    ready: !!state.ready,
     socialError: state.socialError || "",
     friends: [...new Set(state.friends || [])].sort(),
     blocked: [...new Set(state.blocked || [])].sort(),
@@ -869,12 +1237,33 @@ function renderAll(state) {
     renderAll.lastFriendsSignature = friendsSignature;
   }
 
+  const notificationsSignature = JSON.stringify({
+    authHydrated,
+    uid: user?.uid || "",
+    verified: isVerifiedState(user, profile),
+    ready: !!state.ready,
+    unread: state.unreadCount || 0,
+    undoDepth: notificationUndoStack.length,
+    redoDepth: notificationRedoStack.length,
+    local: (state.localNotifications || []).map((entry) => `${entry.id || ""}:${entry.read ? "1" : "0"}:${entry.createdAt || 0}`),
+    social: (state.messages || [])
+      .filter((message) => String(message.kind || "") !== "chat" && String(message.kind || "") !== "group-invite")
+      .filter((message) => String(message.kind || "") !== "friend-request" || String(message.status || "pending") === "pending")
+      .map((message) => `${message.id || ""}:${(Array.isArray(message.readBy) ? message.readBy : []).includes(user?.uid || "") ? "1" : "0"}:${toMs(message.createdAt)}`)
+  });
+  if (renderAll.lastNotificationsSignature !== notificationsSignature) {
+    renderNotifications(state);
+    renderAll.lastNotificationsSignature = notificationsSignature;
+  }
+
   applyAuthGuards();
   syncMessagesTabBadge(state);
 }
 renderAll.lastAuthSignature = "";
 renderAll.lastProgressSignature = "";
+renderAll.lastSettingsSignature = "";
 renderAll.lastFriendsSignature = "";
+renderAll.lastNotificationsSignature = "";
 
 async function copyText(value) {
   try {
@@ -996,6 +1385,8 @@ function bindAuthForms() {
 
   $("settings-locked-refresh-btn")?.addEventListener("click", handleVerificationRefresh);
   $("settings-locked-resend-btn")?.addEventListener("click", handleVerificationResend);
+  $("friends-locked-refresh-btn")?.addEventListener("click", handleVerificationRefresh);
+  $("friends-locked-resend-btn")?.addEventListener("click", handleVerificationResend);
   $("messages-locked-refresh-btn")?.addEventListener("click", handleVerificationRefresh);
   $("messages-locked-resend-btn")?.addEventListener("click", handleVerificationResend);
 }
@@ -1009,7 +1400,7 @@ function bindFriends() {
       if ($("friend-id-input")) $("friend-id-input").value = "";
       if ($("friend-note-input")) $("friend-note-input").value = "";
       setStatus("Friend request sent.", "success");
-      window.openAccountArea("info", "requests");
+      window.openAccountArea("friends", "requests");
     } catch (error) {
       setStatus(error?.message || "Could not send friend request.", "error");
       window.alert(error?.message || "Could not send friend request.");
@@ -1022,7 +1413,7 @@ function bindFriends() {
       if ($("friend-id-input")) $("friend-id-input").value = "";
       if ($("friend-note-input")) $("friend-note-input").value = "";
       setStatus("User blocked.", "success");
-      window.openAccountArea("info", "blocked");
+      window.openAccountArea("friends", "blocked");
     } catch (error) {
       setStatus(error?.message || "Could not block user.", "error");
       window.alert(error?.message || "Could not block user.");
@@ -1038,17 +1429,6 @@ function bindFriends() {
     const id = button.dataset.id || "";
 
     try {
-      if (action === "friend-view" || action === "request-view-profile") {
-        await viewProfileById(uid);
-        window.openAccountArea("info", "friends", uid);
-        return;
-      }
-
-      if (action === "friend-message") {
-        window.openAccountArea("messages", "chat", uid);
-        return;
-      }
-
       if (action === "friend-copy") {
         const copied = await copyText(uid);
         if (copied) {
@@ -1074,23 +1454,152 @@ function bindFriends() {
 
       if (action === "request-accept") {
         await respondToFriendRequest(id, "accept");
-        await viewProfileById(uid);
         setStatus("Friend request accepted.", "success");
-        window.openAccountArea("info", "friends", uid);
+        window.openAccountArea("friends", "friends");
         return;
       }
 
       if (action === "request-ignore") {
         await respondToFriendRequest(id, "ignore");
         setStatus("Friend request ignored.", "info");
-        window.openAccountArea("info", "requests");
+        window.openAccountArea("friends", "requests");
         return;
       }
 
       if (action === "request-decline") {
         await respondToFriendRequest(id, "decline");
         setStatus("Friend request declined.", "info");
-        window.openAccountArea("info", "requests");
+        window.openAccountArea("friends", "requests");
+      }
+    } catch (error) {
+      console.error(error);
+      window.alert(error?.message || "Action failed.");
+    }
+  });
+}
+
+function refreshLocalNotifications(uid = resolvedUser(currentState)?.uid || "") {
+  currentState.localNotifications = getStoredNotifications(uid);
+}
+
+function bindNotifications() {
+  document.body.addEventListener("click", async (event) => {
+    const button = event.target.closest("[id^='notifications-'][id$='-btn']");
+    if (!button) return;
+
+    try {
+      if (button.id === "notifications-read-all-btn") {
+        const items = notificationItemsFromState(currentState).filter((item) => item.unread);
+        if (!items.length) return;
+        const undoOps = items.map((item) => notificationReadOp(item, false));
+        const redoOps = items.map((item) => notificationReadOp(item, true));
+        await applyNotificationOps(redoOps);
+        rememberNotificationHistory(undoOps, redoOps);
+        setStatus("All notifications marked as read.", "success");
+        return;
+      }
+
+      if (button.id === "notifications-unread-all-btn") {
+        const items = notificationItemsFromState(currentState).filter((item) => !item.unread);
+        if (!items.length) return;
+        const undoOps = items.map((item) => notificationReadOp(item, true));
+        const redoOps = items.map((item) => notificationReadOp(item, false));
+        await applyNotificationOps(redoOps);
+        rememberNotificationHistory(undoOps, redoOps);
+        setStatus("All notifications marked as unread.", "info");
+        return;
+      }
+
+      if (button.id === "notifications-undo-btn") {
+        await runNotificationHistory("undo");
+        setStatus("Last notification action undone.", "info");
+        return;
+      }
+
+      if (button.id === "notifications-redo-btn") {
+        await runNotificationHistory("redo");
+        setStatus("Last notification action redone.", "info");
+      }
+    } catch (error) {
+      console.error(error);
+      window.alert(error?.message || "Action failed.");
+    }
+  });
+
+  document.body.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-notification-action]");
+    if (!button) return;
+
+    const action = String(button.dataset.notificationAction || "").trim();
+    const source = String(button.dataset.source || "").trim();
+    const id = String(button.dataset.id || "").trim();
+    const uid = String(button.dataset.uid || "").trim();
+    const href = String(button.dataset.href || "").trim();
+
+    try {
+      if (action === "open-link" && href) {
+        window.location.href = href;
+        return;
+      }
+
+      if (action === "accept-request") {
+        await respondToFriendRequest(id, "accept");
+        setStatus("Friend request accepted.", "success");
+        window.openAccountArea("friends", "friends");
+        return;
+      }
+
+      if (action === "ignore-request") {
+        await respondToFriendRequest(id, "ignore");
+        setStatus("Friend request ignored.", "info");
+        return;
+      }
+
+      if (action === "decline-request") {
+        await respondToFriendRequest(id, "decline");
+        setStatus("Friend request declined.", "info");
+        return;
+      }
+
+      if (action === "mark-read") {
+        const item = findNotificationItem(source, id);
+        if (!item) return;
+        const undoOps = [notificationReadOp(item, false)];
+        const redoOps = [notificationReadOp(item, true)];
+        if (source === "social") {
+          await applyNotificationOps(redoOps);
+        } else {
+          await applyNotificationOps(redoOps);
+        }
+        rememberNotificationHistory(undoOps, redoOps);
+        return;
+      }
+
+      if (action === "mark-unread") {
+        const item = findNotificationItem(source, id);
+        if (!item) return;
+        const undoOps = [notificationReadOp(item, true)];
+        const redoOps = [notificationReadOp(item, false)];
+        if (source === "social") {
+          await applyNotificationOps(redoOps);
+        } else {
+          await applyNotificationOps(redoOps);
+        }
+        rememberNotificationHistory(undoOps, redoOps);
+        return;
+      }
+
+      if (action === "delete") {
+        const item = findNotificationItem(source, id);
+        if (!item) return;
+        const undoOps = [notificationDeleteUndoOp(item)];
+        const redoOps = [notificationDeleteRedoOp(item)];
+        if (source === "social") {
+          await applyNotificationOps(redoOps);
+        } else {
+          await applyNotificationOps(redoOps);
+        }
+        rememberNotificationHistory(undoOps, redoOps);
       }
     } catch (error) {
       console.error(error);
@@ -1102,8 +1611,11 @@ function bindFriends() {
 function start() {
   bindNavigation();
   bindAuthForms();
+  bindFriends();
+  bindNotifications();
   setAuthMode("login");
   showSettingsSubsection("account");
+  refreshLocalNotifications();
   renderAll(currentState);
   applyInitialAccountArea();
   setStatus("Checking account...", "info");
@@ -1125,9 +1637,6 @@ function start() {
       }
 
       renderAll(currentState);
-      if (typeof window.PanategwaMessagesRender === "function") {
-        window.PanategwaMessagesRender();
-      }
     })
     .catch((error) => {
       authHydrated = true;
@@ -1136,6 +1645,16 @@ function start() {
     });
 
   watchAuth(async (user, profile) => {
+    authHydrated = true;
+
+    const nextUid = user?.uid || "";
+    if (notificationHistoryUserId !== nextUid) {
+      notificationHistoryUserId = nextUid;
+      notificationUndoStack = [];
+      notificationRedoStack = [];
+      syncNotificationHistoryButtons();
+    }
+
     if (!user || copiedUserIdValue !== user.uid) {
       copiedUserIdValue = null;
       copiedUserIdUntil = 0;
@@ -1147,6 +1666,7 @@ function start() {
 
     currentState.user = user;
     currentState.profile = profile || (user ? await getProfile(user.uid) : null);
+    refreshLocalNotifications(user?.uid || "");
     renderAll(currentState);
 
     if (!user) {
@@ -1157,14 +1677,15 @@ function start() {
     setStatus(isVerifiedState(user, currentState.profile)
       ? "Logged in and verified."
       : "Logged in. Verify your email to unlock account features.", "success");
-    if (typeof window.PanategwaMessagesRender === "function") {
-      window.PanategwaMessagesRender();
-    }
   });
 
   subscribeSocial((state) => {
     const authUser = auth.currentUser || currentState.user || null;
     const loggedOut = !auth.currentUser && !state.user;
+
+    if (authUser || state.user || state.ready) {
+      authHydrated = true;
+    }
 
     currentState = {
       ...currentState,
@@ -1174,6 +1695,11 @@ function start() {
     };
     renderAll(currentState);
   });
+
+  subscribeStoredNotifications((notifications) => {
+    currentState.localNotifications = notifications;
+    renderAll(currentState);
+  }, () => resolvedUser(currentState)?.uid || "");
 }
 
 if (document.readyState === "loading") {

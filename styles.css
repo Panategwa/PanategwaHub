@@ -115,30 +115,28 @@ a:focus {
 
 button {
   font-size: var(--global-font-size, 16px);
-  padding: 0.78em 1.15em;
-  border-radius: 14px;
+  padding: 0.74em 1.08em;
+  border-radius: 12px;
   background: var(--menu-button);
   color: var(--button-text);
   border: 1px solid var(--surface-border);
   cursor: pointer;
-  font-weight: bold;
+  font-weight: 600;
   font-family: 'Rubik', sans-serif;
   margin: 0.75rem 0;
   display: inline-block;
-  box-shadow: var(--surface-shadow);
+  box-shadow: 0 12px 26px rgba(2, 6, 23, 0.16);
   backdrop-filter: blur(14px);
-  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
 
 button:hover {
-  transform: translateY(-1px);
   border-color: rgba(191, 219, 254, 0.32);
-  box-shadow: 0 16px 30px rgba(2, 6, 23, 0.18);
+  box-shadow: 0 14px 28px rgba(2, 6, 23, 0.18);
 }
 
 button:disabled {
   cursor: default;
-  transform: none;
   box-shadow: none;
   opacity: 0.62;
 }
@@ -663,8 +661,8 @@ main {
     .tab-chip {
       position: relative;
       margin: 0;
-      padding: 9px 14px;
-      border-radius: 999px;
+      padding: 8px 13px;
+      border-radius: 12px;
       border: 1px solid var(--button-border);
       background: var(--button-bg);
       color: #f8fafc;
@@ -678,7 +676,7 @@ main {
     .tab-chip.active {
       background: var(--accent);
       border-color: var(--accent-border);
-      box-shadow: 0 16px 30px rgba(37, 99, 235, 0.28);
+      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.18);
     }
 
     .tab-button.has-dot {
@@ -757,31 +755,25 @@ main {
 
     .button-row button {
       margin: 0;
-      border-radius: 999px;
+      border-radius: 12px;
     }
 
     .account-wrap button:not(.link-button) {
-      transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
+      transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
       border: 1px solid var(--button-border);
       background: var(--button-bg);
       color: #f8fafc;
-      box-shadow: var(--button-shadow);
+      box-shadow: 0 8px 18px rgba(2, 6, 23, 0.1);
     }
 
     .account-wrap button:not(.link-button):hover {
-      transform: translateY(-1px);
       border-color: var(--button-hover-border);
-      box-shadow: 0 16px 32px rgba(2, 6, 23, 0.26);
-    }
-
-    .account-wrap button:not(.link-button):active {
-      transform: translateY(0);
+      box-shadow: 0 10px 22px rgba(2, 6, 23, 0.14);
     }
 
     .account-wrap button:not(.link-button):disabled {
       opacity: 0.58;
       cursor: not-allowed;
-      transform: none;
       box-shadow: none;
     }
 
@@ -1039,6 +1031,28 @@ main {
       border: 1px solid rgba(255,255,255,0.08);
     }
 
+    .avatar-shell {
+      position: relative;
+      display: inline-grid;
+      flex: 0 0 auto;
+    }
+
+    .avatar-verified-badge {
+      position: absolute;
+      right: -2px;
+      bottom: -2px;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(180deg, #38bdf8, #2563eb);
+      color: #eff6ff;
+      border: 2px solid rgba(15, 23, 42, 0.9);
+      box-shadow: 0 6px 14px rgba(37, 99, 235, 0.24);
+      z-index: 1;
+    }
+
     .copy-icon-btn {
       display: inline-grid;
       place-items: center;
@@ -1227,6 +1241,10 @@ main {
 
     .settings-panel[data-settings-subpanel="privacy"] .setting-card {
       grid-column: span 6;
+    }
+
+    .privacy-preview-host {
+      grid-column: span 12 !important;
     }
 
     .danger-zone-card {
@@ -1729,7 +1747,7 @@ main {
 
     .friends-grid {
       display: grid;
-      grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr);
       gap: 14px;
       align-items: start;
     }
@@ -1756,6 +1774,110 @@ main {
     .request-stack {
       display: grid;
       gap: 10px;
+    }
+
+    .notification-stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .notifications-toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .notifications-summary {
+      font-size: 0.92rem;
+      opacity: 0.82;
+    }
+
+    .notification-bulk-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .notification-card {
+      padding: 15px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: var(--panel-soft);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+      display: grid;
+      gap: 12px;
+    }
+
+    .notification-card.unread {
+      border-color: rgba(96, 165, 250, 0.36);
+      background: linear-gradient(180deg, rgba(96,165,250,0.14), rgba(255,255,255,0.05));
+    }
+
+    .notification-card-top,
+    .notification-title-row,
+    .notification-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .notification-title-row {
+      justify-content: flex-start;
+    }
+
+    .notification-meta {
+      font-size: 0.88rem;
+      opacity: 0.76;
+      margin-top: 4px;
+    }
+
+    .notification-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      text-transform: uppercase;
+    }
+
+    .notification-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #ef4444;
+      box-shadow: 0 0 0 4px rgba(239,68,68,0.18);
+      flex: 0 0 auto;
+    }
+
+    .notification-body {
+      margin: 0;
+      color: var(--text-color);
+      opacity: 0.9;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+
+    .notification-actions {
+      justify-content: flex-start;
+    }
+
+    .notification-bulk-actions button,
+    .notification-actions button {
+      width: auto;
+      margin: 0;
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 0.9rem;
     }
 
     .friend-list-stack {
@@ -1785,6 +1907,10 @@ main {
       gap: 10px;
     }
 
+    .friend-entry-static {
+      cursor: default;
+    }
+
     .friend-entry-button.active {
       background: rgba(59,130,246,0.22);
       border-color: rgba(125,211,252,0.28);
@@ -1806,16 +1932,41 @@ main {
       display: grid;
       place-items: center;
       background: rgba(255,255,255,0.1);
-      overflow: hidden;
       font-size: 22px;
       border: 1px solid rgba(255,255,255,0.12);
       flex: 0 0 auto;
+    }
+
+    .friend-entry-avatar {
+      overflow: visible;
+      background: transparent;
+      border: 0;
+    }
+
+    .friend-avatar-img {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: block;
     }
 
     .profile-avatar-large {
       width: 74px;
       height: 74px;
       font-size: 30px;
+    }
+
+    .avatar-shell .profile-avatar-large + .avatar-verified-badge {
+      width: 22px;
+      height: 22px;
+    }
+
+    .friend-entry-avatar .avatar-verified-badge {
+      width: 18px;
+      height: 18px;
+      right: -1px;
+      bottom: -1px;
     }
 
     .friend-entry-text {

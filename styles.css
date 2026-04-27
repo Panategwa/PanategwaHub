@@ -422,6 +422,23 @@ main {
   display: block;
 }
 
+.menu-account-shell {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.menu-account-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(9, 17, 32, 0.92);
+}
+
 /* ===== Panategwa account extras ===== */
 
 .copy-icon-btn {
@@ -756,6 +773,11 @@ main {
     .button-row button {
       margin: 0;
       border-radius: 12px;
+    }
+
+    .field-row-inline {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
     }
 
     .account-wrap button:not(.link-button) {
@@ -1229,6 +1251,32 @@ main {
       line-height: 1.4;
     }
 
+    .setting-status {
+      margin: 0;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      opacity: 0.92;
+    }
+
+    .setting-status[data-kind="error"] { color: #fecaca; }
+    .setting-status[data-kind="success"] { color: #bbf7d0; }
+    .setting-status[data-kind="info"] { color: rgba(226, 232, 240, 0.88); }
+
+    .settings-panel .button-row {
+      gap: 8px;
+      align-items: center;
+    }
+
+    .settings-panel .button-row button,
+    .settings-panel .field-row-inline button {
+      width: auto;
+      min-height: 42px;
+      padding: 10px 14px;
+      font-size: 0.92rem;
+      line-height: 1.2;
+      flex: 0 0 auto;
+    }
+
     .avatar-grid {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1562,6 +1610,23 @@ main {
       overflow: hidden;
     }
 
+    .social-icon .avatar-shell {
+      width: 40px;
+      height: 40px;
+    }
+
+    .social-icon .friend-avatar-img {
+      width: 40px;
+      height: 40px;
+    }
+
+    .social-icon .avatar-verified-badge {
+      width: 16px;
+      height: 16px;
+      right: -1px;
+      bottom: -1px;
+    }
+
     .social-main,
     .msg-body {
       min-width: 0;
@@ -1638,6 +1703,10 @@ main {
       gap: 8px;
       justify-content: flex-end;
       align-items: flex-start;
+    }
+
+    .social-actions-start {
+      justify-content: flex-start;
     }
 
     .social-actions button,
@@ -1749,7 +1818,6 @@ main {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       gap: 14px;
-      align-items: start;
     }
 
     .friends-list-card,
@@ -1757,6 +1825,7 @@ main {
     .requests-card,
     .blocked-card {
       padding: 14px;
+      padding-bottom: 102px;
       border-radius: 18px;
       border: 1px solid rgba(255,255,255,0.12);
       background: var(--panel-soft);
@@ -1881,22 +1950,26 @@ main {
     }
 
     .friend-list-stack {
-      max-height: 560px;
-      overflow: auto;
+      max-height: none;
+      overflow: visible;
       padding-right: 4px;
     }
 
     .friend-entry {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 10px;
-      align-items: start;
+      grid-template-columns: minmax(0, 420px) auto;
+      width: fit-content;
+      max-width: 100%;
+      gap: 12px;
+      align-items: center;
+      overflow: visible;
+      padding-right: 4px;
     }
 
     .friend-entry-button {
       width: 100%;
       margin: 0;
-      padding: 12px 14px;
+      padding: 12px 13px;
       border-radius: 16px;
       border: 1px solid rgba(255,255,255,0.12);
       background: rgba(255,255,255,0.06);
@@ -1907,8 +1980,15 @@ main {
       gap: 10px;
     }
 
-    .friend-entry-static {
-      cursor: default;
+    .friend-entry-profile {
+      width: 100%;
+      max-width: 420px;
+      justify-self: start;
+    }
+
+    .friend-entry-profile:hover {
+      border-color: rgba(191, 219, 254, 0.24);
+      background: rgba(59,130,246,0.12);
     }
 
     .friend-entry-button.active {
@@ -1991,6 +2071,12 @@ main {
 
     .friend-entry-menu {
       position: relative;
+      justify-self: end;
+      left: 3px;
+    }
+
+    .friend-entry-menu[open] {
+      z-index: 24;
     }
 
     .friend-entry-menu summary {
@@ -2019,10 +2105,13 @@ main {
 
     .friend-entry-popover {
       position: absolute;
-      top: calc(100% + 8px);
-      right: 0;
-      min-width: 170px;
-      padding: 8px;
+      top: 0;
+      left: calc(100% + 4px);
+      right: auto;
+      min-width: 196px;
+      width: max-content;
+      max-width: min(224px, calc(100vw - 40px));
+      padding: 10px;
       border-radius: 14px;
       border: 1px solid rgba(255,255,255,0.12);
       background: rgba(18,18,28,0.96);
@@ -2038,6 +2127,8 @@ main {
       text-align: left;
       border-radius: 12px;
       justify-content: flex-start;
+      padding: 10px 12px;
+      font-size: 0.92rem;
     }
 
     .message-entry-popover button {
@@ -2049,7 +2140,7 @@ main {
 
     .profile-hero {
       display: flex;
-      gap: 14px;
+      gap: 5px;
       align-items: center;
       flex-wrap: wrap;
     }
@@ -2339,88 +2430,12 @@ main {
       font-weight: 700;
     }
 
-    .social-chat-head-strong {
-      padding-bottom: 14px;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      margin-bottom: 14px;
-      align-items: center;
-    }
-
-    .social-chat-hero {
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      gap: 12px;
-      align-items: center;
-      min-width: 0;
-    }
-
-    .social-chat-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: flex-end;
-    }
-
-    .social-message-stream {
-      min-height: 500px;
-      max-height: 500px;
-      overflow: auto;
-      display: grid;
-      gap: 12px;
-      padding: 10px 6px 10px 0;
-      align-content: start;
-    }
-
-    .chat-message {
-      display: flex;
-    }
-
-    .chat-message.mine {
-      justify-content: flex-end;
-    }
-
-    .chat-bubble-shell {
-      max-width: min(78%, 620px);
-      display: grid;
-      gap: 6px;
-    }
-
-    .chat-bubble {
-      padding: 13px 15px;
-      border-radius: 18px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.1);
-      color: rgba(255,255,255,0.96);
-      line-height: 1.48;
-      word-break: break-word;
-    }
-
-    .chat-message.mine .chat-bubble {
-      background: linear-gradient(135deg, rgba(59,130,246,0.94), rgba(37,99,235,0.84));
-      border-color: rgba(125,211,252,0.24);
-    }
-
-    .chat-meta {
-      font-size: 0.8rem;
-      opacity: 0.72;
-      padding: 0 6px;
-    }
-
     .social-composer {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 10px;
       margin-top: 14px;
       align-items: center;
-    }
-
-    .social-chat-empty,
-    .social-empty {
-      border-radius: 18px;
-      border: 1px dashed rgba(255,255,255,0.14);
-      background: rgba(255,255,255,0.03);
-      padding: 18px;
-      opacity: 0.88;
     }
 
     .social-empty.inline {
@@ -2518,10 +2533,21 @@ main {
       }
 
       .friend-entry-menu {
+        left: 0;
         justify-self: start;
       }
 
+      .friend-entry {
+        width: 100%;
+      }
+
+      .friend-entry-profile {
+        width: 100%;
+        max-width: none;
+      }
+
       .friend-entry-popover {
+        top: calc(100% + 8px);
         left: 0;
         right: auto;
       }
@@ -2545,6 +2571,10 @@ main {
 
       .social-chat-actions {
         justify-content: flex-start;
+      }
+
+      .field-row-inline {
+        grid-template-columns: 1fr;
       }
     }
 

@@ -13,6 +13,21 @@ function ensureSharedAchievements() {
   document.head.appendChild(script);
 }
 
+function ensureSharedSocialNotifications() {
+  const alreadyLoaded = [...document.querySelectorAll("script[type='module']")].some((script) => {
+    const src = script.getAttribute("src") || "";
+    return src === "auth/social.js" || src.endsWith("/auth/social.js");
+  });
+
+  if (alreadyLoaded) return;
+
+  const script = document.createElement("script");
+  script.type = "module";
+  script.src = "auth/social.js";
+  script.dataset.panategwaSocial = "true";
+  document.head.appendChild(script);
+}
+
 function defaultAvatarIcon() {
   return `
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -20,6 +35,34 @@ function defaultAvatarIcon() {
       <path fill="currentColor" d="M12 12.2a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z"/>
     </svg>
   `;
+}
+
+function currentUid() {
+  try {
+    return String(localStorage.getItem("ptg_current_uid") || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function socialUnreadCount(uid) {
+  if (!uid) return 0;
+  try {
+    return Math.max(0, parseInt(localStorage.getItem(`ptg_social_unread_count_${uid}`) || "0", 10) || 0);
+  } catch {
+    return 0;
+  }
+}
+
+function localUnreadCount(uid) {
+  if (!uid) return 0;
+  try {
+    const raw = JSON.parse(localStorage.getItem(`ptg_notifications_${uid}`) || "[]");
+    if (!Array.isArray(raw)) return 0;
+    return raw.filter((entry) => !entry?.read).length;
+  } catch {
+    return 0;
+  }
 }
 
 function iconMarkup(type) {
@@ -56,12 +99,18 @@ function renderSidebarAvatar() {
 
   const loggedIn = localStorage.getItem("ptg_logged_in") === "1";
   const url = localStorage.getItem("panategwa_sidebar_avatar_url") || "";
+  const uid = currentUid();
+  const unread = loggedIn ? (socialUnreadCount(uid) + localUnreadCount(uid)) : 0;
+  const content = loggedIn && url
+    ? `<img src="${url}" alt="Account" style="width:22px;height:22px;border-radius:50%;object-fit:cover;display:block;" />`
+    : defaultAvatarIcon();
 
-  if (loggedIn && url) {
-    btn.innerHTML = `<img src="${url}" alt="Account" style="width:22px;height:22px;border-radius:50%;object-fit:cover;display:block;" />`;
-  } else {
-    btn.innerHTML = defaultAvatarIcon();
-  }
+  btn.innerHTML = `
+    <span class="menu-account-shell ${unread > 0 ? "has-unread" : ""}">
+      ${content}
+      ${unread > 0 ? `<span class="menu-account-dot" aria-hidden="true"></span>` : ""}
+    </span>
+  `;
 }
 
 window.PanategwaUpdateSidebarAvatar = function (avatarUrl) {
@@ -69,8 +118,13 @@ window.PanategwaUpdateSidebarAvatar = function (avatarUrl) {
   renderSidebarAvatar();
 };
 
+window.PanategwaUpdateSidebarUnread = function () {
+  renderSidebarAvatar();
+};
+
 document.addEventListener("DOMContentLoaded", function () {
   ensureSharedAchievements();
+  ensureSharedSocialNotifications();
 
   const menuContainer = document.getElementById("menu-container");
   if (!menuContainer) return;
@@ -157,6 +211,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
   menuContainer.innerHTML = menuHTML;
   renderSidebarAvatar();
+  window.addEventListener("panategwa:notifications-changed", renderSidebarAvatar);
+  window.addEventListener("storage", (event) => {
+    if (!event.key) return;
+    if (event.key === "ptg_logged_in"
+      || event.key === "ptg_current_uid"
+      || event.key === "panategwa_sidebar_avatar_url"
+      || event.key.startsWith("ptg_social_unread_count_")
+      || event.key.startsWith("ptg_notifications_")) {
+      renderSidebarAvatar();
+    }
+  });
 
   const wrapper = document.createElement("div");
   wrapper.id = "page-content";

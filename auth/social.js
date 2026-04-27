@@ -53,6 +53,8 @@ let unsubProfile = null;
 let unsubMessages = null;
 const listenerErrors = new Map();
 const TOAST_STORAGE_LIMIT = 160;
+let unreadSummaryToastUserId = "";
+let hydratedMessagesUserId = "";
 
 function cloneState() {
   return {
@@ -138,6 +140,59 @@ function saveSeenToastIds(uid, ids, channel = "messages") {
   } catch {}
 }
 
+function unreadSummaryStorageKey(uid) {
+  return `ptg_social_unread_summary_${uid}`;
+}
+
+function loadUnreadSummarySignature(uid) {
+  try {
+    return String(localStorage.getItem(unreadSummaryStorageKey(uid)) || "");
+  } catch {
+    return "";
+  }
+}
+
+function saveUnreadSummarySignature(uid, signature = "") {
+  try {
+    localStorage.setItem(unreadSummaryStorageKey(uid), String(signature || ""));
+  } catch {}
+}
+
+function unreadSummarySignature(messages) {
+  return [...new Set((Array.isArray(messages) ? messages : [])
+    .map((message) => String(message?.id || "").trim())
+    .filter(Boolean))]
+    .sort()
+    .join("|");
+}
+
+function socialUnreadStorageKey(uid) {
+  return `ptg_social_unread_count_${uid}`;
+}
+
+function currentStoredUid() {
+  try {
+    return cleanUid(localStorage.getItem("ptg_current_uid"));
+  } catch {
+    return "";
+  }
+}
+
+function syncSidebarUnreadIndicator() {
+  const uid = cleanUid(socialState.user?.uid) || currentStoredUid();
+  const count = Math.max(0, Number(socialState.unreadCount || 0));
+
+  if (uid) {
+    try {
+      localStorage.setItem(socialUnreadStorageKey(uid), String(count));
+    } catch {}
+  }
+
+  if (typeof window.PanategwaUpdateSidebarUnread === "function") {
+    window.PanategwaUpdateSidebarUnread(count);
+  }
+}
+
 function normalizeAccountSection(section) {
   return String(section || "info").trim().toLowerCase();
 }
@@ -170,12 +225,14 @@ function syncUnreadCount() {
   const uid = socialState.user?.uid;
   if (!uid) {
     socialState.unreadCount = 0;
+    syncSidebarUnreadIndicator();
     return;
   }
 
   socialState.unreadCount = (socialState.messages || []).filter((message) => {
     return cleanUid(message.toUid) === uid && isUnreadForUser(message, uid);
   }).length;
+  syncSidebarUnreadIndicator();
 }
 
 function currentStreakOf(profile) {
@@ -439,6 +496,46 @@ function maybeToastNewMessages(messages) {
 
   freshIncoming.forEach((message) => seenIds.add(message.id));
   saveSeenToastIds(currentUid, seenIds, "messages");
+}
+
+function markIncomingMessagesAsSeen(messages, uid) {
+  const currentUid = cleanUid(uid);
+  if (!currentUid) return;
+
+  const seenIds = loadSeenToastIds(currentUid, "messages");
+  for (const message of messages || []) {
+    if (message?.id) seenIds.add(message.id);
+  }
+  saveSeenToastIds(currentUid, seenIds, "messages");
+}
+
+function maybeToastUnreadSummary(messages, uid) {
+  const currentUid = cleanUid(uid);
+  if (!currentUid) return;
+
+  ensurePanategwaToast();
+  const toastFn = window.PanategwaToast;
+  if (typeof toastFn !== "function") return;
+
+  const unreadCount = Number(Array.isArray(messages) ? messages.length : 0);
+  const signature = unreadSummarySignature(messages);
+  if (unreadCount < 1 || !signature) {
+    saveUnreadSummarySignature(currentUid, "");
+    return;
+  }
+
+  if (loadUnreadSummarySignature(currentUid) === signature) return;
+
+  unreadSummaryToastUserId = currentUid;
+  saveUnreadSummarySignature(currentUid, signature);
+  const label = unreadCount > 10 ? "10+" : String(unreadCount);
+  const suffix = unreadCount === 1 ? "message" : "messages";
+
+  toastFn({
+    title: "Notifications",
+    body: `You have ${label} new ${suffix}.`,
+    href: buildAccountHref("messages")
+  });
 }
 
 function relationshipTargetUid(message, currentUid) {
@@ -721,6 +818,21 @@ async function blockUser(targetUid) {
   }
 }
 
+async function unblockUser(targetUid) {
+  try {
+    const { user } = await requireSocialUser("friend actions");
+    const id = cleanUid(targetUid);
+    if (!id) throw new Error("Enter a user ID.");
+
+    await setDoc(userRef(user.uid), {
+      blocked: arrayRemove(id),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  } catch (error) {
+    throw new Error(friendlyActionError(error));
+  }
+}
+
 async function markMessageRead(messageId, read = true) {
   const { user } = await requireSocialUser("notifications");
   const ref = doc(db, "messages", messageId);
@@ -761,6 +873,8 @@ async function setMessageDeletedForCurrentUser(messageId, deleted = true) {
 
 function resetSocialState() {
   listenerErrors.clear();
+  unreadSummaryToastUserId = "";
+  hydratedMessagesUserId = "";
   socialState.ready = true;
   socialState.user = null;
   socialState.profile = null;
@@ -795,6 +909,8 @@ function startRealtime() {
     }
 
     listenerErrors.clear();
+    unreadSummaryToastUserId = "";
+    hydratedMessagesUserId = "";
     socialState.ready = false;
     socialState.user = user;
     socialState.socialError = null;
@@ -832,9 +948,17 @@ function startRealtime() {
           snap.forEach((docSnap) => all.push({ id: docSnap.id, ...docSnap.data() }));
 
           const sorted = sortNewestFirst(all);
-          maybeToastNewMessages(sorted);
-
           const visible = sorted.filter((message) => !unique(message.deletedFor).includes(user.uid));
+          const unreadIncoming = visible.filter((message) => cleanUid(message.toUid) === user.uid && isUnreadForUser(message, user.uid));
+          const initialSnapshot = hydratedMessagesUserId !== user.uid;
+          if (initialSnapshot) {
+            markIncomingMessagesAsSeen(unreadIncoming, user.uid);
+            maybeToastUnreadSummary(unreadIncoming, user.uid);
+            hydratedMessagesUserId = user.uid;
+          } else {
+            maybeToastNewMessages(sorted);
+          }
+
           socialState.messages = visible;
           socialState.incomingRequests = sortNewestFirst(
             visible.filter((message) => message.kind === "friend-request" && cleanUid(message.toUid) === user.uid && (message.status || "pending") === "pending")
@@ -874,6 +998,7 @@ export {
   respondToFriendRequest,
   removeFriend,
   blockUser,
+  unblockUser,
   markMessageRead,
   setMessageDeletedForCurrentUser,
   socialState

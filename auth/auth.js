@@ -715,6 +715,7 @@ export async function loginWithGoogle() {
 export async function logout() {
   await authReady;
   localStorage.removeItem("ptg_logged_in");
+  localStorage.removeItem("ptg_current_uid");
   return signOut(auth);
 }
 
@@ -1062,12 +1063,14 @@ export function watchAuth(callback) {
     unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         localStorage.removeItem("ptg_logged_in");
+        localStorage.removeItem("ptg_current_uid");
         callback(null, null);
         return;
       }
 
       try {
         localStorage.setItem("ptg_logged_in", "1");
+        localStorage.setItem("ptg_current_uid", user.uid);
         const profile = await ensureUserProfile(user);
         await touchLastLoginOnce(user);
         callback(user, profile);

@@ -17,6 +17,7 @@ import {
   respondToFriendRequest,
   removeFriend,
   blockUser,
+  unblockUser,
   markMessageRead,
   setMessageDeletedForCurrentUser
 } from "./social.js";
@@ -297,6 +298,13 @@ function initials(value, fallback = "P") {
   return String(value || "").trim().slice(0, 1).toUpperCase() || fallback;
 }
 
+function currentInfoTargetId() {
+  const params = new URLSearchParams(window.location.search);
+  const section = normalizeAccountSection(params.get("tab") || "info");
+  const targetId = String(params.get("target") || "").trim();
+  return section === "info" && targetId ? targetId : "";
+}
+
 function updateSidebarAvatar(profile, user) {
   const photoURL = profile?.photoURL || (user ? getDefaultAvatarDataUrl() : "");
   localStorage.setItem("panategwa_sidebar_avatar_url", photoURL || "");
@@ -549,6 +557,7 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
     }
 
     syncQuery(nextSection, finalSub, targetId);
+    renderAll(currentState);
   } catch (error) {
     console.error("Account navigation error:", error);
     if (baseOpenAccountArea) {
@@ -559,10 +568,12 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
 
 function renderAuth(state) {
   const user = resolvedUser(state);
-  const profile = resolvedProfile(state) || {};
+  const ownProfile = resolvedProfile(state) || {};
   const authCard = $("auth-card");
   const accountCard = $("account-card");
   const info = $("user-info");
+  const cardTitle = $("account-card-title");
+  const cardBadge = $("account-card-badge");
 
   if (!info) return;
 
@@ -577,17 +588,71 @@ function renderAuth(state) {
   if (authCard) authCard.style.display = "none";
   if (accountCard) accountCard.style.display = "block";
 
-  const username = profile.username || user.displayName || "Player";
-  const email = user.email || profile.email || "--";
+  const targetId = currentInfoTargetId();
+  const friendProfile = targetId && targetId !== user.uid ? (state.friendProfiles?.[targetId] || null) : null;
+  const viewingFriend = !!friendProfile;
+
+  if (cardTitle) cardTitle.textContent = viewingFriend ? "Friend profile" : "Your profile";
+  if (cardBadge) cardBadge.textContent = viewingFriend ? "Friends only" : "Signed in";
+
+  if (viewingFriend) {
+    const username = friendProfile.username || "Player";
+    const avatar = avatarMarkup(
+      friendProfile.photoURL || getDefaultAvatarDataUrl(),
+      `${username} avatar`,
+      "account-avatar",
+      !!friendProfile.verified
+    );
+    const rank = friendProfile.currentRank || "Hidden";
+    const joined = friendProfile.createdAt ? formatDateOnly(friendProfile.createdAt) : "Hidden";
+    const siteAge = friendProfile.createdAt ? relativeSince(friendProfile.createdAt) : "Hidden";
+    const streak = friendProfile.streakCurrent == null ? "Hidden" : `${friendProfile.streakCurrent} day${friendProfile.streakCurrent === 1 ? "" : "s"}`;
+    const longest = friendProfile.streakLongest == null ? "Hidden" : `${friendProfile.streakLongest} day${friendProfile.streakLongest === 1 ? "" : "s"}`;
+
+    info.innerHTML = `
+      <div class="account-header">
+        ${avatar}
+        <div>
+          <p style="margin: 0;"><strong>${escapeHtml(username)}</strong></p>
+          <p style="margin: 0; opacity: 0.8;">Friend profile</p>
+        </div>
+      </div>
+
+      <div class="button-row" style="margin-bottom: 14px;">
+        <button id="back-to-friends-btn" type="button" class="small">Back to friends</button>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-row"><span>Verified</span><strong>${friendProfile.verified ? "Yes" : "No"}</strong></div>
+        <div class="info-row"><span>Username</span><strong>${escapeHtml(username)}</strong></div>
+        <div class="info-row"><span>Account ID</span><strong>${escapeHtml(friendProfile.uid || "--")}</strong></div>
+        <div class="info-row"><span>Rank</span><strong>${escapeHtml(rank)}</strong></div>
+        <div class="info-row"><span>Joined</span><strong>${escapeHtml(joined)}</strong></div>
+        <div class="info-row"><span>On the site for</span><strong>${escapeHtml(siteAge)}</strong></div>
+        <div class="info-row"><span>Current streak</span><strong>${escapeHtml(streak)}</strong></div>
+        <div class="info-row"><span>Longest streak</span><strong>${escapeHtml(longest)}</strong></div>
+      </div>
+    `;
+
+    $("back-to-friends-btn")?.addEventListener("click", () => {
+      window.openAccountArea("friends", "friends");
+    });
+
+    updateSidebarAvatar(ownProfile, user);
+    return;
+  }
+
+  const username = ownProfile.username || user.displayName || "Player";
+  const email = user.email || ownProfile.email || "--";
   const verified = user.emailVerified ? "Yes" : "No";
-  const xp = typeof profile.xp === "number" ? profile.xp : 0;
-  const streak = profile?.streak?.current || 0;
-  const longestStreak = profile?.longestStreak || profile?.streak?.longest || streak || 0;
-  const memberFor = relativeSince(profile.createdAt);
-  const avatarUrl = profile.photoURL || getDefaultAvatarDataUrl();
-  const avatar = avatarMarkup(avatarUrl, "Avatar", "account-avatar", isVerifiedState(user, profile));
+  const xp = typeof ownProfile.xp === "number" ? ownProfile.xp : 0;
+  const streak = ownProfile?.streak?.current || 0;
+  const longestStreak = ownProfile?.longestStreak || ownProfile?.streak?.longest || streak || 0;
+  const memberFor = relativeSince(ownProfile.createdAt);
+  const avatarUrl = ownProfile.photoURL || getDefaultAvatarDataUrl();
+  const avatar = avatarMarkup(avatarUrl, "Avatar", "account-avatar", isVerifiedState(user, ownProfile));
   const copied = isUserIdCopied(user.uid);
-  const verifyNotice = !isVerifiedState(user, profile) ? `
+  const verifyNotice = !isVerifiedState(user, ownProfile) ? `
     <div class="verify-callout">
       <strong>Verify your email to unlock account features</strong>
       <p>Friends, notifications, avatars, privacy controls, and the rest of your account tools open as soon as your email is verified.</p>
@@ -620,7 +685,7 @@ function renderAuth(state) {
           </button>
         </strong>
       </div>
-      <div class="info-row"><span>Created</span><strong>${escapeHtml(formatDateOnly(profile.createdAt))}</strong></div>
+      <div class="info-row"><span>Created</span><strong>${escapeHtml(formatDateOnly(ownProfile.createdAt))}</strong></div>
       <div class="info-row"><span>On the site for</span><strong>${escapeHtml(memberFor)}</strong></div>
       <div class="info-row"><span>XP</span><strong>${xp}</strong></div>
       <div class="info-row"><span>Rank</span><strong>${escapeHtml(getRank(xp))}</strong></div>
@@ -643,7 +708,7 @@ function renderAuth(state) {
   $("inline-refresh-verification-btn")?.addEventListener("click", handleVerificationRefresh);
   $("inline-resend-verification-btn")?.addEventListener("click", handleVerificationResend);
 
-  updateSidebarAvatar(profile, user);
+  updateSidebarAvatar(ownProfile, user);
 }
 
 function renderProgress(state) {
@@ -840,7 +905,7 @@ function renderFriends(state) {
   if (friendsList) {
     friendsList.innerHTML = friendProfiles.length ? friendProfiles.map((friend) => `
       <div class="friend-entry">
-        <div class="friend-entry-button friend-entry-static">
+        <button type="button" class="friend-entry-button friend-entry-profile" data-action="friend-view" data-uid="${escapeHtml(friend.uid)}">
           <span class="friend-entry-main">
             <span class="friend-entry-avatar">${profileAvatarMarkup(friend)}</span>
             <span class="friend-entry-text">
@@ -848,7 +913,7 @@ function renderFriends(state) {
               <span class="friend-entry-meta">${escapeHtml(friend.uid || "")}</span>
             </span>
           </span>
-        </div>
+        </button>
 
         <details class="friend-entry-menu">
           <summary aria-label="Friend actions">&#8942;</summary>
@@ -868,10 +933,14 @@ function renderFriends(state) {
         <div class="subsection-head"><h3>Blocked users</h3></div>
         ${blockedProfiles.map((profile) => `
           <div class="social-item">
-            <div class="social-icon">${escapeHtml(initials(profile.username || profile.uid || "B", "B"))}</div>
+            <div class="social-icon">${profileAvatarMarkup(profile)}</div>
             <div class="social-main">
               <div class="social-title">${escapeHtml(profile.username || "Player")}</div>
               <div class="social-sub">${escapeHtml(profile.uid || "")}</div>
+            </div>
+            <div class="social-actions social-actions-start">
+              <button type="button" class="small" data-action="friend-copy" data-uid="${escapeHtml(profile.uid || "")}">Copy ID</button>
+              <button type="button" class="small" data-action="friend-unblock" data-uid="${escapeHtml(profile.uid || "")}">Unblock</button>
             </div>
           </div>
         `).join("")}
@@ -1161,6 +1230,7 @@ function renderAll(state) {
   const authSignature = JSON.stringify({
     authHydrated,
     uid: user?.uid || "",
+    targetId: currentInfoTargetId(),
     username: profile?.username || "",
     email: user?.email || profile?.email || "",
     verified: isVerifiedState(user, profile),
@@ -1169,7 +1239,14 @@ function renderAll(state) {
     streak: profile?.streak?.current || 0,
     longest: profile?.longestStreak || profile?.streak?.longest || 0,
     createdAt: formatDateOnly(profile?.createdAt),
-    copied: isUserIdCopied(user?.uid || "")
+    copied: isUserIdCopied(user?.uid || ""),
+    viewedFriend: (() => {
+      const id = currentInfoTargetId();
+      const friend = id ? state.friendProfiles?.[id] : null;
+      return friend
+        ? `${friend.uid || ""}:${friend.username || ""}:${friend.currentRank || ""}:${friend.streakCurrent ?? ""}:${friend.streakLongest ?? ""}:${formatDateOnly(friend.createdAt)}`
+        : "";
+    })()
   });
   if (renderAll.lastAuthSignature !== authSignature) {
     renderAuth(state);
@@ -1421,6 +1498,11 @@ function bindFriends() {
     const id = button.dataset.id || "";
 
     try {
+      if (action === "friend-view") {
+        window.openAccountArea("info", null, uid);
+        return;
+      }
+
       if (action === "friend-copy") {
         const copied = await copyText(uid);
         if (copied) {
@@ -1441,6 +1523,12 @@ function bindFriends() {
       if (action === "friend-block") {
         await blockUser(uid);
         setStatus("User blocked.", "success");
+        return;
+      }
+
+      if (action === "friend-unblock") {
+        await unblockUser(uid);
+        setStatus("User unblocked.", "success");
         return;
       }
 

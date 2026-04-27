@@ -261,8 +261,8 @@
 
       <section class="card" id="account-card" style="display:none; margin-top: 16px;">
         <div class="subsection-head">
-          <h2>Your profile</h2>
-          <span class="profile-badge">Signed in</span>
+          <h2 id="account-card-title">Your profile</h2>
+          <span id="account-card-badge" class="profile-badge">Signed in</span>
         </div>
         <div id="user-info"></div>
       </section>
@@ -303,6 +303,7 @@
                 <div class="button-row">
                   <button id="save-username-btn" type="button">Save name</button>
                 </div>
+                <p id="settings-profile-status" class="setting-status section-hidden" aria-live="polite"></p>
               </div>
 
               <div class="setting-card">
@@ -365,6 +366,7 @@
                     <small data-avatar-rank-note>Veteran + secret achievement</small>
                   </button>
                 </div>
+                <p id="settings-avatar-status" class="setting-status section-hidden" aria-live="polite"></p>
               </div>
 
               <div class="setting-card">
@@ -377,6 +379,7 @@
                 <div class="button-row">
                   <button id="change-email-btn" type="button">Change email</button>
                 </div>
+                <p id="settings-email-status" class="setting-status section-hidden" aria-live="polite"></p>
               </div>
 
               <div class="setting-card">
@@ -390,6 +393,7 @@
                   <button id="change-password-btn" type="button">Change password</button>
                   <button id="send-reset-email-btn" type="button">Send reset email</button>
                 </div>
+                <p id="settings-password-status" class="setting-status section-hidden" aria-live="polite"></p>
               </div>
 
               <div class="setting-card">
@@ -398,12 +402,13 @@
                   <button id="resend-verification-btn" type="button">Resend verification email</button>
                   <button id="logout-btn" type="button">Logout</button>
                 </div>
+                <p id="settings-actions-status" class="setting-status section-hidden" aria-live="polite"></p>
               </div>
 
               <div class="setting-card danger-zone-card">
                 <div class="setting-title">Danger zone</div>
                 <p class="setting-desc">These resets are permanent. There is no going back after they are done.</p>
-                <div class="field-row">
+                <div class="field-row field-row-inline">
                   <select id="reset-data-select">
                     <option value="progress">Delete progress</option>
                     <option value="friends">Delete friends</option>
@@ -417,6 +422,7 @@
                 <div class="button-row">
                   <button id="delete-account-btn" class="danger" type="button">Delete account</button>
                 </div>
+                <p id="settings-danger-status" class="setting-status section-hidden" aria-live="polite"></p>
               </div>
             </div>
           </div>
@@ -467,6 +473,7 @@
                     </span>
                   </label>
                 </div>
+                <p id="settings-privacy-status" class="setting-status section-hidden" aria-live="polite"></p>
               </div>
 
               <div class="setting-card privacy-preview-host">

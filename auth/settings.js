@@ -25,12 +25,28 @@ const $ = (id) => document.getElementById(id);
 const PRESET_IDS = [...AVATAR_PRESET_IDS];
 let currentUser = null;
 let currentProfile = null;
+const SETTING_STATUS_IDS = ["profile", "avatar", "email", "password", "actions", "danger", "privacy"];
 
 function setStatus(message, kind = "info") {
   const el = $("auth-status");
   if (!el) return;
   el.textContent = message;
   el.dataset.kind = kind;
+}
+
+function setScopedStatus(scope, message = "", kind = "info") {
+  const el = $(`settings-${scope}-status`);
+  if (!el) return;
+
+  el.textContent = String(message || "").trim();
+  el.dataset.kind = kind;
+  el.classList.toggle("section-hidden", !el.textContent);
+}
+
+function clearScopedStatuses() {
+  for (const scope of SETTING_STATUS_IDS) {
+    setScopedStatus(scope, "");
+  }
 }
 
 function syncForm(profile, user) {
@@ -130,17 +146,17 @@ async function refreshSettingsProfileView() {
 async function applyUsername() {
   const value = String($("profile-username")?.value || "").trim().slice(0, 20);
   if (!value) {
-    setStatus("Type a username first.", "error");
+    setScopedStatus("profile", "Type a username first.", "error");
     return;
   }
 
   try {
     await saveUsername(value);
     await refreshSettingsProfileView();
-    setStatus("Username updated.", "success");
+    setScopedStatus("profile", "Username updated.", "success");
   } catch (error) {
     console.error(error);
-    setStatus(error.message || "Could not save username.", "error");
+    setScopedStatus("profile", error.message || "Could not save username.", "error");
   }
 }
 
@@ -148,10 +164,10 @@ async function applyAvatarPreset(presetId) {
   try {
     await setAvatarPreset(presetId);
     await refreshSettingsProfileView();
-    setStatus("Profile picture updated.", "success");
+    setScopedStatus("avatar", "Profile picture updated.", "success");
   } catch (error) {
     console.error(error);
-    setStatus(error.message || "Could not update profile picture.", "error");
+    setScopedStatus("avatar", error.message || "Could not update profile picture.", "error");
   }
 }
 
@@ -159,10 +175,10 @@ async function applyDefaultAvatar() {
   try {
     await useDefaultProfilePicture();
     await refreshSettingsProfileView();
-    setStatus("Default pfp restored.", "success");
+    setScopedStatus("avatar", "Default pfp restored.", "success");
   } catch (error) {
     console.error(error);
-    setStatus(error.message || "Could not reset profile picture.", "error");
+    setScopedStatus("avatar", error.message || "Could not reset profile picture.", "error");
   }
 }
 
@@ -170,10 +186,10 @@ async function applyPrivacySetting(key, value) {
   try {
     await updatePrivacySettings({ [key]: !!value });
     await refreshSettingsProfileView();
-    setStatus("Privacy settings updated.", "success");
+    setScopedStatus("privacy", "Privacy settings updated.", "success");
   } catch (error) {
     console.error(error);
-    setStatus(error.message || "Could not update privacy settings.", "error");
+    setScopedStatus("privacy", error.message || "Could not update privacy settings.", "error");
   }
 }
 
@@ -184,10 +200,10 @@ async function applyEmailChange() {
   try {
     await changeEmail(nextEmail, currentPassword);
     await refreshSettingsProfileView();
-    setStatus("Email updated. Check the new inbox for verification if needed.", "success");
+    setScopedStatus("email", "Email updated. Check the new inbox for verification if needed.", "success");
   } catch (error) {
     console.error(error);
-    setStatus(error.message || "Could not change email.", "error");
+    setScopedStatus("email", error.message || "Could not change email.", "error");
   }
 }
 
@@ -197,19 +213,19 @@ async function applyPasswordChange() {
   const confirmPassword = String($("confirm-password")?.value || "");
 
   if (nextPassword !== confirmPassword) {
-    setStatus("New passwords do not match.", "error");
+    setScopedStatus("password", "New passwords do not match.", "error");
     return;
   }
 
   try {
     await changePassword(currentPassword, nextPassword);
-    setStatus("Password updated.", "success");
+    setScopedStatus("password", "Password updated.", "success");
     if ($("current-password")) $("current-password").value = "";
     if ($("new-password")) $("new-password").value = "";
     if ($("confirm-password")) $("confirm-password").value = "";
   } catch (error) {
     console.error(error);
-    setStatus(error.message || "Could not change password.", "error");
+    setScopedStatus("password", error.message || "Could not change password.", "error");
   }
 }
 
@@ -225,26 +241,26 @@ function bindButtons() {
   $("send-reset-email-btn")?.addEventListener("click", async () => {
     const email = String($("change-email-input")?.value || "").trim();
     if (!email) {
-      setStatus("Type an email first.", "error");
+      setScopedStatus("password", "Type an email first.", "error");
       return;
     }
 
     try {
       await requestPasswordReset(email);
-      setStatus("Reset email sent.", "success");
+      setScopedStatus("password", "Reset email sent.", "success");
     } catch (error) {
       console.error(error);
-      setStatus(error.message || "Could not send reset email.", "error");
+      setScopedStatus("password", error.message || "Could not send reset email.", "error");
     }
   });
 
   $("resend-verification-btn")?.addEventListener("click", async () => {
     try {
       const sent = await resendVerificationEmail();
-      setStatus(sent === false ? "Your email is already verified." : "Verification email sent.", sent === false ? "info" : "success");
+      setScopedStatus("actions", sent === false ? "Your email is already verified." : "Verification email sent.", sent === false ? "info" : "success");
     } catch (error) {
       console.error(error);
-      setStatus(error.message || "Could not resend verification email.", "error");
+      setScopedStatus("actions", error.message || "Could not resend verification email.", "error");
     }
   });
 
@@ -265,10 +281,10 @@ function bindButtons() {
     try {
       await resetAccountData(mode);
       await refreshSettingsProfileView();
-      setStatus("Selected account data deleted.", "success");
+      setScopedStatus("danger", "Selected account data deleted.", "success");
     } catch (error) {
       console.error(error);
-      setStatus(error.message || "Could not reset account data.", "error");
+      setScopedStatus("danger", error.message || "Could not reset account data.", "error");
     }
   });
 
@@ -281,7 +297,7 @@ function bindButtons() {
       window.location.reload();
     } catch (error) {
       console.error(error);
-      setStatus(error.message || "Could not delete account.", "error");
+      setScopedStatus("danger", error.message || "Could not delete account.", "error");
     }
   });
 
@@ -308,6 +324,7 @@ function start() {
 
   watchAuth(async (user, profile) => {
     currentUser = user || null;
+    clearScopedStatuses();
     if (!user) {
       currentProfile = null;
       setStatus("Not logged in.", "info");

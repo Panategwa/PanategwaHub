@@ -4,11 +4,8 @@ import {
   changePassword,
   setAvatarPreset,
   AVATAR_PRESET_IDS,
-  getAvatarPresetRequirement,
+  getAvatarPickerEntries,
   getAvatarPresetRequirementText,
-  getAvatarPresetName,
-  getAvatarPresetPreviewUrl,
-  getDefaultAvatarDataUrl,
   isAvatarPresetUnlocked,
   useDefaultProfilePicture,
   updatePrivacySettings,
@@ -23,9 +20,28 @@ import {
 
 const $ = (id) => document.getElementById(id);
 const PRESET_IDS = [...AVATAR_PRESET_IDS];
+const AVATAR_PICKER_ENTRIES = getAvatarPickerEntries();
+const DEFAULT_AVATAR_ENTRY = AVATAR_PICKER_ENTRIES.find((entry) => entry.isDefault) || {
+  id: "default",
+  name: "Default pfp",
+  requirementText: "None",
+  previewUrl: "",
+  hiddenRequirement: false,
+  isDefault: true
+};
+const AVATAR_ENTRY_MAP = new Map(AVATAR_PICKER_ENTRIES.filter((entry) => !entry.isDefault).map((entry) => [entry.id, entry]));
 let currentUser = null;
 let currentProfile = null;
 const SETTING_STATUS_IDS = ["profile", "avatar", "email", "password", "actions", "danger", "privacy"];
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
 
 function setStatus(message, kind = "info") {
   const el = $("auth-status");
@@ -82,17 +98,18 @@ function syncForm(profile, user) {
 function syncAvatarPresetLocks(profile) {
   const currentAvatarType = String(profile?.avatarType || "default");
   const currentAvatarPreset = String(profile?.avatarPreset || "default");
+  const hasKnownPreset = currentAvatarType === "preset" && PRESET_IDS.includes(currentAvatarPreset);
 
   for (const presetId of PRESET_IDS) {
     const button = $(`avatar-preset-${presetId}-btn`);
     if (!button) continue;
 
+    const entry = AVATAR_ENTRY_MAP.get(presetId);
     const unlocked = isAvatarPresetUnlocked(profile, presetId);
-    const requirement = getAvatarPresetRequirement(presetId);
     const note = button.querySelector("[data-avatar-rank-note]");
     const name = button.querySelector("[data-avatar-name]");
     const image = button.querySelector("img");
-    const selected = currentAvatarType === "preset" && currentAvatarPreset === presetId;
+    const selected = hasKnownPreset && currentAvatarPreset === presetId;
 
     button.disabled = !unlocked;
     button.dataset.locked = unlocked ? "false" : "true";
@@ -103,19 +120,19 @@ function syncAvatarPresetLocks(profile) {
       : `Locked: ${getAvatarPresetRequirementText(presetId, false)}`;
 
     if (image) {
-      image.src = getAvatarPresetPreviewUrl(presetId);
-      image.alt = `${getAvatarPresetName(presetId)} avatar preset`;
+      image.src = entry?.previewUrl || "";
+      image.alt = `${entry?.name || "Avatar"} avatar preset`;
     }
 
     if (name) {
-      name.textContent = getAvatarPresetName(presetId);
+      name.textContent = entry?.name || `Preset ${presetId}`;
     }
 
     if (note) {
       note.textContent = getAvatarPresetRequirementText(presetId, unlocked);
     }
 
-    if (requirement.hiddenAchievement) {
+    if (entry?.hiddenRequirement) {
       button.dataset.secretRequirement = "true";
     } else {
       delete button.dataset.secretRequirement;
@@ -125,15 +142,49 @@ function syncAvatarPresetLocks(profile) {
   const defaultButton = $("avatar-default-btn");
   if (defaultButton) {
     const image = defaultButton.querySelector("img");
-    const selected = currentAvatarType !== "preset";
+    const note = defaultButton.querySelector("[data-avatar-rank-note]");
+    const name = defaultButton.querySelector("[data-avatar-name]");
+    const selected = !hasKnownPreset;
     if (image) {
-      image.src = getDefaultAvatarDataUrl();
-      image.alt = "Default pfp";
+      image.src = DEFAULT_AVATAR_ENTRY.previewUrl || "";
+      image.alt = DEFAULT_AVATAR_ENTRY.name;
+    }
+    if (name) {
+      name.textContent = DEFAULT_AVATAR_ENTRY.name;
+    }
+    if (note) {
+      note.textContent = DEFAULT_AVATAR_ENTRY.requirementText;
     }
     defaultButton.dataset.selected = selected ? "true" : "false";
     defaultButton.classList.toggle("current", selected);
     defaultButton.setAttribute("aria-pressed", selected ? "true" : "false");
   }
+}
+
+function renderAvatarChoices() {
+  const grid = document.querySelector(".avatar-grid");
+  if (!grid) return;
+
+  grid.innerHTML = `
+    <button id="avatar-default-btn" type="button" class="avatar-choice avatar-choice-default">
+      <img alt="" src="" />
+      <span data-avatar-name>${escapeHtml(DEFAULT_AVATAR_ENTRY.name)}</span>
+      <small class="avatar-requirements">
+        <span class="avatar-requirements-label">Requirements:</span>
+        <span class="avatar-requirements-text" data-avatar-rank-note>${escapeHtml(DEFAULT_AVATAR_ENTRY.requirementText)}</span>
+      </small>
+    </button>
+    ${AVATAR_PICKER_ENTRIES.filter((entry) => !entry.isDefault).map((entry) => `
+      <button id="avatar-preset-${escapeHtml(entry.id)}-btn" type="button" class="avatar-choice">
+        <img alt="" src="" />
+        <span data-avatar-name>${escapeHtml(entry.name)}</span>
+        <small class="avatar-requirements">
+          <span class="avatar-requirements-label">Requirements:</span>
+          <span class="avatar-requirements-text" data-avatar-rank-note>${escapeHtml(entry.requirementText)}</span>
+        </small>
+      </button>
+    `).join("")}
+  `;
 }
 
 async function refreshSettingsProfileView() {
@@ -319,6 +370,7 @@ function bindButtons() {
 }
 
 function start() {
+  renderAvatarChoices();
   bindButtons();
   syncAvatarPresetLocks({});
 

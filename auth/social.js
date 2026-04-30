@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase-config.js";
-import { watchAuth, ensureUserProfile, getDefaultAvatarDataUrl } from "./auth.js";
+import { watchAuth, ensureUserProfile, getDefaultAvatarDataUrl, normalizeSiteTimeMs } from "./auth.js";
 import { ensurePanategwaToast } from "./toast.js";
 
 import {
@@ -271,13 +271,15 @@ function publicProfile(profile, viewerUid) {
       friendsOnly: true,
       currentRank: null,
       streakCurrent: null,
-      streakLongest: null
+      streakLongest: null,
+      siteTimeMs: null
     };
   }
 
   const canShowRank = self || privacy.showRank;
   const canShowJoined = self || privacy.showJoined;
   const canShowStreaks = self || privacy.showStreaks;
+  const canShowSiteAge = self || privacy.showSiteAge;
 
   return {
     uid: profile.uid,
@@ -296,7 +298,8 @@ function publicProfile(profile, viewerUid) {
     friendsOnly: false,
     currentRank: canShowRank ? rankFromXp(profile.xp || 0) : null,
     streakCurrent: canShowStreaks ? currentStreakOf(profile) : null,
-    streakLongest: canShowStreaks ? longestStreakOf(profile) : null
+    streakLongest: canShowStreaks ? longestStreakOf(profile) : null,
+    siteTimeMs: canShowSiteAge ? normalizeSiteTimeMs(profile.siteTimeMs) : null
   };
 }
 

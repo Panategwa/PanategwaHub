@@ -59,6 +59,42 @@ function normalizePrivacySettings(settings = {}) {
   };
 }
 
+export function normalizeSiteTimeMs(value) {
+  const ms = Number(value || 0);
+  return Number.isFinite(ms) && ms > 0 ? Math.floor(ms) : 0;
+}
+
+export function formatSiteTimeDuration(value) {
+  const totalMinutes = Math.floor(normalizeSiteTimeMs(value) / (60 * 1000));
+  const MINUTES_PER_HOUR = 60;
+  const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
+  const MINUTES_PER_WEEK = 7 * MINUTES_PER_DAY;
+  const MINUTES_PER_MONTH = 30 * MINUTES_PER_DAY;
+  const MINUTES_PER_YEAR = 365 * MINUTES_PER_DAY;
+
+  let remaining = totalMinutes;
+  const years = Math.floor(remaining / MINUTES_PER_YEAR);
+  remaining -= years * MINUTES_PER_YEAR;
+  const months = Math.floor(remaining / MINUTES_PER_MONTH);
+  remaining -= months * MINUTES_PER_MONTH;
+  const weeks = Math.floor(remaining / MINUTES_PER_WEEK);
+  remaining -= weeks * MINUTES_PER_WEEK;
+  const days = Math.floor(remaining / MINUTES_PER_DAY);
+  remaining -= days * MINUTES_PER_DAY;
+  const hours = Math.floor(remaining / MINUTES_PER_HOUR);
+  remaining -= hours * MINUTES_PER_HOUR;
+  const minutes = remaining;
+
+  const parts = [];
+  if (years) parts.push(`${years} year${years === 1 ? "" : "s"}`);
+  if (months) parts.push(`${months} month${months === 1 ? "" : "s"}`);
+  if (weeks) parts.push(`${weeks} week${weeks === 1 ? "" : "s"}`);
+  parts.push(`${days} day${days === 1 ? "" : "s"}`);
+  parts.push(`${hours} hour${hours === 1 ? "" : "s"}`);
+  parts.push(`${minutes} min${minutes === 1 ? "" : "s"}`);
+  return parts.join(", ");
+}
+
 function currentThemeSetting() {
   try {
     return localStorage.getItem("theme") || "Panategwa Mode (Default)";
@@ -90,7 +126,8 @@ function normalizeProgressBaseline(value = {}) {
     theme: String(value.theme || ""),
     textSize: String(value.textSize || ""),
     hourBucket: String(value.hourBucket || ""),
-    friends: uniqueStrings(value.friends)
+    friends: uniqueStrings(value.friends),
+    siteTimeMs: normalizeSiteTimeMs(value.siteTimeMs)
   };
 }
 
@@ -105,26 +142,108 @@ const RANK_LEVELS = Object.freeze({
   Veteran: 3
 });
 
+const DEFAULT_AVATAR_PRESET = Object.freeze({
+  id: "default",
+  name: "Default pfp",
+  requirementText: "None",
+  svg: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1">
+          <stop stop-color="#38bdf8"/>
+          <stop offset="1" stop-color="#2563eb"/>
+        </linearGradient>
+      </defs>
+      <rect width="128" height="128" rx="64" fill="url(#g)"/>
+      <circle cx="64" cy="48" r="22" fill="rgba(255,255,255,0.92)"/>
+      <path d="M31 104c3-20 17-34 33-34s30 14 33 34" fill="rgba(255,255,255,0.92)"/>
+    </svg>
+  `
+});
+
+// Avatar catalog:
+// Edit DEFAULT_AVATAR_PRESET and AVATAR_PRESETS below.
+// Each entry keeps the id, name, unlock requirements, and SVG artwork together in one place.
 export const AVATAR_PRESETS = Object.freeze([
+  // Add more profile pictures by copying one object and changing id, name, requirement, and svg.
+  // Keep every requirement object in the same shape:
+  // rank, achievementId, achievementName, hiddenAchievement, note
   Object.freeze({
     id: "1",
     name: "Trail Spark",
-    requirement: Object.freeze({ rank: "Adventurer", note: "Adventurer rank" })
+    requirement: Object.freeze({
+      rank: "Adventurer",
+      achievementId: "",
+      achievementName: "",
+      hiddenAchievement: false,
+      note: "Adventurer rank"
+    }),
+    svg: `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0ea5e9"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <circle cx="64" cy="64" r="40" fill="rgba(255,255,255,0.12)"/>
+        <path d="M64 24 76 49l28 4-20 19 5 28-25-13-25 13 5-28-20-19 28-4z" fill="rgba(255,255,255,0.96)"/>
+      </svg>
+    `
   }),
   Object.freeze({
     id: "2",
     name: "Ember Crest",
-    requirement: Object.freeze({ rank: "Adventurer", note: "Adventurer rank" })
+    requirement: Object.freeze({
+      rank: "Adventurer",
+      achievementId: "",
+      achievementName: "",
+      hiddenAchievement: false,
+      note: "Adventurer rank"
+    }),
+    svg: `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#f97316"/><stop offset="1" stop-color="#ef4444"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <path d="M64 18 87 36l23 16-8 29-21 21H47L26 81l-8-29 23-16z" fill="rgba(255,255,255,0.94)"/>
+        <path d="M64 38 77 50l12 9-5 18-13 13H57L44 77l-5-18 12-9z" fill="rgba(249,115,22,0.42)"/>
+      </svg>
+    `
   }),
   Object.freeze({
     id: "3",
     name: "Explorer Beacon",
-    requirement: Object.freeze({ rank: "Explorer", note: "Explorer rank" })
+    requirement: Object.freeze({
+      rank: "Explorer",
+      achievementId: "",
+      achievementName: "",
+      hiddenAchievement: false,
+      note: "Explorer rank"
+    }),
+    svg: `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0f766e"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <circle cx="64" cy="64" r="44" fill="rgba(255,255,255,0.08)"/>
+        <path d="M64 22 75 50l30 2-23 18 8 28-26-16-26 16 8-28-23-18 30-2z" fill="rgba(255,255,255,0.96)"/>
+        <circle cx="64" cy="60" r="8" fill="rgba(15,118,110,0.4)"/>
+      </svg>
+    `
   }),
   Object.freeze({
     id: "4",
     name: "Sky Marker",
-    requirement: Object.freeze({ rank: "Explorer", note: "Explorer rank" })
+    requirement: Object.freeze({
+      rank: "Explorer",
+      achievementId: "",
+      achievementName: "",
+      hiddenAchievement: false,
+      note: "Explorer rank"
+    }),
+    svg: `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#2563eb"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <path d="M64 20c18 10 30 26 30 43 0 21-15 34-30 46-15-12-30-25-30-46 0-17 12-33 30-43z" fill="rgba(255,255,255,0.96)"/>
+        <circle cx="64" cy="60" r="12" fill="rgba(37,99,235,0.45)"/>
+      </svg>
+    `
   }),
   Object.freeze({
     id: "5",
@@ -135,7 +254,16 @@ export const AVATAR_PRESETS = Object.freeze([
       achievementName: "Week Streak",
       hiddenAchievement: false,
       note: "Explorer + Week Streak"
-    })
+    }),
+    svg: `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#16a34a"/><stop offset="1" stop-color="#22c55e"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <rect x="26" y="28" width="76" height="72" rx="18" fill="rgba(255,255,255,0.92)"/>
+        <path d="M43 20v20m42-20v20" stroke="rgba(255,255,255,0.92)" stroke-width="8" stroke-linecap="round"/>
+        <path d="M44 60h14m12 0h14m-26 18h26" stroke="rgba(22,163,74,0.65)" stroke-width="8" stroke-linecap="round"/>
+      </svg>
+    `
   }),
   Object.freeze({
     id: "6",
@@ -146,7 +274,16 @@ export const AVATAR_PRESETS = Object.freeze([
       achievementName: "Settled In",
       hiddenAchievement: false,
       note: "Experienced + Settled In"
-    })
+    }),
+    svg: `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#4338ca"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <path d="M64 18 90 44v52l-26 14-26-14V44z" fill="rgba(255,255,255,0.94)"/>
+        <path d="M64 38v42" stroke="rgba(67,56,202,0.52)" stroke-width="8" stroke-linecap="round"/>
+        <path d="M50 54h28" stroke="rgba(67,56,202,0.52)" stroke-width="8" stroke-linecap="round"/>
+      </svg>
+    `
   }),
   Object.freeze({
     id: "7",
@@ -157,7 +294,17 @@ export const AVATAR_PRESETS = Object.freeze([
       achievementName: "Small Crew",
       hiddenAchievement: false,
       note: "Experienced + Small Crew"
-    })
+    }),
+    svg: `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#1d4ed8"/><stop offset="1" stop-color="#0ea5e9"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <circle cx="40" cy="48" r="14" fill="rgba(255,255,255,0.94)"/>
+        <circle cx="88" cy="48" r="14" fill="rgba(255,255,255,0.94)"/>
+        <circle cx="64" cy="84" r="16" fill="rgba(255,255,255,0.94)"/>
+        <path d="M48 56 58 72M80 56 70 72M54 84h20" stroke="rgba(29,78,216,0.48)" stroke-width="8" stroke-linecap="round"/>
+      </svg>
+    `
   }),
   Object.freeze({
     id: "8",
@@ -168,7 +315,15 @@ export const AVATAR_PRESETS = Object.freeze([
       achievementName: "Achievement Collector",
       hiddenAchievement: false,
       note: "Veteran + Achievement Collector"
-    })
+    }),
+    svg: `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#7c2d12"/><stop offset="1" stop-color="#f59e0b"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <path d="M64 16 92 34l10 28-12 34-26 16-26-16-12-34 10-28z" fill="rgba(255,255,255,0.95)"/>
+        <path d="M64 34 74 56h24L79 71l7 23-22-12-22 12 7-23-19-15h24z" fill="rgba(124,45,18,0.5)"/>
+      </svg>
+    `
   }),
   Object.freeze({
     id: "9",
@@ -179,7 +334,16 @@ export const AVATAR_PRESETS = Object.freeze([
       achievementName: "Year Streak",
       hiddenAchievement: false,
       note: "Veteran + Year Streak"
-    })
+    }),
+    svg: `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#64748b"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <path d="M38 86c8 0 14-7 14-15-8 0-14 7-14 15zm52-15c0 8 6 15 14 15 0-8-6-15-14-15z" fill="rgba(255,255,255,0.88)"/>
+        <path d="M34 58 48 72l16-30 16 30 14-14v18c0 14-12 28-30 28S34 90 34 76z" fill="rgba(255,255,255,0.95)"/>
+        <circle cx="64" cy="42" r="10" fill="rgba(100,116,139,0.45)"/>
+      </svg>
+    `
   }),
   Object.freeze({
     id: "10",
@@ -190,7 +354,16 @@ export const AVATAR_PRESETS = Object.freeze([
       achievementName: "Secret achievement",
       hiddenAchievement: true,
       note: "Veteran + secret achievement"
-    })
+    }),
+    svg: `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs>
+        <rect width="128" height="128" rx="64" fill="url(#g)"/>
+        <circle cx="64" cy="64" r="44" fill="rgba(255,255,255,0.06)"/>
+        <path d="M64 18 76 46l30 4-22 18 7 28-27-14-27 14 7-28-22-18 30-4z" fill="rgba(255,255,255,0.95)"/>
+        <circle cx="64" cy="62" r="9" fill="rgba(67,56,202,0.6)"/>
+      </svg>
+    `
   })
 ]);
 
@@ -214,6 +387,14 @@ export function doesRankMeetRequirement(rank, requiredRank) {
 
 export function getAvatarPresetName(presetId) {
   return AVATAR_PRESET_MAP.get(String(presetId || "1"))?.name || AVATAR_PRESET_MAP.get("1")?.name || "Trail Spark";
+}
+
+export function isKnownAvatarPreset(presetId) {
+  return AVATAR_PRESET_MAP.has(String(presetId || "").trim());
+}
+
+function getAvatarPresetDefinition(presetId) {
+  return AVATAR_PRESET_MAP.get(String(presetId || "").trim()) || AVATAR_PRESET_MAP.get("1") || AVATAR_PRESETS[0] || null;
 }
 
 export function getAvatarPresetRequirement(presetId) {
@@ -271,151 +452,37 @@ function svgDataUrl(svg) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
-function defaultAvatarDataUrl() {
-  return svgDataUrl(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-      <defs>
-        <linearGradient id="g" x1="0" x2="1">
-          <stop stop-color="#38bdf8"/>
-          <stop offset="1" stop-color="#2563eb"/>
-        </linearGradient>
-      </defs>
-      <rect width="128" height="128" rx="64" fill="url(#g)"/>
-      <circle cx="64" cy="48" r="22" fill="rgba(255,255,255,0.92)"/>
-      <path d="M31 104c3-20 17-34 33-34s30 14 33 34" fill="rgba(255,255,255,0.92)"/>
-    </svg>
-  `);
+function avatarSvgToDataUrl(svg) {
+  return svgDataUrl(String(svg || DEFAULT_AVATAR_PRESET.svg || "").trim() || DEFAULT_AVATAR_PRESET.svg);
 }
 
 export function getDefaultAvatarDataUrl() {
-  return defaultAvatarDataUrl();
-}
-
-function presetAvatarDataUrl(presetId) {
-  const id = String(presetId || "1");
-
-  if (id === "1") {
-    return svgDataUrl(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0ea5e9"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
-        <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <circle cx="64" cy="64" r="40" fill="rgba(255,255,255,0.12)"/>
-        <path d="M64 24 76 49l28 4-20 19 5 28-25-13-25 13 5-28-20-19 28-4z" fill="rgba(255,255,255,0.96)"/>
-      </svg>
-    `);
-  }
-
-  if (id === "2") {
-    return svgDataUrl(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#f97316"/><stop offset="1" stop-color="#ef4444"/></linearGradient></defs>
-        <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <path d="M64 18 87 36l23 16-8 29-21 21H47L26 81l-8-29 23-16z" fill="rgba(255,255,255,0.94)"/>
-        <path d="M64 38 77 50l12 9-5 18-13 13H57L44 77l-5-18 12-9z" fill="rgba(249,115,22,0.42)"/>
-      </svg>
-    `);
-  }
-
-  if (id === "3") {
-    return svgDataUrl(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0f766e"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
-        <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <circle cx="64" cy="64" r="44" fill="rgba(255,255,255,0.08)"/>
-        <path d="M64 22 75 50l30 2-23 18 8 28-26-16-26 16 8-28-23-18 30-2z" fill="rgba(255,255,255,0.96)"/>
-        <circle cx="64" cy="60" r="8" fill="rgba(15,118,110,0.4)"/>
-      </svg>
-    `);
-  }
-
-  if (id === "4") {
-    return svgDataUrl(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#2563eb"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
-        <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <path d="M64 20c18 10 30 26 30 43 0 21-15 34-30 46-15-12-30-25-30-46 0-17 12-33 30-43z" fill="rgba(255,255,255,0.96)"/>
-        <circle cx="64" cy="60" r="12" fill="rgba(37,99,235,0.45)"/>
-      </svg>
-    `);
-  }
-
-  if (id === "5") {
-    return svgDataUrl(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#16a34a"/><stop offset="1" stop-color="#22c55e"/></linearGradient></defs>
-        <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <rect x="26" y="28" width="76" height="72" rx="18" fill="rgba(255,255,255,0.92)"/>
-        <path d="M43 20v20m42-20v20" stroke="rgba(255,255,255,0.92)" stroke-width="8" stroke-linecap="round"/>
-        <path d="M44 60h14m12 0h14m-26 18h26" stroke="rgba(22,163,74,0.65)" stroke-width="8" stroke-linecap="round"/>
-      </svg>
-    `);
-  }
-
-  if (id === "6") {
-    return svgDataUrl(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#4338ca"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
-        <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <path d="M64 18 90 44v52l-26 14-26-14V44z" fill="rgba(255,255,255,0.94)"/>
-        <path d="M64 38v42" stroke="rgba(67,56,202,0.52)" stroke-width="8" stroke-linecap="round"/>
-        <path d="M50 54h28" stroke="rgba(67,56,202,0.52)" stroke-width="8" stroke-linecap="round"/>
-      </svg>
-    `);
-  }
-
-  if (id === "7") {
-    return svgDataUrl(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#1d4ed8"/><stop offset="1" stop-color="#0ea5e9"/></linearGradient></defs>
-        <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <circle cx="40" cy="48" r="14" fill="rgba(255,255,255,0.94)"/>
-        <circle cx="88" cy="48" r="14" fill="rgba(255,255,255,0.94)"/>
-        <circle cx="64" cy="84" r="16" fill="rgba(255,255,255,0.94)"/>
-        <path d="M48 56 58 72M80 56 70 72M54 84h20" stroke="rgba(29,78,216,0.48)" stroke-width="8" stroke-linecap="round"/>
-      </svg>
-    `);
-  }
-
-  if (id === "8") {
-    return svgDataUrl(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#7c2d12"/><stop offset="1" stop-color="#f59e0b"/></linearGradient></defs>
-        <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <path d="M64 16 92 34l10 28-12 34-26 16-26-16-12-34 10-28z" fill="rgba(255,255,255,0.95)"/>
-        <path d="M64 34 74 56h24L79 71l7 23-22-12-22 12 7-23-19-15h24z" fill="rgba(124,45,18,0.5)"/>
-      </svg>
-    `);
-  }
-
-  if (id === "9") {
-    return svgDataUrl(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#64748b"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
-        <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <path d="M38 86c8 0 14-7 14-15-8 0-14 7-14 15zm52-15c0 8 6 15 14 15 0-8-6-15-14-15z" fill="rgba(255,255,255,0.88)"/>
-        <path d="M34 58 48 72l16-30 16 30 14-14v18c0 14-12 28-30 28S34 90 34 76z" fill="rgba(255,255,255,0.95)"/>
-        <circle cx="64" cy="42" r="10" fill="rgba(100,116,139,0.45)"/>
-      </svg>
-    `);
-  }
-
-  if (id === "10") {
-    return svgDataUrl(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-        <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs>
-        <rect width="128" height="128" rx="64" fill="url(#g)"/>
-        <circle cx="64" cy="64" r="44" fill="rgba(255,255,255,0.06)"/>
-        <path d="M64 18 76 46l30 4-22 18 7 28-27-14-27 14 7-28-22-18 30-4z" fill="rgba(255,255,255,0.95)"/>
-        <circle cx="64" cy="62" r="9" fill="rgba(67,56,202,0.6)"/>
-      </svg>
-    `);
-  }
-
-  return presetAvatarDataUrl("1");
+  return avatarSvgToDataUrl(DEFAULT_AVATAR_PRESET.svg);
 }
 
 export function getAvatarPresetPreviewUrl(presetId) {
-  return presetAvatarDataUrl(presetId);
+  return avatarSvgToDataUrl(getAvatarPresetDefinition(presetId)?.svg);
+}
+
+export function getAvatarPickerEntries() {
+  return Object.freeze([
+    Object.freeze({
+      id: DEFAULT_AVATAR_PRESET.id,
+      name: DEFAULT_AVATAR_PRESET.name,
+      requirementText: DEFAULT_AVATAR_PRESET.requirementText,
+      previewUrl: getDefaultAvatarDataUrl(),
+      hiddenRequirement: false,
+      isDefault: true
+    }),
+    ...AVATAR_PRESETS.map((preset) => Object.freeze({
+      id: preset.id,
+      name: preset.name,
+      requirementText: getAvatarPresetRequirementText(preset.id, false),
+      previewUrl: getAvatarPresetPreviewUrl(preset.id),
+      hiddenRequirement: !!preset.requirement?.hiddenAchievement,
+      isDefault: false
+    }))
+  ]);
 }
 
 function letterAvatarDataUrl(letter) {
@@ -429,19 +496,38 @@ function letterAvatarDataUrl(letter) {
 }
 
 function resolvedStoredAvatar(data = {}) {
+  return normalizeStoredAvatarChoice(data).photoURL;
+}
+
+function normalizeStoredAvatarChoice(data = {}) {
   const photoURL = cleanText(data.photoURL);
   const avatarType = String(data.avatarType || "").trim().toLowerCase();
-  const avatarPreset = String(data.avatarPreset || "").trim().toLowerCase();
-  if (avatarType === "custom" && photoURL) return photoURL;
-  if (avatarType === "default") return defaultAvatarDataUrl();
-  if (avatarType === "preset" && avatarPreset && avatarPreset !== "default") {
-    return presetAvatarDataUrl(avatarPreset);
-  }
-  if (avatarType === "letter") {
-    return letterAvatarDataUrl(data.avatarLetter || data.username || "P");
+  const avatarPreset = String(data.avatarPreset || "").trim();
+
+  if (avatarType === "custom" && photoURL) {
+    return {
+      photoURL,
+      avatarType: "custom",
+      avatarPreset: "default",
+      avatarLetter: ""
+    };
   }
 
-  return defaultAvatarDataUrl();
+  if (avatarType === "preset" && isKnownAvatarPreset(avatarPreset)) {
+    return {
+      photoURL: getAvatarPresetPreviewUrl(avatarPreset),
+      avatarType: "preset",
+      avatarPreset,
+      avatarLetter: ""
+    };
+  }
+
+  return {
+    photoURL: getDefaultAvatarDataUrl(),
+    avatarType: "default",
+    avatarPreset: "default",
+    avatarLetter: ""
+  };
 }
 
 function syncSidebarAvatar(photoURL) {
@@ -456,12 +542,14 @@ function baseProfile(user) {
     email: user.email || "",
     emailLower: cleanEmail(user.email),
     username: user.displayName || defaultUsername(user),
-    photoURL: defaultAvatarDataUrl(),
+    photoURL: getDefaultAvatarDataUrl(),
     avatarType: "default",
     avatarPreset: "default",
     verified: !!user.emailVerified,
     xp: 0,
     achievements: [],
+    achievementRewardSnapshot: {},
+    siteTimeMs: 0,
     visitedPages: [],
     friends: [],
     blocked: [],
@@ -579,18 +667,24 @@ export async function ensureUserProfile(user) {
     friends: uniqueStrings(data.socialBackup?.friends),
     blocked: uniqueStrings(data.socialBackup?.blocked)
   };
+  const normalizedAvatar = normalizeStoredAvatarChoice(data);
 
   const merged = {
     uid: user.uid,
     email: user.email || data.email || "",
     emailLower: cleanEmail(user.email || data.email || ""),
     username: data.username || user.displayName || defaultUsername(user),
-    photoURL: resolvedStoredAvatar(data),
-    avatarType: data.avatarType || "default",
-    avatarPreset: data.avatarPreset || "default",
+    photoURL: normalizedAvatar.photoURL,
+    avatarType: normalizedAvatar.avatarType,
+    avatarPreset: normalizedAvatar.avatarPreset,
+    avatarLetter: normalizedAvatar.avatarLetter,
     verified: !!user.emailVerified,
     xp: typeof data.xp === "number" ? data.xp : achievements.length,
     achievements,
+    achievementRewardSnapshot: (!data.achievementRewardSnapshot || typeof data.achievementRewardSnapshot !== "object" || Array.isArray(data.achievementRewardSnapshot))
+      ? {}
+      : data.achievementRewardSnapshot,
+    siteTimeMs: normalizeSiteTimeMs(data.siteTimeMs),
     visitedPages,
     friends,
     blocked,
@@ -741,12 +835,15 @@ export async function setAvatarPreset(presetId) {
   if (!user) throw new Error("Not logged in.");
 
   const id = String(presetId || "1");
+  if (!isKnownAvatarPreset(id)) {
+    throw new Error("That profile picture preset does not exist anymore.");
+  }
   const profile = await getProfile(user.uid);
   if (!isAvatarPresetUnlocked(profile, id)) {
     throw new Error(lockedAvatarReason(profile, id));
   }
 
-  const dataUrl = presetAvatarDataUrl(id);
+  const dataUrl = getAvatarPresetPreviewUrl(id);
   await updateProfile(user, { photoURL: dataUrl });
   await setDoc(userRef(user.uid), {
     photoURL: dataUrl,
@@ -781,7 +878,7 @@ export async function useDefaultProfilePicture() {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
 
-  const dataUrl = defaultAvatarDataUrl();
+  const dataUrl = getDefaultAvatarDataUrl();
   await updateProfile(user, { photoURL: dataUrl });
   await setDoc(userRef(user.uid), {
     photoURL: dataUrl,
@@ -924,6 +1021,7 @@ export async function resetAccountData(mode = "progress") {
   if (nextMode === "progress" || nextMode === "all") {
     updates.xp = 0;
     updates.achievements = [];
+    updates.achievementRewardSnapshot = {};
     updates.visitedPages = [];
     updates.stats = {
       ...(profile.stats || {}),
@@ -938,7 +1036,8 @@ export async function resetAccountData(mode = "progress") {
       theme: currentThemeSetting(),
       textSize: currentTextSizeSetting(),
       hourBucket: currentHourBucket(),
-      friends: uniqueStrings(profile.friends)
+      friends: uniqueStrings(profile.friends),
+      siteTimeMs: normalizeSiteTimeMs(profile.siteTimeMs)
     });
     updates.longestStreak = 0;
     updates.streak = {

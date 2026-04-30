@@ -6,6 +6,7 @@ import {
   resendVerificationEmail,
   refreshCurrentUserSession,
   getDefaultAvatarDataUrl,
+  formatSiteTimeDuration,
   watchAuth,
   getProfile
 } from "./auth.js";
@@ -605,7 +606,7 @@ function renderAuth(state) {
     );
     const rank = friendProfile.currentRank || "Hidden";
     const joined = friendProfile.createdAt ? formatDateOnly(friendProfile.createdAt) : "Hidden";
-    const siteAge = friendProfile.createdAt ? relativeSince(friendProfile.createdAt) : "Hidden";
+    const siteAge = friendProfile.siteTimeMs == null ? "Hidden" : formatSiteTimeDuration(friendProfile.siteTimeMs);
     const streak = friendProfile.streakCurrent == null ? "Hidden" : `${friendProfile.streakCurrent} day${friendProfile.streakCurrent === 1 ? "" : "s"}`;
     const longest = friendProfile.streakLongest == null ? "Hidden" : `${friendProfile.streakLongest} day${friendProfile.streakLongest === 1 ? "" : "s"}`;
 
@@ -648,7 +649,7 @@ function renderAuth(state) {
   const xp = typeof ownProfile.xp === "number" ? ownProfile.xp : 0;
   const streak = ownProfile?.streak?.current || 0;
   const longestStreak = ownProfile?.longestStreak || ownProfile?.streak?.longest || streak || 0;
-  const memberFor = relativeSince(ownProfile.createdAt);
+  const memberFor = formatSiteTimeDuration(ownProfile.siteTimeMs);
   const avatarUrl = ownProfile.photoURL || getDefaultAvatarDataUrl();
   const avatar = avatarMarkup(avatarUrl, "Avatar", "account-avatar", isVerifiedState(user, ownProfile));
   const copied = isUserIdCopied(user.uid);
@@ -754,6 +755,9 @@ function renderAchievements(state) {
     const isUnlocked = unlocked.has(achievement.id);
     const title = achievement.secret && !isUnlocked ? "Secret achievement" : achievement.name;
     const description = achievement.secret && !isUnlocked ? "Hidden until unlocked." : achievement.description;
+    const requirement = achievement.secret && !isUnlocked
+      ? "Requirement hidden."
+      : (achievement.requirement?.note || achievement.description);
 
     return `
       <div class="achievement-card ${isUnlocked ? "unlocked" : "locked"}" id="achievement-card-${escapeHtml(achievement.id)}" data-achievement-id="${escapeHtml(achievement.id)}">
@@ -761,6 +765,7 @@ function renderAchievements(state) {
         <div class="achievement-copy">
           <div class="achievement-name">${escapeHtml(title)}</div>
           <div class="achievement-desc">${escapeHtml(description)}</div>
+          <div class="achievement-desc">Requirement: ${escapeHtml(requirement)}</div>
           <div class="achievement-desc">Reward: +${escapeHtml(String(achievement.reward || 0))} XP</div>
         </div>
       </div>
@@ -793,7 +798,7 @@ function renderPrivacyProfilePreview(state) {
   const rank = showRank ? getRank(profile.xp || 0) : null;
   const streakCurrent = showStreaks ? (profile?.streak?.current || 0) : null;
   const streakLongest = showStreaks ? (profile?.longestStreak || profile?.streak?.longest || streakCurrent || 0) : null;
-  const siteAge = showSiteAge ? relativeSince(profile.createdAt) : null;
+  const siteAge = showSiteAge ? formatSiteTimeDuration(profile.siteTimeMs) : null;
   const avatar = avatarMarkup(
     profile.photoURL || getDefaultAvatarDataUrl(),
     `${username} avatar`,
@@ -1238,13 +1243,14 @@ function renderAll(state) {
     xp: profile?.xp || 0,
     streak: profile?.streak?.current || 0,
     longest: profile?.longestStreak || profile?.streak?.longest || 0,
+    siteTimeMs: profile?.siteTimeMs || 0,
     createdAt: formatDateOnly(profile?.createdAt),
     copied: isUserIdCopied(user?.uid || ""),
     viewedFriend: (() => {
       const id = currentInfoTargetId();
       const friend = id ? state.friendProfiles?.[id] : null;
       return friend
-        ? `${friend.uid || ""}:${friend.username || ""}:${friend.currentRank || ""}:${friend.streakCurrent ?? ""}:${friend.streakLongest ?? ""}:${formatDateOnly(friend.createdAt)}`
+        ? `${friend.uid || ""}:${friend.username || ""}:${friend.currentRank || ""}:${friend.streakCurrent ?? ""}:${friend.streakLongest ?? ""}:${friend.siteTimeMs ?? ""}:${formatDateOnly(friend.createdAt)}`
         : "";
     })()
   });
@@ -1270,6 +1276,7 @@ function renderAll(state) {
     photoURL: profile?.photoURL || "",
     xp: profile?.xp || 0,
     createdAt: formatDateOnly(profile?.createdAt),
+    siteTimeMs: profile?.siteTimeMs || 0,
     streak: profile?.streak?.current || 0,
     longest: profile?.longestStreak || profile?.streak?.longest || 0,
     privacyShowRank: profile?.privacySettings?.showRank !== false,
@@ -1780,6 +1787,17 @@ function start() {
     currentState.localNotifications = notifications;
     renderAll(currentState);
   }, () => resolvedUser(currentState)?.uid || "");
+
+  window.addEventListener("panategwa:sitetimechange", (event) => {
+    const detail = event?.detail || {};
+    const uid = detail.uid || "";
+    if (!uid || currentState.user?.uid !== uid || !currentState.profile) return;
+    currentState.profile = {
+      ...currentState.profile,
+      siteTimeMs: Number(detail.siteTimeMs || 0)
+    };
+    renderAll(currentState);
+  });
 }
 
 if (document.readyState === "loading") {

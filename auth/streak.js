@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase-config.js";
-import { watchAuth, getProfile } from "./auth.js";
+import { watchAuth, getProfile, formatSiteTimeDuration } from "./auth.js";
 import { ensurePanategwaToast } from "./toast.js";
 
 import {
@@ -17,6 +17,7 @@ let currentUser = null;
 let currentProfile = null;
 let viewingMonthKey = "";
 let midnightTimer = null;
+let countdownTimer = null;
 
 function userRef(uid) {
   return doc(db, "users", uid);
@@ -158,39 +159,6 @@ function createdMonthKey(profile) {
   return createdAt ? localMonthKey(new Date(createdAt)) : localMonthKey(new Date());
 }
 
-function relativeAge(value) {
-  const ms = toMs(value);
-  if (!ms) return "--";
-
-  const diff = Math.max(0, Date.now() - ms);
-  const minute = 60 * 1000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-  const month = 30 * day;
-  const year = 365 * day;
-
-  if (diff < minute) return "Just now";
-  if (diff < hour) {
-    const amount = Math.floor(diff / minute);
-    return `${amount} min${amount === 1 ? "" : "s"}`;
-  }
-  if (diff < day) {
-    const amount = Math.floor(diff / hour);
-    return `${amount} hour${amount === 1 ? "" : "s"}`;
-  }
-  if (diff < month) {
-    const amount = Math.floor(diff / day);
-    return `${amount} day${amount === 1 ? "" : "s"}`;
-  }
-  if (diff < year) {
-    const amount = Math.floor(diff / month);
-    return `${amount} month${amount === 1 ? "" : "s"}`;
-  }
-
-  const amount = Math.floor(diff / year);
-  return `${amount} year${amount === 1 ? "" : "s"}`;
-}
-
 function prettyDateTime(value) {
   const ms = toMs(value);
   if (!ms) return "--";
@@ -200,6 +168,38 @@ function prettyDateTime(value) {
     hour: "numeric",
     minute: "2-digit"
   });
+}
+
+function clearCountdownTimer() {
+  if (!countdownTimer) return;
+  window.clearInterval(countdownTimer);
+  countdownTimer = null;
+}
+
+function msUntilLocalMidnight() {
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  return Math.max(0, next.getTime() - now.getTime());
+}
+
+function formatCountdown(ms) {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+function renderCountdown() {
+  const value = $("streak-countdown-value");
+  if (!value) return;
+  value.textContent = formatCountdown(msUntilLocalMidnight());
+}
+
+function startCountdown() {
+  clearCountdownTimer();
+  renderCountdown();
+  countdownTimer = window.setInterval(renderCountdown, 1000);
 }
 
 function monthBounds(monthKey) {
@@ -384,6 +384,7 @@ function renderPage() {
   if (!root) return;
 
   if (!currentUser) {
+    clearCountdownTimer();
     root.innerHTML = `
       <div class="streak-card">
         <h1>Streak</h1>
@@ -409,6 +410,7 @@ function renderPage() {
   const alreadyClaimed = state.lastClaimDay === today;
   const prevDisabled = compareMonthKeys(viewingMonthKey, joinedMonth) <= 0;
   const nextDisabled = compareMonthKeys(viewingMonthKey, latestMonth) >= 0;
+  const countdownNote = alreadyClaimed ? "until the next streak day" : "left to claim today's streak";
 
   root.innerHTML = `
     <div class="streak-card">
@@ -438,7 +440,13 @@ function renderPage() {
 
         <div class="setting-card">
           <div class="setting-title">On the site for</div>
-          <div class="setting-desc">${relativeAge(profile?.createdAt)}</div>
+          <div class="setting-desc">${formatSiteTimeDuration(profile?.siteTimeMs)}</div>
+        </div>
+
+        <div class="setting-card">
+          <div class="setting-title">Time left today</div>
+          <div id="streak-countdown-value" class="setting-desc streak-countdown-value">--:--:--</div>
+          <div class="setting-desc streak-countdown-note">${countdownNote}</div>
         </div>
       </div>
 
@@ -466,6 +474,8 @@ function renderPage() {
     viewingMonthKey = shiftMonth(viewingMonthKey, 1);
     renderPage();
   });
+
+  startCountdown();
 }
 
 function start() {
@@ -484,6 +494,17 @@ function start() {
 
     renderPage();
     scheduleMidnightRefresh();
+  });
+
+  window.addEventListener("panategwa:sitetimechange", (event) => {
+    const detail = event?.detail || {};
+    const uid = String(detail.uid || "").trim();
+    if (!uid || currentUser?.uid !== uid || !currentProfile) return;
+    currentProfile = {
+      ...currentProfile,
+      siteTimeMs: Number(detail.siteTimeMs || 0)
+    };
+    renderPage();
   });
 }
 

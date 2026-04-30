@@ -28,8 +28,8 @@
 body {
   color: var(--text-color);
   background:
-    radial-gradient(circle at 14% 18%, var(--page-glow-a), transparent 28%),
-    radial-gradient(circle at 82% 2%, var(--page-glow-b), transparent 24%),
+    radial-gradient(circle at 15% 20%, var(--page-glow-a), transparent 30%),
+    radial-gradient(circle at 80% 0%, var(--page-glow-b), transparent 30%),
     linear-gradient(180deg, rgba(2, 6, 23, 0.26), rgba(2, 6, 23, 0.6)),
     var(--bg-color);
   padding: 0 2rem;
@@ -131,11 +131,11 @@ button {
 }
 
 button:hover {
-  border-color: rgba(191, 219, 254, 0.32);
-  box-shadow: 0 14px 28px rgba(2, 6, 23, 0.18);
+  filter: brightness(0.75);
 }
 
 button:disabled {
+  filter: brightness(0.5);
   cursor: default;
   box-shadow: none;
   opacity: 0.62;
@@ -224,7 +224,7 @@ select:focus {
   background: var(--menu-bg);
   overflow: hidden;
   z-index: 1000;
-  border-right: 1px solid rgba(255,255,255,0.1);
+  border-right: 1px solid color-mix(in srgb, var(--menu-bg) 5%, white 5%) ;
   backdrop-filter: blur(18px);
   box-shadow: 14px 0 32px rgba(2, 6, 23, 0.14);
 }
@@ -245,11 +245,11 @@ select:focus {
   width: 6px;
   height: 100%;
   cursor: ew-resize;
-
-  background: rgba(0, 0, 0, 0.75);
+  background: color-mix(in srgb, var(--menu-bg) 50%, black 50%);
 }
+
 #resize-handle:hover {
-  background: rgba(255,255,255,0.25);
+  background: rgba(150,150,150,0.5);
 }
 
 /* =========================
@@ -1324,6 +1324,22 @@ main {
       opacity: 0.76;
       font-size: 0.82rem;
       line-height: 1.25;
+    }
+
+    .avatar-requirements {
+      display: grid;
+      gap: 2px;
+    }
+
+    .avatar-requirements-label {
+      font-weight: 800;
+      opacity: 0.96;
+      letter-spacing: 0.01em;
+    }
+
+    .avatar-requirements-text {
+      font-weight: 500;
+      opacity: 0.78;
     }
 
     .avatar-choice[disabled] {

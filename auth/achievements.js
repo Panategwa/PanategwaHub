@@ -1,33 +1,460 @@
 import { auth, db } from "./firebase-config.js";
-import { watchAuth, ensureUserProfile } from "./auth.js";
+import { watchAuth, ensureUserProfile, normalizeSiteTimeMs } from "./auth.js";
 import { ensurePanategwaToast } from "./toast.js";
 
 import {
   doc,
   onSnapshot,
   runTransaction,
-  serverTimestamp
+  setDoc,
+  serverTimestamp,
+  increment
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-export const ACHIEVEMENTS = [
-  { id: "achievement_collector", name: "Achievement Collector", description: "Unlock 10 achievements.", secret: false, reward: 5 },
-  { id: "all_planets", name: "Astronaut", description: "Visit all celestial bodies of the Panategwa system.", secret: false, reward: 5 },
-  { id: "big_reader", name: "Need some glasses?", description: "Set text size to Large.", secret: true, reward: 2 },
-  { id: "morning_person", name: "Morning Person", description: "Visit between 3am and 10am.", secret: true, reward: 2 },
-  { id: "nocturnal", name: "Nocturnal", description: "Visit between 9pm and 3am.", secret: true, reward: 2 },
-  { id: "ocean_mode", name: "Wavefinder", description: "Use the Ocean theme.", secret: false, reward: 1 },
-  { id: "three_friends", name: "Small Crew", description: "Add 3 friends.", secret: false, reward: 3 },
-  { id: "profile_name", name: "True Name", description: "Set your username.", secret: false, reward: 1 },
-  { id: "site_20_minutes", name: "Settled In", description: "Be part of the site for over 20 minutes.", secret: false, reward: 2 },
-  { id: "space_mode", name: "Stargazer", description: "Use the Space theme.", secret: false, reward: 1 },
-  { id: "theme_shifter", name: "Aesthetic Control", description: "Change your theme.", secret: false, reward: 1 },
-  { id: "thrinsachelom_history", name: "Historian", description: "View the history of the Thrinsacheloms.", secret: false, reward: 5 },
-  { id: "tiny_text", name: "Microscopic Text", description: "Set text size to Small.", secret: true, reward: 2 },
-  { id: "verified_email", name: "Verified Signal", description: "Verify your email address.", secret: false, reward: 2 },
-  { id: "week_streak", name: "Week Streak", description: "Reach a 7 day streak.", secret: false, reward: 4 },
-  { id: "year_streak", name: "Year Streak", description: "Reach a 365 day streak.", secret: true, reward: 50 },
-  { id: "veteran", name: "Veteran", description: "Reach Veteran rank (30 XP).", secret: false, reward: 5 }
-];
+function achievementRequirement(patch = {}) {
+  return Object.freeze({
+    type: String(patch.type || "manual"),
+    note: String(patch.note || ""),
+    baselineAware: !!patch.baselineAware,
+    page: String(patch.page || ""),
+    pages: Object.freeze((Array.isArray(patch.pages) ? patch.pages : []).map((value) => String(value || "").trim()).filter(Boolean)),
+    theme: String(patch.theme || ""),
+    textSize: String(patch.textSize || ""),
+    hourBucket: String(patch.hourBucket || ""),
+    minutesOnSite: Number(patch.minutesOnSite || 0),
+    friendCount: Number(patch.friendCount || 0),
+    streakDays: Number(patch.streakDays || 0),
+    xp: Number(patch.xp || 0),
+    achievementCount: Number(patch.achievementCount || 0),
+    verifiedEmail: !!patch.verifiedEmail,
+    usernameSet: !!patch.usernameSet
+  });
+}
+
+// Achievement catalog:
+// Keep each achievement in this one list.
+// Every requirement uses the same shape so it's easy to copy an existing one and edit it.
+// Requirement types currently used: achievement_count, visit_all_pages, visit_page, theme,
+// theme_changed, text_size, hour_bucket, friend_count, username_set, minutes_on_site,
+// verified_email, streak_days, xp.
+export const ACHIEVEMENTS = Object.freeze([
+  Object.freeze({
+    id: "achievement_collector",
+    name: "Achievement Collector",
+    description: "Unlock 10 achievements.",
+    secret: false,
+    reward: 5,
+    requirement: achievementRequirement({
+      type: "achievement_count",
+      note: "Unlock 10 achievements.",
+      baselineAware: false,
+      page: "",
+      pages: [],
+      theme: "",
+      textSize: "",
+      hourBucket: "",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 10,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "all_planets",
+    name: "Astronaut",
+    description: "Visit all celestial bodies of the Panategwa system.",
+    secret: false,
+    reward: 10,
+    requirement: achievementRequirement({
+      type: "visit_all_pages",
+      note: "Visit all seven Panategwa planet pages.",
+      baselineAware: false,
+      page: "",
+      pages: [
+        "panategwa-page.html",
+        "panategwa-b-page.html",
+        "panategwa-c-page.html",
+        "panategwa-d-page.html",
+        "panategwa-e-page.html",
+        "panategwa-f-page.html",
+        "panategwa-g-page.html"
+      ],
+      theme: "",
+      textSize: "",
+      hourBucket: "",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "big_reader",
+    name: "Need some glasses?",
+    description: "Set text size to Large.",
+    secret: true,
+    reward: 2,
+    requirement: achievementRequirement({
+      type: "text_size",
+      note: "Set text size to Large.",
+      baselineAware: true,
+      page: "",
+      pages: [],
+      theme: "",
+      textSize: "large",
+      hourBucket: "",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "morning_person",
+    name: "Morning Person",
+    description: "Visit between 3am and 10am.",
+    secret: true,
+    reward: 2,
+    requirement: achievementRequirement({
+      type: "hour_bucket",
+      note: "Visit between 3am and 10am.",
+      baselineAware: true,
+      page: "",
+      pages: [],
+      theme: "",
+      textSize: "",
+      hourBucket: "morning",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "nocturnal",
+    name: "Nocturnal",
+    description: "Visit between 9pm and 3am.",
+    secret: true,
+    reward: 10,
+    requirement: achievementRequirement({
+      type: "hour_bucket",
+      note: "Visit between 9pm and 3am.",
+      baselineAware: true,
+      page: "",
+      pages: [],
+      theme: "",
+      textSize: "",
+      hourBucket: "nocturnal",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "ocean_mode",
+    name: "Wavefinder",
+    description: "Use the Ocean theme.",
+    secret: false,
+    reward: 2,
+    requirement: achievementRequirement({
+      type: "theme",
+      note: "Use the Ocean theme.",
+      baselineAware: true,
+      page: "",
+      pages: [],
+      theme: "Ocean",
+      textSize: "",
+      hourBucket: "",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "three_friends",
+    name: "Small Crew",
+    description: "Add 3 friends.",
+    secret: false,
+    reward: 10,
+    requirement: achievementRequirement({
+      type: "friend_count",
+      note: "Add 3 friends.",
+      baselineAware: true,
+      page: "",
+      pages: [],
+      theme: "",
+      textSize: "",
+      hourBucket: "",
+      minutesOnSite: 0,
+      friendCount: 3,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "site_20_minutes",
+    name: "Settled In",
+    description: "Spend 20 minutes on the site.",
+    secret: false,
+    reward: 5,
+    requirement: achievementRequirement({
+      type: "minutes_on_site",
+      note: "Spend 20 minutes on the site.",
+      baselineAware: true,
+      page: "",
+      pages: [],
+      theme: "",
+      textSize: "",
+      hourBucket: "",
+      minutesOnSite: 20,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "site_60_minutes",
+    name: "Settled In II",
+    description: "Spend 1 hour on the site.",
+    secret: false,
+    reward: 5,
+    requirement: achievementRequirement({
+      type: "minutes_on_site",
+      note: "Spend 1 hour on the site.",
+      baselineAware: true,
+      page: "",
+      pages: [],
+      theme: "",
+      textSize: "",
+      hourBucket: "",
+      minutesOnSite: 60,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "space_mode",
+    name: "Stargazer",
+    description: "Use the Space theme.",
+    secret: false,
+    reward: 1,
+    requirement: achievementRequirement({
+      type: "theme",
+      note: "Use the Space theme.",
+      baselineAware: true,
+      page: "",
+      pages: [],
+      theme: "Space",
+      textSize: "",
+      hourBucket: "",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "theme_shifter",
+    name: "Aesthetic Control",
+    description: "Change your theme.",
+    secret: false,
+    reward: 1,
+    requirement: achievementRequirement({
+      type: "theme_changed",
+      note: "Change your theme away from the default.",
+      baselineAware: true,
+      page: "",
+      pages: [],
+      theme: "Panategwa Mode (Default)",
+      textSize: "",
+      hourBucket: "",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "thrinsachelom_history",
+    name: "Historian",
+    description: "View the history of the Thrinsacheloms.",
+    secret: false,
+    reward: 10,
+    requirement: achievementRequirement({
+      type: "visit_page",
+      note: "Open the Thrinsachelom history page.",
+      baselineAware: false,
+      page: "thrinsachelom-history-page.html",
+      pages: [],
+      theme: "",
+      textSize: "",
+      hourBucket: "",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "tiny_text",
+    name: "Microscopic Text",
+    description: "Set text size to Small.",
+    secret: true,
+    reward: 2,
+    requirement: achievementRequirement({
+      type: "text_size",
+      note: "Set text size to Small.",
+      baselineAware: true,
+      page: "",
+      pages: [],
+      theme: "",
+      textSize: "small",
+      hourBucket: "",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "verified_email",
+    name: "Verified Signal",
+    description: "Verify your email address.",
+    secret: false,
+    reward: 2,
+    requirement: achievementRequirement({
+      type: "verified_email",
+      note: "Verify your email address.",
+      baselineAware: true,
+      page: "",
+      pages: [],
+      theme: "",
+      textSize: "",
+      hourBucket: "",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: true,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "week_streak",
+    name: "Week Streak",
+    description: "Reach a 7 day streak.",
+    secret: false,
+    reward: 4,
+    requirement: achievementRequirement({
+      type: "streak_days",
+      note: "Reach a 7 day streak.",
+      baselineAware: false,
+      page: "",
+      pages: [],
+      theme: "",
+      textSize: "",
+      hourBucket: "",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 7,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "year_streak",
+    name: "Year Streak",
+    description: "Reach a 365 day streak.",
+    secret: true,
+    reward: 50,
+    requirement: achievementRequirement({
+      type: "streak_days",
+      note: "Reach a 365 day streak.",
+      baselineAware: false,
+      page: "",
+      pages: [],
+      theme: "",
+      textSize: "",
+      hourBucket: "",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 365,
+      xp: 0,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  }),
+  Object.freeze({
+    id: "veteran",
+    name: "Veteran",
+    description: "Reach Veteran rank (30 XP).",
+    secret: false,
+    reward: 5,
+    requirement: achievementRequirement({
+      type: "xp",
+      note: "Reach Veteran rank (30 XP).",
+      baselineAware: false,
+      page: "",
+      pages: [],
+      theme: "",
+      textSize: "",
+      hourBucket: "",
+      minutesOnSite: 0,
+      friendCount: 0,
+      streakDays: 0,
+      xp: 30,
+      achievementCount: 0,
+      verifiedEmail: false,
+      usernameSet: false
+    })
+  })
+]);
 
 const ACHIEVEMENT_MAP = new Map(ACHIEVEMENTS.map((achievement) => [achievement.id, achievement]));
 const KNOWN_IDS = new Set(ACHIEVEMENTS.map((achievement) => achievement.id));
@@ -40,9 +467,14 @@ let trackedUser = null;
 let trackedProfile = null;
 let lastSyncAt = 0;
 let interactionSyncTimer = null;
+let siteTimeStartedAt = 0;
+let siteTimePendingMs = 0;
+let siteTimeInterval = null;
+let siteTimeFlushInFlight = null;
 
 const SYNC_INTERVAL_MS = 8000;
 const MIN_SYNC_GAP_MS = 4000;
+const SITE_TIME_FLUSH_MS = 60 * 1000;
 
 function pageId() {
   return (window.location.pathname.split("/").pop() || "index.html").toLowerCase();
@@ -80,6 +512,185 @@ function rewardForId(id) {
   return ACHIEVEMENT_MAP.get(id)?.reward || 1;
 }
 
+function normalizeAchievementRewardSnapshot(value = {}) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const next = {};
+
+  for (const [rawId, rawReward] of Object.entries(value)) {
+    const id = String(rawId || "").trim();
+    if (!KNOWN_IDS.has(id)) continue;
+
+    const reward = Number(rawReward);
+    if (!Number.isFinite(reward)) continue;
+    next[id] = reward;
+  }
+
+  return next;
+}
+
+function rewardSnapshotFor(ids = []) {
+  const next = {};
+  for (const id of uniqueKnown(ids).slice().sort((a, b) => a.localeCompare(b))) {
+    next[id] = rewardForId(id);
+  }
+  return next;
+}
+
+function totalRewardFor(ids = []) {
+  return uniqueKnown(ids).reduce((sum, id) => sum + rewardForId(id), 0);
+}
+
+function totalSnapshotReward(snapshot = {}) {
+  return Object.values(normalizeAchievementRewardSnapshot(snapshot))
+    .reduce((sum, reward) => sum + Number(reward || 0), 0);
+}
+
+function totalStreakReward(history = {}) {
+  if (!history || typeof history !== "object" || Array.isArray(history)) return 0;
+  return Object.values(history).reduce((sum, entry) => {
+    const reward = Number(entry?.reward || 0);
+    return sum + (Number.isFinite(reward) ? reward : 0);
+  }, 0);
+}
+
+function sameRewardSnapshot(a = {}, b = {}) {
+  const left = normalizeAchievementRewardSnapshot(a);
+  const right = normalizeAchievementRewardSnapshot(b);
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+
+  if (leftKeys.length !== rightKeys.length) return false;
+
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    const key = leftKeys[index];
+    if (key !== rightKeys[index]) return false;
+    if (Number(left[key] || 0) !== Number(right[key] || 0)) return false;
+  }
+
+  return true;
+}
+
+function siteTimePendingKey(uid) {
+  return `ptg_site_time_pending_${String(uid || "").trim()}`;
+}
+
+function loadPendingSiteTime(uid) {
+  try {
+    return normalizeSiteTimeMs(sessionStorage.getItem(siteTimePendingKey(uid)));
+  } catch {
+    return 0;
+  }
+}
+
+function savePendingSiteTime(uid, value) {
+  try {
+    const next = normalizeSiteTimeMs(value);
+    if (next > 0) {
+      sessionStorage.setItem(siteTimePendingKey(uid), String(next));
+    } else {
+      sessionStorage.removeItem(siteTimePendingKey(uid));
+    }
+  } catch {}
+}
+
+function currentSiteTimeUid() {
+  return String(trackedUser?.uid || auth.currentUser?.uid || "").trim();
+}
+
+function clearSiteTimeInterval() {
+  if (!siteTimeInterval) return;
+  window.clearInterval(siteTimeInterval);
+  siteTimeInterval = null;
+}
+
+function captureSiteTimeElapsed() {
+  const uid = currentSiteTimeUid();
+  if (!uid || !siteTimeStartedAt) return 0;
+
+  const elapsed = Math.max(0, Date.now() - siteTimeStartedAt);
+  if (!elapsed) return 0;
+
+  siteTimePendingMs += elapsed;
+  siteTimeStartedAt = Date.now();
+  savePendingSiteTime(uid, siteTimePendingMs);
+  return elapsed;
+}
+
+function pauseSiteTimeTracking() {
+  captureSiteTimeElapsed();
+  siteTimeStartedAt = 0;
+  clearSiteTimeInterval();
+}
+
+async function flushPendingSiteTime(force = false) {
+  const uid = currentSiteTimeUid();
+  if (!uid) return;
+
+  const pending = normalizeSiteTimeMs(siteTimePendingMs);
+  if (!pending) return;
+  if (!force && pending < SITE_TIME_FLUSH_MS) return;
+
+  if (siteTimeFlushInFlight) return siteTimeFlushInFlight;
+
+  const delta = pending;
+  siteTimePendingMs = 0;
+  savePendingSiteTime(uid, 0);
+
+  siteTimeFlushInFlight = (async () => {
+    try {
+      await setDoc(doc(db, "users", uid), {
+        siteTimeMs: increment(delta),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      const nextSiteTime = normalizeSiteTimeMs((trackedProfile?.siteTimeMs || 0) + delta);
+      if (trackedProfile && trackedUser?.uid === uid) {
+        trackedProfile = {
+          ...trackedProfile,
+          siteTimeMs: nextSiteTime
+        };
+      }
+
+      window.dispatchEvent(new CustomEvent("panategwa:sitetimechange", {
+        detail: { uid, siteTimeMs: nextSiteTime }
+      }));
+      scheduleAchievementSync(120, true);
+    } catch (error) {
+      console.error("Site time sync error:", error);
+      siteTimePendingMs += delta;
+      savePendingSiteTime(uid, siteTimePendingMs);
+    } finally {
+      siteTimeFlushInFlight = null;
+    }
+  })();
+
+  return siteTimeFlushInFlight;
+}
+
+function resumeSiteTimeTracking() {
+  const uid = currentSiteTimeUid();
+  if (!uid || document.hidden) return;
+
+  if (!siteTimePendingMs) {
+    siteTimePendingMs = loadPendingSiteTime(uid);
+  }
+
+  if (!siteTimeStartedAt) {
+    siteTimeStartedAt = Date.now();
+  }
+
+  if (!siteTimeInterval) {
+    siteTimeInterval = window.setInterval(() => {
+      captureSiteTimeElapsed();
+      flushPendingSiteTime(false);
+    }, SITE_TIME_FLUSH_MS);
+  }
+
+  if (siteTimePendingMs >= SITE_TIME_FLUSH_MS) {
+    flushPendingSiteTime(true);
+  }
+}
+
 function createdAtMs(value) {
   if (!value) return 0;
   if (typeof value.toMillis === "function") return value.toMillis();
@@ -97,7 +708,8 @@ function normalizeProgressBaseline(value = {}) {
     theme: String(value.theme || ""),
     textSize: String(value.textSize || ""),
     hourBucket: String(value.hourBucket || ""),
-    friends: [...new Set((Array.isArray(value.friends) ? value.friends : []).map((entry) => String(entry || "").trim()).filter(Boolean))]
+    friends: [...new Set((Array.isArray(value.friends) ? value.friends : []).map((entry) => String(entry || "").trim()).filter(Boolean))],
+    siteTimeMs: normalizeSiteTimeMs(value.siteTimeMs)
   };
 }
 
@@ -107,65 +719,104 @@ function hourBucket(hour) {
   return "day";
 }
 
-function computeUnlocks(user, profile, pages) {
+function buildAchievementContext(user, profile, pages) {
   const unlocked = unlockedSet(profile);
-  const pending = [];
-  const add = (id, condition) => {
-    if (condition && !unlocked.has(id) && !pending.includes(id)) pending.push(id);
-  };
-
   const page = pageId();
   const baseline = normalizeProgressBaseline(profile?.progressBaseline);
   const hasResetBaseline = baseline.resetAt > 0;
   const currentUsername = String(profile?.username || user.displayName || "").trim();
   const theme = currentTheme();
   const size = currentTextSize();
-  const hour = new Date().getHours();
-  const currentBucket = hourBucket(hour);
+  const currentBucket = hourBucket(new Date().getHours());
   const baselineFriends = new Set(baseline.friends);
   const currentFriends = [...new Set((Array.isArray(profile?.friends) ? profile.friends : []).map((value) => String(value || "").trim()).filter(Boolean))];
   const newFriendsCount = hasResetBaseline
     ? currentFriends.filter((uid) => !baselineFriends.has(uid)).length
     : currentFriends.length;
 
-  add("profile_name", hasResetBaseline ? (!!currentUsername && currentUsername !== baseline.username) : !!currentUsername);
-  add("verified_email", hasResetBaseline ? (!!user.emailVerified && !baseline.verified) : !!user.emailVerified);
-  add("thrinsachelom_history", page === "thrinsachelom-history-page.html");
+  return {
+    user,
+    profile,
+    unlocked,
+    pages,
+    page,
+    baseline,
+    hasResetBaseline,
+    currentUsername,
+    theme,
+    size,
+    currentBucket,
+    currentFriends,
+    newFriendsCount,
+    currentXp: typeof profile?.xp === "number" ? profile.xp : unlocked.size,
+    streakCurrent: Number(profile?.streak?.current || 0),
+    siteTimeMs: normalizeSiteTimeMs(profile?.siteTimeMs),
+    siteTimeSinceResetMs: hasResetBaseline
+      ? Math.max(0, normalizeSiteTimeMs(profile?.siteTimeMs) - normalizeSiteTimeMs(baseline.siteTimeMs))
+      : normalizeSiteTimeMs(profile?.siteTimeMs)
+  };
+}
 
-  add("all_planets", [
-    "panategwa-page.html",
-    "panategwa-b-page.html",
-    "panategwa-c-page.html",
-    "panategwa-d-page.html",
-    "panategwa-e-page.html",
-    "panategwa-f-page.html",
-    "panategwa-g-page.html"
-  ].every((targetPage) => pages.includes(targetPage)));
+function requirementSatisfied(achievement, context, pending = new Set()) {
+  const requirement = achievement?.requirement || {};
 
-  add("theme_shifter", hasResetBaseline ? (theme !== "Panategwa Mode (Default)" && theme !== baseline.theme) : theme !== "Panategwa Mode (Default)");
-  add("ocean_mode", theme === "Ocean" && (!hasResetBaseline || baseline.theme !== "Ocean"));
-  add("space_mode", theme === "Space" && (!hasResetBaseline || baseline.theme !== "Space"));
+  switch (requirement.type) {
+    case "achievement_count":
+      return context.unlocked.size + pending.size >= requirement.achievementCount;
+    case "visit_all_pages":
+      return requirement.pages.every((targetPage) => context.pages.includes(targetPage));
+    case "visit_page":
+      return context.page === requirement.page;
+    case "theme":
+      return context.theme === requirement.theme
+        && (!requirement.baselineAware || context.baseline.theme !== requirement.theme);
+    case "theme_changed":
+      return context.theme !== requirement.theme
+        && (!requirement.baselineAware || context.baseline.theme !== context.theme);
+    case "text_size":
+      return context.size === requirement.textSize
+        && (!requirement.baselineAware || context.baseline.textSize !== requirement.textSize);
+    case "hour_bucket":
+      return context.currentBucket === requirement.hourBucket
+        && (!requirement.baselineAware || context.baseline.hourBucket !== requirement.hourBucket);
+    case "friend_count":
+      return (requirement.baselineAware ? context.newFriendsCount : context.currentFriends.length) >= requirement.friendCount;
+    case "username_set":
+      return !!context.currentUsername
+        && (!requirement.baselineAware || context.currentUsername !== context.baseline.username);
+    case "minutes_on_site":
+      return (requirement.baselineAware ? context.siteTimeSinceResetMs : context.siteTimeMs)
+        >= requirement.minutesOnSite * 60 * 1000;
+    case "verified_email":
+      return !!context.user.emailVerified
+        && (!requirement.baselineAware || !context.baseline.verified);
+    case "streak_days":
+      return context.streakCurrent >= requirement.streakDays;
+    case "xp":
+      return context.currentXp + totalRewardFor([...pending]) >= requirement.xp;
+    default:
+      return false;
+  }
+}
 
-  add("big_reader", size === "large" && (!hasResetBaseline || baseline.textSize !== "large"));
-  add("tiny_text", size === "small" && (!hasResetBaseline || baseline.textSize !== "small"));
-  add("nocturnal", currentBucket === "nocturnal" && (!hasResetBaseline || baseline.hourBucket !== "nocturnal"));
-  add("morning_person", currentBucket === "morning" && (!hasResetBaseline || baseline.hourBucket !== "morning"));
+function computeUnlocks(user, profile, pages) {
+  const context = buildAchievementContext(user, profile, pages);
+  const pending = new Set();
+  let changed = true;
 
-  const currentXp = typeof profile?.xp === "number" ? profile.xp : unlocked.size;
-  const streakCurrent = Number(profile?.streak?.current || 0);
-  const joinedMs = createdAtMs(profile?.createdAt);
-  const progressAgeStart = hasResetBaseline ? baseline.resetAt : joinedMs;
+  while (changed) {
+    changed = false;
 
-  add("three_friends", newFriendsCount >= 3);
-  add("site_20_minutes", progressAgeStart > 0 && (Date.now() - progressAgeStart) >= 20 * 60 * 1000);
-  add("week_streak", streakCurrent >= 7);
-  add("year_streak", streakCurrent >= 365);
-  add("veteran", currentXp >= 30);
+    for (const achievement of ACHIEVEMENTS) {
+      if (context.unlocked.has(achievement.id) || pending.has(achievement.id)) continue;
 
-  const projectedAchievementCount = unlocked.size + pending.length;
-  add("achievement_collector", projectedAchievementCount >= 10);
+      if (!requirementSatisfied(achievement, context, pending)) continue;
+      pending.add(achievement.id);
+      changed = true;
+    }
+  }
 
-  return pending;
+  return [...pending];
 }
 
 export async function syncAchievementProgress(user, profile) {
@@ -179,6 +830,21 @@ export async function syncAchievementProgress(user, profile) {
     const currentAchievements = uniqueKnown(data.achievements || profile?.achievements || []);
     const currentVisited = visitedPages(data);
     const nextVisited = [...new Set([...currentVisited, pageId()])];
+    // Keep a per-achievement reward snapshot so editing reward values later can
+    // raise or lower total XP without touching non-achievement XP like streaks.
+    const storedRewardSnapshot = normalizeAchievementRewardSnapshot(
+      data.achievementRewardSnapshot || profile?.achievementRewardSnapshot
+    );
+    const fallbackRewardSnapshot = rewardSnapshotFor(currentAchievements);
+    const hasStoredRewardSnapshot = Object.keys(storedRewardSnapshot).length > 0;
+    const rewardSnapshotBaseline = hasStoredRewardSnapshot
+      ? storedRewardSnapshot
+      : fallbackRewardSnapshot;
+    const baseXp = typeof data.xp === "number" ? data.xp : currentAchievements.length;
+    const nonAchievementXp = hasStoredRewardSnapshot
+      ? Math.max(0, baseXp - totalSnapshotReward(rewardSnapshotBaseline))
+      : Math.max(0, totalStreakReward(data.streakHistory || profile?.streakHistory));
+    const currentAchievementXp = totalRewardFor(currentAchievements);
 
     const mergedProfile = {
       ...data,
@@ -188,13 +854,14 @@ export async function syncAchievementProgress(user, profile) {
       verified: !!user.emailVerified,
       achievements: currentAchievements,
       visitedPages: nextVisited,
-      xp: typeof data.xp === "number" ? data.xp : currentAchievements.length
+      achievementRewardSnapshot: rewardSnapshotBaseline,
+      xp: Math.max(0, nonAchievementXp + currentAchievementXp)
     };
 
     const pending = computeUnlocks(user, mergedProfile, nextVisited);
     const mergedAchievements = uniqueKnown([...currentAchievements, ...pending]);
-    const addedReward = pending.reduce((sum, id) => sum + rewardForId(id), 0);
-    const xp = (typeof data.xp === "number" ? data.xp : currentAchievements.length) + addedReward;
+    const nextRewardSnapshot = rewardSnapshotFor(mergedAchievements);
+    const xp = Math.max(0, nonAchievementXp + totalSnapshotReward(nextRewardSnapshot));
     const nextUsername = data.username || user.displayName || "";
     const nextEmail = user.email || data.email || "";
     const nextEmailLower = String(nextEmail || "").toLowerCase();
@@ -210,7 +877,8 @@ export async function syncAchievementProgress(user, profile) {
       !!data.verified !== nextVerified ||
       currentVisited.length !== nextVisited.length ||
       currentAchievements.length !== mergedAchievements.length ||
-      (typeof data.xp === "number" ? data.xp : currentAchievements.length) !== xp ||
+      !sameRewardSnapshot(storedRewardSnapshot, nextRewardSnapshot) ||
+      baseXp !== xp ||
       Number(data?.stats?.pagesVisited || 0) !== pagesVisited;
 
     const nextDoc = {
@@ -220,6 +888,7 @@ export async function syncAchievementProgress(user, profile) {
       username: nextUsername,
       verified: nextVerified,
       achievements: mergedAchievements,
+      achievementRewardSnapshot: nextRewardSnapshot,
       visitedPages: nextVisited,
       xp,
       stats: {
@@ -268,6 +937,9 @@ export function renderAchievements(profile) {
     const isUnlocked = unlocked.has(achievement.id);
     const title = achievement.secret && !isUnlocked ? "Secret" : achievement.name;
     const desc = achievement.secret && !isUnlocked ? "Hidden achievement" : achievement.description;
+    const requirement = achievement.secret && !isUnlocked
+      ? "Requirement hidden"
+      : (achievement.requirement?.note || achievement.description);
 
     return `
       <div class="achievement-card ${isUnlocked ? "unlocked" : "locked"}" id="achievement-card-${achievement.id}" data-achievement-id="${achievement.id}">
@@ -275,6 +947,7 @@ export function renderAchievements(profile) {
         <div>
           <div class="achievement-name">${title}</div>
           <div class="achievement-desc">${desc}</div>
+          <div class="achievement-desc">Requirement: ${requirement}</div>
           <div class="achievement-desc">+${achievement.reward} XP</div>
         </div>
       </div>
@@ -361,9 +1034,13 @@ function scheduleAchievementSync(delay = 0, force = false) {
 
 function startAccountWatcher() {
   watchAuth((user, profile) => {
+    pauseSiteTimeTracking();
+    flushPendingSiteTime(true);
+
     if (!user) {
       trackedUser = null;
       trackedProfile = null;
+      siteTimePendingMs = 0;
       clearSyncTimer();
       renderAchievements(null);
       return;
@@ -371,6 +1048,8 @@ function startAccountWatcher() {
 
     trackedUser = user;
     trackedProfile = profile || trackedProfile;
+    siteTimePendingMs = loadPendingSiteTime(user.uid);
+    resumeSiteTimeTracking();
     scheduleAchievementSync(0, true);
   });
 }
@@ -424,11 +1103,27 @@ function startReactiveSyncTriggers() {
   };
 
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) scheduleSoon();
+    if (document.hidden) {
+      pauseSiteTimeTracking();
+      flushPendingSiteTime(true);
+      return;
+    }
+    resumeSiteTimeTracking();
+    scheduleSoon();
   });
 
-  window.addEventListener("focus", scheduleSoon);
-  window.addEventListener("pageshow", scheduleSoon);
+  window.addEventListener("focus", () => {
+    resumeSiteTimeTracking();
+    scheduleSoon();
+  });
+  window.addEventListener("pageshow", () => {
+    resumeSiteTimeTracking();
+    scheduleSoon();
+  });
+  window.addEventListener("pagehide", () => {
+    pauseSiteTimeTracking();
+    flushPendingSiteTime(true);
+  });
   window.addEventListener("panategwa:themechange", scheduleSoft);
   window.addEventListener("panategwa:textsizechange", scheduleSoft);
   window.addEventListener("panategwa:achievement-sync", scheduleSoon);

@@ -960,6 +960,9 @@ export async function refreshCurrentUserSession() {
   await reload(user);
   const refreshedUser = auth.currentUser || user;
   const profile = await ensureUserProfile(refreshedUser);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("panategwa:achievement-sync"));
+  }
   return { user: refreshedUser, profile };
 }
 

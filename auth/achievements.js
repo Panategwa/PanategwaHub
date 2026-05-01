@@ -367,7 +367,7 @@ export const ACHIEVEMENTS = Object.freeze([
     requirement: achievementRequirement({
       type: "verified_email",
       note: "Verify your email address.",
-      baselineAware: true,
+      baselineAware: false,
       page: "",
       pages: [],
       theme: "",
@@ -788,7 +788,7 @@ function requirementSatisfied(achievement, context, pending = new Set()) {
       return (requirement.baselineAware ? context.siteTimeSinceResetMs : context.siteTimeMs)
         >= requirement.minutesOnSite * 60 * 1000;
     case "verified_email":
-      return !!context.user.emailVerified
+      return !!(context.user?.emailVerified || context.profile?.verified)
         && (!requirement.baselineAware || !context.baseline.verified);
     case "streak_days":
       return context.streakCurrent >= requirement.streakDays;
@@ -966,7 +966,7 @@ function emitAchievementToasts(user, newlyUnlocked) {
     window.PanategwaToast({
       title: "Achievement unlocked",
       body: `${achievement.name}\n+${achievement.reward} XP`,
-      href: "account-page.html?tab=progress",
+      href: `account-page.html?tab=progress&target=${encodeURIComponent(id)}`,
       duration: 5000,
       persist: true,
       kind: "achievement",

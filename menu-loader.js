@@ -28,6 +28,21 @@ function ensureSharedSocialNotifications() {
   document.head.appendChild(script);
 }
 
+function ensureSharedMusic() {
+  const alreadyLoaded = [...document.querySelectorAll("script[type='module']")].some((script) => {
+    const src = script.getAttribute("src") || "";
+    return src === "audio/music-system.js" || src.endsWith("/audio/music-system.js");
+  });
+
+  if (alreadyLoaded) return;
+
+  const script = document.createElement("script");
+  script.type = "module";
+  script.src = "audio/music-system.js";
+  script.dataset.panategwaMusic = "true";
+  document.head.appendChild(script);
+}
+
 function defaultAvatarIcon() {
   return `
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -122,9 +137,22 @@ window.PanategwaUpdateSidebarUnread = function () {
   renderSidebarAvatar();
 };
 
+window.PanategwaGoTo = function (url) {
+  try {
+    window.PanategwaMusic?.captureState?.();
+  } catch {}
+
+  window.location.href = String(url || "").trim();
+};
+
+ensureSharedAchievements();
+ensureSharedSocialNotifications();
+ensureSharedMusic();
+
 document.addEventListener("DOMContentLoaded", function () {
   ensureSharedAchievements();
   ensureSharedSocialNotifications();
+  ensureSharedMusic();
 
   const menuContainer = document.getElementById("menu-container");
   if (!menuContainer) return;
@@ -162,17 +190,19 @@ document.addEventListener("DOMContentLoaded", function () {
     </div>
   `;
 
+  menuHTML += `<div id="menu-music-slot"></div>`;
+
   menuHTML += `
     <div class="line icons">
       <button class="menu-icon-button ${isSettings ? "active-icon" : ""}"
         ${isSettings ? "disabled" : ""}
-        onclick="window.location.href='${buildUrl("settings-page.html")}'"
+        onclick="window.PanategwaGoTo('${buildUrl("settings-page.html")}')"
         title="Site settings">
         ${iconMarkup("settings")}
       </button>
 
       <button class="menu-icon-button"
-        onclick="window.location.href='${buildUrl("account-page.html")}'"
+        onclick="window.PanategwaGoTo('${buildUrl("account-page.html")}')"
         title="Account">
         <span id="menu-account-button"
           class="${isAccount ? "active-icon" : ""}"
@@ -180,7 +210,7 @@ document.addEventListener("DOMContentLoaded", function () {
       </button>
 
       <button class="menu-icon-button"
-        onclick="window.location.href='${buildUrl("streak-page.html")}'"
+        onclick="window.PanategwaGoTo('${buildUrl("streak-page.html")}')"
         title="Streak">
         ${iconMarkup("streak")}
       </button>
@@ -200,7 +230,7 @@ document.addEventListener("DOMContentLoaded", function () {
     menuHTML += `
       <button class="menu-button ${isActive ? "active" : ""}"
         ${isActive ? "disabled" : ""}
-        onclick="window.location.href='${url}'">
+        onclick="window.PanategwaGoTo('${url}')">
         ${page.name}
       </button>
     `;

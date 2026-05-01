@@ -315,6 +315,69 @@ function updateSidebarAvatar(profile, user) {
   }
 }
 
+function buildAccountHref(section, sub = null, targetId = null) {
+  const params = new URLSearchParams();
+  if (section) params.set("tab", normalizeAccountSection(section));
+  if (sub) params.set("sub", String(sub || "").trim());
+  if (targetId) params.set("target", String(targetId || "").trim());
+  const query = params.toString();
+  return query ? `account-page.html?${query}` : "account-page.html";
+}
+
+function socialNotificationHref(message) {
+  const kind = String(message?.kind || "").trim();
+  const targetUid = String(message?.fromUid || message?.targetId || "").trim();
+
+  if (kind === "friend-request") return buildAccountHref("friends", "requests");
+  if (kind === "friend-accepted") return buildAccountHref("info", null, targetUid || null);
+  if (kind === "friend-declined") return buildAccountHref("friends", "requests");
+  if (kind === "friend-removed") return buildAccountHref("friends", "friends");
+  if (kind === "friend-blocked") return buildAccountHref("friends", "blocked");
+
+  const section = normalizeAccountSection(message?.targetSection || "messages");
+  const sub = String(message?.targetSubSection || "").trim() || null;
+  const targetId = String(message?.targetId || "").trim() || null;
+  return buildAccountHref(section, sub, targetId);
+}
+
+function localNotificationHref(entry) {
+  const kind = String(entry?.kind || "").trim();
+  const rawId = String(entry?.id || "").trim();
+
+  if (kind === "achievement") {
+    const achievementId = rawId.startsWith("achievement:") ? rawId.slice("achievement:".length).trim() : "";
+    return buildAccountHref("progress", null, achievementId || null);
+  }
+
+  if (kind === "streak") {
+    return "streak-page.html";
+  }
+
+  return String(entry?.href || "").trim();
+}
+
+function openNotificationHref(href) {
+  const target = String(href || "").trim();
+  if (!target) return;
+
+  try {
+    const url = new URL(target, window.location.href);
+    const page = String(url.pathname.split("/").pop() || "").trim().toLowerCase();
+
+    if (page === "account-page.html" && typeof window.openAccountArea === "function") {
+      const section = normalizeAccountSection(url.searchParams.get("tab") || "info");
+      const sub = String(url.searchParams.get("sub") || "").trim() || null;
+      const targetId = String(url.searchParams.get("target") || "").trim() || null;
+      window.openAccountArea(section, sub, targetId);
+      return;
+    }
+
+    window.location.href = url.toString();
+  } catch {
+    window.location.href = target;
+  }
+}
+
 function syncMessagesTabBadge(state) {
   const button = $("tab-messages");
   if (!button) return;
@@ -1050,7 +1113,7 @@ function socialNotificationItems(state) {
       kind: String(message.kind || "social"),
       title: String(message.title || "Notification"),
       body: formatNotificationBody(message.kind, message.body || ""),
-      href: "account-page.html?tab=messages",
+      href: socialNotificationHref(message),
       createdAt: toMs(message.createdAt),
       unread: !(Array.isArray(message.readBy) ? message.readBy : []).includes(user.uid),
       uid: String(message.fromUid || message.targetId || "").trim(),
@@ -1066,7 +1129,7 @@ function localNotificationItems(state) {
     kind: String(entry.kind || "general"),
     title: String(entry.title || "Notification"),
     body: formatNotificationBody(entry.kind, entry.body || ""),
-    href: String(entry.href || ""),
+    href: localNotificationHref(entry),
     createdAt: Number(entry.createdAt || 0),
     unread: !entry.read,
     uid: "",
@@ -1100,7 +1163,7 @@ function notificationActions(item) {
   }
 
   if (item.href) {
-    actions.push(`<button type="button" data-notification-action="open-link" data-href="${escapeHtml(item.href)}">Open</button>`);
+    actions.push(`<button type="button" data-notification-action="open-link" data-source="${escapeHtml(item.source)}" data-id="${escapeHtml(item.rawId)}">Open</button>`);
   }
 
   actions.push(`<button type="button" data-notification-action="${item.unread ? "mark-read" : "mark-unread"}" data-source="${escapeHtml(item.source)}" data-id="${escapeHtml(item.rawId)}">${item.unread ? "Mark read" : "Mark unread"}</button>`);
@@ -1660,11 +1723,17 @@ function bindNotifications() {
     const source = String(button.dataset.source || "").trim();
     const id = String(button.dataset.id || "").trim();
     const uid = String(button.dataset.uid || "").trim();
-    const href = String(button.dataset.href || "").trim();
 
     try {
-      if (action === "open-link" && href) {
-        window.location.href = href;
+      if (action === "open-link") {
+        const item = findNotificationItem(source, id);
+        if (!item) return;
+        if (item.unread) {
+          await applyNotificationOps([notificationReadOp(item, true)]);
+        }
+        if (item.href) {
+          openNotificationHref(item.href);
+        }
         return;
       }
 

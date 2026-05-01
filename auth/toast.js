@@ -1,9 +1,22 @@
 import { auth } from "./firebase-config.js";
 
 const MAX_STORED_NOTIFICATIONS = 120;
+const AUDIO_SETTINGS_KEY = "ptg_audio_settings";
+const DEFAULT_AUDIO_SETTINGS = Object.freeze({
+  masterVolume: 100,
+  popupVolume: 70,
+  musicVolume: 70,
+  lastMasterVolume: 100,
+  lastPopupVolume: 70,
+  lastMusicVolume: 70
+});
 
 let toastQueue = [];
 let toastActive = false;
+let toastAudioContext = null;
+let toastAudioUnlockInstalled = false;
+let lastToastSoundAt = 0;
+let activeToastTimer = 0;
 
 function ensureToastStyle() {
   const styleId = "achievement-toast-style";
@@ -59,6 +72,86 @@ function getStack() {
   return stack;
 }
 
+function ensureToastAudioContext() {
+  if (toastAudioContext) return toastAudioContext;
+  const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextCtor) return null;
+  toastAudioContext = new AudioContextCtor();
+  return toastAudioContext;
+}
+
+function installToastAudioUnlock() {
+  if (toastAudioUnlockInstalled || typeof window === "undefined") return;
+  toastAudioUnlockInstalled = true;
+
+  const unlock = async () => {
+    const ctx = ensureToastAudioContext();
+    if (!ctx) return;
+
+    try {
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
+    } catch {}
+
+    if (ctx.state === "running") {
+      window.removeEventListener("pointerdown", unlock, true);
+      window.removeEventListener("keydown", unlock, true);
+      window.removeEventListener("touchstart", unlock, true);
+    }
+  };
+
+  window.addEventListener("pointerdown", unlock, true);
+  window.addEventListener("keydown", unlock, true);
+  window.addEventListener("touchstart", unlock, true);
+}
+
+async function playToastSound() {
+  try {
+    const now = Date.now();
+    if (now - lastToastSoundAt < 120) return;
+    lastToastSoundAt = now;
+
+    const audioSettings = getToastAudioSettings();
+    const masterVolume = clampPercent(audioSettings.masterVolume, DEFAULT_AUDIO_SETTINGS.masterVolume);
+    const popupVolume = clampPercent(audioSettings.popupVolume, DEFAULT_AUDIO_SETTINGS.popupVolume);
+    const effectivePopupVolume = Math.round((masterVolume * popupVolume) / 100);
+    if (effectivePopupVolume <= 0) return;
+
+    const ctx = ensureToastAudioContext();
+    if (!ctx) return;
+
+    if (ctx.state === "suspended") {
+      await ctx.resume().catch(() => {});
+    }
+    if (ctx.state !== "running") return;
+
+    const start = ctx.currentTime + 0.01;
+    const master = ctx.createGain();
+    const peakGain = 0.01 + (effectivePopupVolume / 100) * 0.04;
+    master.gain.setValueAtTime(0.0001, start);
+    master.gain.exponentialRampToValueAtTime(peakGain, start + 0.02);
+    master.gain.exponentialRampToValueAtTime(0.0001, start + 0.42);
+    master.connect(ctx.destination);
+
+    const primary = ctx.createOscillator();
+    primary.type = "sine";
+    primary.frequency.setValueAtTime(740, start);
+    primary.frequency.exponentialRampToValueAtTime(980, start + 0.18);
+    primary.connect(master);
+    primary.start(start);
+    primary.stop(start + 0.24);
+
+    const shimmer = ctx.createOscillator();
+    shimmer.type = "triangle";
+    shimmer.frequency.setValueAtTime(1180, start + 0.02);
+    shimmer.frequency.exponentialRampToValueAtTime(1560, start + 0.20);
+    shimmer.connect(master);
+    shimmer.start(start + 0.02);
+    shimmer.stop(start + 0.26);
+  } catch {}
+}
+
 function currentUid(uid = auth.currentUser?.uid) {
   return String(uid || "").trim();
 }
@@ -67,11 +160,144 @@ function notificationsKey(uid) {
   return `ptg_notifications_${uid}`;
 }
 
+function clampPercent(value, fallback = 0) {
+  const next = Number(value);
+  if (!Number.isFinite(next)) return fallback;
+  return Math.max(0, Math.min(100, Math.round(next)));
+}
+
+function audioMemoryKey(channel) {
+  if (channel === "masterVolume") return "lastMasterVolume";
+  if (channel === "popupVolume") return "lastPopupVolume";
+  if (channel === "musicVolume") return "lastMusicVolume";
+  return "";
+}
+
+function normalizeAudioSettings(value = {}) {
+  const next = {
+    masterVolume: clampPercent(value.masterVolume, DEFAULT_AUDIO_SETTINGS.masterVolume),
+    popupVolume: clampPercent(value.popupVolume, DEFAULT_AUDIO_SETTINGS.popupVolume),
+    musicVolume: clampPercent(value.musicVolume, DEFAULT_AUDIO_SETTINGS.musicVolume),
+    lastMasterVolume: clampPercent(value.lastMasterVolume, DEFAULT_AUDIO_SETTINGS.lastMasterVolume),
+    lastPopupVolume: clampPercent(value.lastPopupVolume, DEFAULT_AUDIO_SETTINGS.lastPopupVolume),
+    lastMusicVolume: clampPercent(value.lastMusicVolume, DEFAULT_AUDIO_SETTINGS.lastMusicVolume)
+  };
+
+  if (next.masterVolume > 0) next.lastMasterVolume = next.masterVolume;
+  if (next.popupVolume > 0) next.lastPopupVolume = next.popupVolume;
+  if (next.musicVolume > 0) next.lastMusicVolume = next.musicVolume;
+
+  return next;
+}
+
+function emitAudioSettingsChange(settings) {
+  window.dispatchEvent(new CustomEvent("panategwa:audio-settings-change", {
+    detail: { settings: normalizeAudioSettings(settings) }
+  }));
+}
+
+export function getToastAudioSettings() {
+  try {
+    const raw = localStorage.getItem(AUDIO_SETTINGS_KEY);
+    if (!raw) return { ...DEFAULT_AUDIO_SETTINGS };
+    return normalizeAudioSettings(JSON.parse(raw));
+  } catch {
+    return { ...DEFAULT_AUDIO_SETTINGS };
+  }
+}
+
+export function updateToastAudioSettings(patch = {}) {
+  const next = normalizeAudioSettings({
+    ...getToastAudioSettings(),
+    ...(patch || {})
+  });
+
+  try {
+    localStorage.setItem(AUDIO_SETTINGS_KEY, JSON.stringify(next));
+  } catch {}
+
+  emitAudioSettingsChange(next);
+  return next;
+}
+
+export function setToastAudioChannelVolume(channel, value) {
+  const targetChannel = String(channel || "").trim();
+  const memoryKey = audioMemoryKey(targetChannel);
+  if (!memoryKey) return getToastAudioSettings();
+
+  const nextVolume = clampPercent(value, DEFAULT_AUDIO_SETTINGS[targetChannel]);
+  const patch = { [targetChannel]: nextVolume };
+  if (nextVolume > 0) {
+    patch[memoryKey] = nextVolume;
+  }
+
+  return updateToastAudioSettings(patch);
+}
+
+export function toggleToastAudioChannelMute(channel) {
+  const targetChannel = String(channel || "").trim();
+  const memoryKey = audioMemoryKey(targetChannel);
+  if (!memoryKey) return getToastAudioSettings();
+
+  const current = getToastAudioSettings();
+  const currentVolume = clampPercent(current[targetChannel], DEFAULT_AUDIO_SETTINGS[targetChannel]);
+  const rememberedVolume = clampPercent(current[memoryKey], DEFAULT_AUDIO_SETTINGS[memoryKey]);
+
+  if (currentVolume > 0) {
+    return updateToastAudioSettings({
+      [targetChannel]: 0,
+      [memoryKey]: currentVolume
+    });
+  }
+
+  return updateToastAudioSettings({
+    [targetChannel]: rememberedVolume > 0 ? rememberedVolume : DEFAULT_AUDIO_SETTINGS[targetChannel]
+  });
+}
+
+export function clearPanategwaToasts() {
+  toastQueue = [];
+  toastActive = false;
+
+  if (activeToastTimer) {
+    window.clearTimeout(activeToastTimer);
+    activeToastTimer = 0;
+  }
+
+  if (typeof document === "undefined") return;
+  const stack = document.getElementById("achievement-toast-stack");
+  if (stack) {
+    stack.replaceChildren();
+  }
+}
+
 function emitNotificationChange(uid) {
   if (!uid) return;
   window.dispatchEvent(new CustomEvent("panategwa:notifications-changed", {
     detail: { uid }
   }));
+}
+
+function openToastHref(href) {
+  const target = String(href || "").trim();
+  if (!target) return;
+
+  try {
+    const url = new URL(target, window.location.href);
+    const page = String(url.pathname.split("/").pop() || "").trim().toLowerCase();
+
+    if (page === "account-page.html" && typeof window.openAccountArea === "function") {
+      const section = String(url.searchParams.get("tab") || "info").trim().toLowerCase();
+      const sub = String(url.searchParams.get("sub") || "").trim() || null;
+      const targetId = String(url.searchParams.get("target") || "").trim() || null;
+      window.openAccountArea(section, sub, targetId);
+      return;
+    }
+
+    window.location.href = url.toString();
+  } catch {
+    window.location.href = target;
+  }
 }
 
 function normalizeStoredNotification(value = {}) {
@@ -199,6 +425,7 @@ export function ensurePanategwaToast() {
   if (window.PanategwaToast) return window.PanategwaToast;
 
   ensureToastStyle();
+  installToastAudioUnlock();
 
   window.PanategwaToast = ({
     title = "Message",
@@ -207,7 +434,8 @@ export function ensurePanategwaToast() {
     duration = 5000,
     persist = false,
     notificationId = "",
-    kind = "general"
+    kind = "general",
+    clearExisting = false
   } = {}) => {
     if (persist) {
       pushStoredNotification({
@@ -221,7 +449,19 @@ export function ensurePanategwaToast() {
       });
     }
 
-    toastQueue.push({ title, body, href, duration: Math.max(1200, Number(duration) || 5000) });
+    if (clearExisting) {
+      clearPanategwaToasts();
+    }
+
+    toastQueue.push({
+      title,
+      body,
+      href,
+      notificationId: String(notificationId || "").trim(),
+      persist: !!persist,
+      clearExisting: !!clearExisting,
+      duration: Math.max(1200, Number(duration) || 5000)
+    });
     if (toastActive) return;
     toastActive = true;
 
@@ -231,6 +471,8 @@ export function ensurePanategwaToast() {
         toastActive = false;
         return;
       }
+
+      playToastSound();
 
       const toast = document.createElement("div");
       toast.className = "achievement-toast";
@@ -245,12 +487,16 @@ export function ensurePanategwaToast() {
       toast.appendChild(titleEl);
       toast.appendChild(bodyEl);
       toast.addEventListener("click", () => {
-        if (item.href) window.location.href = item.href;
+        if (item.persist && item.notificationId) {
+          setStoredNotificationRead(item.notificationId, true);
+        }
+        if (item.href) openToastHref(item.href);
       });
 
       getStack().appendChild(toast);
 
-      window.setTimeout(() => {
+      activeToastTimer = window.setTimeout(() => {
+        activeToastTimer = 0;
         toast.remove();
         next();
       }, item.duration);

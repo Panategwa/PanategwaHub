@@ -5,11 +5,13 @@
   <title>Settings</title>
 
   <link rel="stylesheet" href="styles.css" />
+  <script type="module" src="audio/music-system.js"></script>
   <script src="menu-loader.js" defer></script>
   <script src="settings/text-size.js" defer></script>
   <script src="settings/color-theme.js" defer></script>
   <script src="settings/translate.js" defer></script>
   <script src="settings/settings.js" defer></script>
+  <script type="module" src="settings/audio-settings.js"></script>
   <script type="module" src="auth/achievements.js"></script>
 </head>
 
@@ -24,7 +26,7 @@
 
     <div class="settings-group">
       <button class="settings-main" onclick="toggleLanguages()">
-        🌍 Language
+        Language
       </button>
 
       <div id="lang-message" style="display:none;">
@@ -41,28 +43,119 @@
       </button>
 
       <div id="textsize-message" style="display:none;">
-        Choose your preferred text size.
+        Choose a preset or set your own text size from 12px to 20px.
       </div>
 
-      
-      <div id="textsize-buttons" class="settings-options" style="display:none;">
-        <button onclick="setTextSize('small')">Small</button>
-        <button onclick="setTextSize('medium')">Medium</button>
-        <button onclick="setTextSize('large')">Large</button>
+      <div id="textsize-buttons" class="settings-options settings-options-rich" style="display:none;"></div>
+    </div>
+
+    <div class="settings-group">
+      <button class="settings-main" onclick="toggleThemes()">
+        Color Theme
+      </button>
+
+      <div id="theme-message" style="display:none;">
+        Choose a visual preset for the site.
+      </div>
+
+      <div id="theme-buttons" class="settings-options" style="display:none;"></div>
+    </div>
+
+    <div class="settings-group">
+      <button class="settings-main" onclick="toggleAudioSettings()">
+        Audio
+      </button>
+
+      <div id="audio-message" style="display:none;">
+        Adjust the site sound levels here.
+      </div>
+
+      <div id="audio-options" class="settings-options settings-options-rich" style="display:none;">
+        <div class="settings-option-card audio-slider-list">
+          <div class="audio-control-card">
+            <div class="audio-slider-row">
+              <span class="audio-slider-copy">
+                <strong>Master Volume</strong>
+                <small>Controls every site sound at once, including popups and future music.</small>
+              </span>
+              <div class="audio-slider-actions">
+                <span id="master-volume-value" class="audio-slider-value">100%</span>
+                <button id="mute-master-volume-btn" type="button" class="audio-inline-button">Mute</button>
+              </div>
+            </div>
+            <input id="master-volume-slider" class="audio-volume-slider" type="range" min="0" max="100" step="1" value="100" />
+          </div>
+
+          <div class="audio-control-card">
+            <div class="audio-slider-row">
+              <span class="audio-slider-copy">
+                <strong>Music Volume</strong>
+                <small>Controls the site music player from the menu, and stays in sync everywhere.</small>
+              </span>
+              <div class="audio-slider-actions">
+                <span id="music-volume-value" class="audio-slider-value">70%</span>
+                <button id="mute-music-volume-btn" type="button" class="audio-inline-button">Mute</button>
+              </div>
+            </div>
+            <input id="music-volume-slider" class="audio-volume-slider" type="range" min="0" max="100" step="1" value="70" />
+          </div>
+
+          <div class="audio-control-card">
+            <div class="audio-slider-row">
+              <span class="audio-slider-copy">
+                <strong>Pop-Up Volume</strong>
+                <small>Controls the popup sound for notifications, achievements, and streak rewards.</small>
+              </span>
+              <div class="audio-slider-actions">
+                <span id="popup-volume-value" class="audio-slider-value">70%</span>
+                <button id="mute-popup-volume-btn" type="button" class="audio-inline-button">Mute</button>
+              </div>
+            </div>
+            <input id="popup-volume-slider" class="audio-volume-slider" type="range" min="0" max="100" step="1" value="70" />
+          </div>
+
+          <p id="audio-status" class="settings-inline-status section-hidden" aria-live="polite"></p>
+        </div>
       </div>
     </div>
 
     <div class="settings-group">
-  <button class="settings-main" onclick="toggleThemes()">
-    Color Theme
-  </button>
+      <button class="settings-main" onclick="toggleOtherSettings()">
+        Other settings
+      </button>
 
-  <div id="theme-message" style="display:none;">
-    Choose a visual preset for the site.
-  </div>
+      <div id="other-message" style="display:none;">
+        Popup tools and testing live here.
+      </div>
 
-  <div id="theme-buttons" class="settings-options" style="display:none;"></div>
-</div>
+      <div id="other-options" class="settings-options settings-options-rich" style="display:none;">
+        <div class="settings-option-card">
+          <div class="settings-card-heading">
+            <strong>Pop-up settings</strong>
+            <small>Instantly remove any visible or queued popups if you want a clean screen.</small>
+          </div>
+          <div class="button-row audio-button-row">
+            <button id="clear-all-popups-btn" type="button">Remove all popups</button>
+          </div>
+          <p id="other-status" class="settings-inline-status section-hidden" aria-live="polite"></p>
+        </div>
+
+        <div class="settings-option-card">
+          <div class="settings-card-heading">
+            <strong>Testing</strong>
+            <small>Send yourself a test popup that uses the same style and sound as the real ones.</small>
+          </div>
+          <div class="settings-inline-fields">
+            <input id="testing-toast-title" type="text" maxlength="60" placeholder="Message title" />
+            <input id="testing-toast-body" type="text" maxlength="140" placeholder="Message body" />
+          </div>
+          <div class="button-row">
+            <button id="send-test-popup-btn" type="button">Send test popup</button>
+          </div>
+          <p id="testing-status" class="settings-inline-status section-hidden" aria-live="polite"></p>
+        </div>
+      </div>
+    </div>
 
   </div>
 

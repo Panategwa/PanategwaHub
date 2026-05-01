@@ -461,7 +461,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Friend request",
       body: message.body || `${message.fromName || "Someone"} sent you a friend request.`,
-      href: buildAccountHref("messages")
+      href: buildAccountHref("friends", "requests")
     };
   }
 
@@ -469,7 +469,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Friend request accepted",
       body: message.body || `${message.fromName || "Someone"} accepted your friend request.`,
-      href: buildAccountHref("messages")
+      href: buildAccountHref("info", null, cleanUid(message.fromUid || message.targetId || ""))
     };
   }
 
@@ -477,7 +477,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Friend request declined",
       body: message.body || `${message.fromName || "Someone"} declined your friend request.`,
-      href: buildAccountHref("messages")
+      href: buildAccountHref("friends", "requests")
     };
   }
 
@@ -485,7 +485,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Friend removed",
       body: message.body || `${message.fromName || "Someone"} removed you from their friends list.`,
-      href: buildAccountHref("messages")
+      href: buildAccountHref("friends", "friends")
     };
   }
 
@@ -493,7 +493,7 @@ function toastConfigForMessage(message) {
     return {
       title: message.title || "Blocked",
       body: message.body || `${message.fromName || "Someone"} blocked you.`,
-      href: buildAccountHref("messages")
+      href: buildAccountHref("friends", "blocked")
     };
   }
 

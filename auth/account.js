@@ -596,6 +596,44 @@ function renderAuth(state) {
   if (cardTitle) cardTitle.textContent = viewingFriend ? "Friend profile" : "Your profile";
   if (cardBadge) cardBadge.textContent = viewingFriend ? "Friends only" : "Signed in";
 
+  if (targetId && targetId !== user.uid && !friendProfile) {
+    const stillLoading = state.ready === false;
+    if (cardTitle) cardTitle.textContent = stillLoading ? "Loading friend profile" : "Friend profile unavailable";
+    if (cardBadge) cardBadge.textContent = "Friends only";
+
+    info.innerHTML = `
+      <div class="account-header">
+        ${avatarMarkup(
+          ownProfile.photoURL || getDefaultAvatarDataUrl(),
+          "Your avatar",
+          "account-avatar",
+          isVerifiedState(user, ownProfile)
+        )}
+        <div>
+          <p style="margin: 0;"><strong>${stillLoading ? "Friend profile" : "Profile unavailable"}</strong></p>
+          <p style="margin: 0; opacity: 0.8;">${stillLoading ? "Syncing your friend's info now." : "This profile is not available anymore."}</p>
+        </div>
+      </div>
+
+      <div class="button-row" style="margin-bottom: 14px;">
+        <button id="back-to-friends-btn" type="button" class="small">Back to friends</button>
+      </div>
+
+      <div class="msg-empty">
+        ${stillLoading
+          ? "We are loading this friend's account info."
+          : "You may not be friends with this person anymore, or their profile is no longer available."}
+      </div>
+    `;
+
+    $("back-to-friends-btn")?.addEventListener("click", () => {
+      window.openAccountArea("friends", "friends");
+    });
+
+    updateSidebarAvatar(ownProfile, user);
+    return;
+  }
+
   if (viewingFriend) {
     const username = friendProfile.username || "Player";
     const avatar = avatarMarkup(
@@ -1234,6 +1272,7 @@ function renderAll(state) {
   const profile = resolvedProfile(state) || {};
   const authSignature = JSON.stringify({
     authHydrated,
+    socialReady: !!state.ready,
     uid: user?.uid || "",
     targetId: currentInfoTargetId(),
     username: profile?.username || "",

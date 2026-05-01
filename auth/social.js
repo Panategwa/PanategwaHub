@@ -326,6 +326,39 @@ async function loadFriendProfiles(ids) {
   emit();
 }
 
+function applyLocalConnections(nextFriendsInput = [], nextBlockedInput = []) {
+  const nextFriends = unique(nextFriendsInput);
+  const nextBlocked = unique(nextBlockedInput);
+  const keepIds = new Set([...nextFriends, ...nextBlocked]);
+  const nextProfiles = {};
+
+  for (const [uid, profile] of Object.entries(socialState.friendProfiles || {})) {
+    const clean = cleanUid(uid);
+    if (!clean || !keepIds.has(clean)) continue;
+    nextProfiles[clean] = profile;
+  }
+
+  if (socialState.profile) {
+    socialState.profile = {
+      ...socialState.profile,
+      friends: nextFriends,
+      blocked: nextBlocked
+    };
+  }
+
+  socialState.friends = nextFriends;
+  socialState.blocked = nextBlocked;
+  socialState.friendProfiles = nextProfiles;
+  emit();
+
+  const needsRefresh = [...keepIds].some((uid) => !nextProfiles[uid]);
+  if (needsRefresh) {
+    loadFriendProfiles([...nextFriends, ...nextBlocked]).catch((error) => {
+      console.warn("Could not refresh friend profiles:", error);
+    });
+  }
+}
+
 async function createMessage(payload) {
   return addDoc(collection(db, "messages"), {
     ...payload,
@@ -552,26 +585,43 @@ function relationshipTargetUid(message, currentUid) {
   return "";
 }
 
+function relationshipSignalTime(message) {
+  return Math.max(toMs(message?.updatedAt), toMs(message?.createdAt), 0);
+}
+
 async function syncRelationshipSignals(messages) {
   const user = auth.currentUser;
   if (!user) return;
 
   const currentFriends = new Set(unique(socialState.profile?.friends));
   const currentBlocked = new Set(unique(socialState.profile?.blocked));
+  const latestSignals = new Map();
   const toAdd = new Set();
   const toRemove = new Set();
 
   for (const message of messages || []) {
-    if (cleanUid(message.toUid) !== user.uid) continue;
-
     const otherUid = relationshipTargetUid(message, user.uid);
     if (!otherUid) continue;
+    const kind = String(message?.kind || "");
+    if (kind !== "friend-accepted" && kind !== "friend-removed" && kind !== "friend-blocked") continue;
 
-    if (message.kind === "friend-accepted" && !currentBlocked.has(otherUid)) {
+    const signal = {
+      kind,
+      time: relationshipSignalTime(message)
+    };
+    const previous = latestSignals.get(otherUid);
+    if (!previous || signal.time >= previous.time) {
+      latestSignals.set(otherUid, signal);
+    }
+  }
+
+  for (const [otherUid, signal] of latestSignals.entries()) {
+    if (signal.kind === "friend-accepted" && !currentBlocked.has(otherUid)) {
       toAdd.add(otherUid);
+      continue;
     }
 
-    if (message.kind === "friend-removed" || message.kind === "friend-blocked") {
+    if (signal.kind === "friend-removed" || signal.kind === "friend-blocked") {
       toRemove.add(otherUid);
     }
   }
@@ -677,6 +727,10 @@ async function respondToFriendRequest(requestId, action) {
         blocked: arrayRemove(request.fromUid),
         updatedAt: serverTimestamp()
       }, { merge: true });
+      applyLocalConnections(
+        [...unique(socialState.profile?.friends || socialState.friends), request.fromUid],
+        unique(socialState.profile?.blocked || socialState.blocked).filter((entry) => entry !== request.fromUid)
+      );
       await updateDoc(ref, { status: "accepted", readBy: arrayUnion(user.uid), updatedAt: serverTimestamp() });
 
       await createMessage({
@@ -726,6 +780,10 @@ async function respondToFriendRequest(requestId, action) {
         friends: arrayRemove(request.fromUid),
         updatedAt: serverTimestamp()
       }, { merge: true });
+      applyLocalConnections(
+        unique(socialState.profile?.friends || socialState.friends).filter((entry) => entry !== request.fromUid),
+        [...unique(socialState.profile?.blocked || socialState.blocked), request.fromUid]
+      );
       await updateDoc(ref, { status: "blocked", readBy: arrayUnion(user.uid), updatedAt: serverTimestamp() });
       await createMessage({
         fromUid: user.uid,
@@ -763,6 +821,10 @@ async function removeFriend(friendUid) {
       friends: arrayRemove(id),
       updatedAt: serverTimestamp()
     }, { merge: true });
+    applyLocalConnections(
+      unique(socialState.profile?.friends || socialState.friends).filter((entry) => entry !== id),
+      socialState.profile?.blocked || socialState.blocked
+    );
 
     if (target) {
       await createMessage({
@@ -799,6 +861,10 @@ async function blockUser(targetUid) {
       friends: arrayRemove(id),
       updatedAt: serverTimestamp()
     }, { merge: true });
+    applyLocalConnections(
+      unique(socialState.profile?.friends || socialState.friends).filter((entry) => entry !== id),
+      [...unique(socialState.profile?.blocked || socialState.blocked), id]
+    );
 
     if (target) {
       await createMessage({
@@ -831,6 +897,10 @@ async function unblockUser(targetUid) {
       blocked: arrayRemove(id),
       updatedAt: serverTimestamp()
     }, { merge: true });
+    applyLocalConnections(
+      socialState.profile?.friends || socialState.friends,
+      unique(socialState.profile?.blocked || socialState.blocked).filter((entry) => entry !== id)
+    );
   } catch (error) {
     throw new Error(friendlyActionError(error));
   }

@@ -616,7 +616,7 @@ main {
 .menu-music-toggle {
   width: 100%;
   margin: 0;
-  padding: 0;
+  padding: 2px 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -656,7 +656,7 @@ main {
 .menu-music-toggle-state {
   flex-shrink: 0;
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: 5px;
   border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.08);
   font-size: 0.7rem;
@@ -731,7 +731,8 @@ main {
 
 .menu-music-progress-slider,
 .menu-music-volume-slider {
-  margin-top: 2px;
+  margin-top: 10px;
+  margin-bottom: 10px;
 }
 
 .menu-music-track-list {
@@ -741,13 +742,13 @@ main {
   overflow: auto;
   padding-right: 2px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.42) rgba(255,255,255,0.04);
+  scrollbar-color: rgba(255, 255, 255, 0.25) rgba(255,255,255,0.04);
 }
 
 .menu-music-track-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 7px;
+  gap: 5px;
   align-items: center;
   padding: 7px 9px;
   border-radius: 12px;
@@ -758,12 +759,12 @@ main {
 }
 
 .menu-music-track-row.is-current {
-  border-color: rgba(96, 165, 250, 0.3);
+  border-color: rgba(200, 255, 255, 0.2);
   background: rgba(96, 165, 250, 0.12);
 }
 
 .menu-music-track-row.is-muted {
-  opacity: 0.72;
+  opacity: 0.5;
 }
 
 .menu-music-track-row.is-broken {
@@ -790,7 +791,7 @@ main {
   right: 10px;
   height: 2px;
   border-radius: 999px;
-  background: rgba(191, 219, 254, 0.95);
+  background: rgba(255, 255, 255, 0.75);
 }
 
 .menu-music-track-row.is-drop-before::before {
@@ -804,7 +805,7 @@ main {
 .menu-music-track-main {
   width: 100%;
   margin: 0;
-  padding: 0;
+  padding: 10px;
   display: grid;
   gap: 3px;
   text-align: left;

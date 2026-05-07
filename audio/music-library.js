@@ -23,6 +23,22 @@ export const MUSIC_LIBRARY = Object.freeze([
     src: "music/tracks/cinematic-space-510707.mp3",
     sourcePage: "https://pixabay.com/music/meditationspiritual-cinematic-space-510707/",
     enabledByDefault: true
+  },
+    {
+    id: "stasemusic-alien-techno-249819",
+    name: "Alien Techno",
+    artist: "StasEMusic",
+    src: "music/tracks/stasemusic-alien-techno-249819.mp3",
+    sourcePage: "https://pixabay.com/music/electronic-alien-techno-249819/",
+    enabledByDefault: true
+  },
+      {
+    id: "the_mountain-sci-fi-512284",
+    name: "Sci-Fi",
+    artist: "The_Mountain",
+    src: "music/tracks/the_mountain-sci-fi-512284.mp3",
+    sourcePage: "https://pixabay.com/music/ambient-sci-fi-512284/",
+    enabledByDefault: true
   }
 ]);
 

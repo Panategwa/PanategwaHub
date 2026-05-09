@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase-config.js";
-import { watchAuth, ensureUserProfile, getDefaultAvatarDataUrl, normalizeSiteTimeMs } from "./auth.js";
+import { watchAuth, ensureUserProfile, getDefaultAvatarDataUrl, normalizeSiteTimeMs, getResolvedProfileSiteTime } from "./auth.js";
 import { ensurePanategwaToast } from "./toast.js";
 
 import {
@@ -300,6 +300,14 @@ function publicProfile(profile, viewerUid) {
     streakCurrent: canShowStreaks ? currentStreakOf(profile) : null,
     streakLongest: canShowStreaks ? longestStreakOf(profile) : null,
     siteTimeMs: canShowSiteAge ? normalizeSiteTimeMs(profile.siteTimeMs) : null
+  };
+}
+
+function withResolvedOwnSiteTime(profile, uid) {
+  if (!profile || !uid) return profile;
+  return {
+    ...profile,
+    siteTimeMs: getResolvedProfileSiteTime(profile, uid)
   };
 }
 
@@ -966,6 +974,20 @@ function resetSocialState() {
 function startRealtime() {
   ensurePanategwaToast();
 
+  window.addEventListener("panategwa:sitetimechange", (event) => {
+    const uid = cleanUid(event?.detail?.uid);
+    if (!uid || socialState.user?.uid !== uid || !socialState.profile) return;
+
+    const nextSiteTimeMs = normalizeSiteTimeMs(event?.detail?.siteTimeMs);
+    if (normalizeSiteTimeMs(socialState.profile.siteTimeMs) === nextSiteTimeMs) return;
+
+    socialState.profile = {
+      ...socialState.profile,
+      siteTimeMs: nextSiteTimeMs
+    };
+    emit();
+  });
+
   watchAuth(async (user) => {
     if (unsubProfile) {
       try { unsubProfile(); } catch {}
@@ -990,7 +1012,7 @@ function startRealtime() {
     emit();
 
     try {
-      socialState.profile = await ensureUserProfile(user);
+      socialState.profile = withResolvedOwnSiteTime(await ensureUserProfile(user), user.uid);
       socialState.settings = { ...DEFAULT_SETTINGS, ...(socialState.profile?.socialSettings || {}) };
       socialState.friends = unique(socialState.profile?.friends);
       socialState.blocked = unique(socialState.profile?.blocked);
@@ -1000,7 +1022,7 @@ function startRealtime() {
 
       unsubProfile = onSnapshot(userRef(user.uid), async (snap) => {
         clearListenerError("profile");
-        const fresh = snap.exists() ? snap.data() : null;
+        const fresh = snap.exists() ? withResolvedOwnSiteTime(snap.data(), user.uid) : null;
         socialState.profile = fresh;
         socialState.settings = { ...DEFAULT_SETTINGS, ...(fresh?.socialSettings || {}) };
         socialState.friends = unique(fresh?.friends);

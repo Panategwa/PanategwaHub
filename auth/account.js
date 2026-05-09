@@ -7,6 +7,7 @@ import {
   refreshCurrentUserSession,
   getDefaultAvatarDataUrl,
   formatSiteTimeDuration,
+  getResolvedProfileSiteTime,
   watchAuth,
   getProfile
 } from "./auth.js";
@@ -240,6 +241,19 @@ function resolvedUser(state = currentState) {
 
 function resolvedProfile(state = currentState) {
   return state?.profile || null;
+}
+
+function resolvedOwnSiteTimeMs(profile = resolvedProfile(currentState), user = resolvedUser(currentState)) {
+  const uid = String(user?.uid || profile?.uid || "").trim();
+  return getResolvedProfileSiteTime(profile || {}, uid);
+}
+
+function withResolvedOwnSiteTime(profile, user) {
+  if (!profile || !user?.uid) return profile;
+  return {
+    ...profile,
+    siteTimeMs: getResolvedProfileSiteTime(profile, user.uid)
+  };
 }
 
 function normalizeAccountSection(section = "info") {
@@ -707,7 +721,7 @@ function renderAuth(state) {
     );
     const rank = friendProfile.currentRank || "Hidden";
     const joined = friendProfile.createdAt ? formatDateOnly(friendProfile.createdAt) : "Hidden";
-    const siteAge = friendProfile.siteTimeMs == null ? "Hidden" : formatSiteTimeDuration(friendProfile.siteTimeMs);
+    const siteAge = friendProfile.siteTimeMs == null ? "Hidden" : formatSiteTimeDuration(friendProfile.siteTimeMs, { includeSeconds: true });
     const streak = friendProfile.streakCurrent == null ? "Hidden" : `${friendProfile.streakCurrent} day${friendProfile.streakCurrent === 1 ? "" : "s"}`;
     const longest = friendProfile.streakLongest == null ? "Hidden" : `${friendProfile.streakLongest} day${friendProfile.streakLongest === 1 ? "" : "s"}`;
 
@@ -750,7 +764,7 @@ function renderAuth(state) {
   const xp = typeof ownProfile.xp === "number" ? ownProfile.xp : 0;
   const streak = ownProfile?.streak?.current || 0;
   const longestStreak = ownProfile?.longestStreak || ownProfile?.streak?.longest || streak || 0;
-  const memberFor = formatSiteTimeDuration(ownProfile.siteTimeMs);
+  const memberFor = formatSiteTimeDuration(resolvedOwnSiteTimeMs(ownProfile, user), { includeSeconds: true });
   const avatarUrl = ownProfile.photoURL || getDefaultAvatarDataUrl();
   const avatar = avatarMarkup(avatarUrl, "Avatar", "account-avatar", isVerifiedState(user, ownProfile));
   const copied = isUserIdCopied(user.uid);
@@ -899,7 +913,22 @@ function renderPrivacyProfilePreview(state) {
   const rank = showRank ? getRank(profile.xp || 0) : null;
   const streakCurrent = showStreaks ? (profile?.streak?.current || 0) : null;
   const streakLongest = showStreaks ? (profile?.longestStreak || profile?.streak?.longest || streakCurrent || 0) : null;
-  const siteAge = showSiteAge ? formatSiteTimeDuration(profile.siteTimeMs) : null;
+  const siteAge = showSiteAge ? formatSiteTimeDuration(resolvedOwnSiteTimeMs(profile, user), { includeSeconds: true }) : null;
+  const privacyCard = (label, value, visible, key, note = "") => `
+    <div class="privacy-preview-card ${visible ? "" : "is-hidden"}">
+      <div class="privacy-preview-card-top">
+        <span>${escapeHtml(label)}</span>
+        <button
+          type="button"
+          class="privacy-inline-toggle"
+          data-privacy-toggle-key="${escapeHtml(key)}"
+          data-privacy-toggle-value="${visible ? "false" : "true"}"
+        >${visible ? "Hide" : "Show"}</button>
+      </div>
+      <strong>${escapeHtml(value)}</strong>
+      ${note ? `<small>${escapeHtml(note)}</small>` : ""}
+    </div>
+  `;
   const avatar = avatarMarkup(
     profile.photoURL || getDefaultAvatarDataUrl(),
     `${username} avatar`,
@@ -923,20 +952,19 @@ function renderPrivacyProfilePreview(state) {
       </div>
 
       <div class="profile-meta">
-        <div><span>Rank</span><strong>${escapeHtml(rank || "Hidden")}</strong></div>
+        <div><span>Username</span><strong>${escapeHtml(username)}</strong></div>
         <div><span>Friends</span><strong>${escapeHtml(String((profile.friends || []).length || 0))}</strong></div>
-        <div><span>Current streak</span><strong>${streakCurrent == null ? "Hidden" : `${streakCurrent} day${streakCurrent === 1 ? "" : "s"}`}</strong></div>
-        <div><span>On the site for</span><strong>${escapeHtml(siteAge || "Hidden")}</strong></div>
       </div>
 
-      <div class="info-grid">
-        <div class="info-row"><span>Username</span><strong>${escapeHtml(username)}</strong></div>
-        <div class="info-row"><span>Rank</span><strong>${escapeHtml(rank || "Hidden")}</strong></div>
-        <div class="info-row"><span>Joined</span><strong>${showJoined && profile.createdAt ? escapeHtml(formatDateOnly(profile.createdAt)) : "Hidden"}</strong></div>
-        <div class="info-row"><span>Longest streak</span><strong>${streakLongest == null ? "Hidden" : `${streakLongest} day${streakLongest === 1 ? "" : "s"}`}</strong></div>
+      <div class="privacy-preview-grid">
+        ${privacyCard("Rank", rank || "Hidden", showRank, "showRank", "Friends can see your rank and XP progress.")}
+        ${privacyCard("Joined", showJoined && profile.createdAt ? formatDateOnly(profile.createdAt) : "Hidden", showJoined, "showJoined", "Friends can see when your account was created.")}
+        ${privacyCard("Current streak", streakCurrent == null ? "Hidden" : `${streakCurrent} day${streakCurrent === 1 ? "" : "s"}`, showStreaks, "showStreaks", "This also controls your longest streak.")}
+        ${privacyCard("Longest streak", streakLongest == null ? "Hidden" : `${streakLongest} day${streakLongest === 1 ? "" : "s"}`, showStreaks, "showStreaks", "This uses the same streak toggle.")}
+        ${privacyCard("On the site for", siteAge || "Hidden", showSiteAge, "showSiteAge", "Friends can see your total time spent on the site.")}
       </div>
 
-      <div class="profile-body-note">Only friends can view your account. The toggles above decide which details they can see.</div>
+      <div class="profile-body-note">Only friends can view your account. Use the small red hide/show buttons in each card to control what they can see.</div>
     </div>
   `;
 }
@@ -1333,6 +1361,7 @@ function renderNotifications(state) {
 function renderAll(state) {
   const user = resolvedUser(state);
   const profile = resolvedProfile(state) || {};
+  const resolvedSiteTimeMs = resolvedOwnSiteTimeMs(profile, user);
   const authSignature = JSON.stringify({
     authHydrated,
     socialReady: !!state.ready,
@@ -1345,7 +1374,7 @@ function renderAll(state) {
     xp: profile?.xp || 0,
     streak: profile?.streak?.current || 0,
     longest: profile?.longestStreak || profile?.streak?.longest || 0,
-    siteTimeMs: profile?.siteTimeMs || 0,
+    siteTimeMs: resolvedSiteTimeMs,
     createdAt: formatDateOnly(profile?.createdAt),
     copied: isUserIdCopied(user?.uid || ""),
     viewedFriend: (() => {
@@ -1378,7 +1407,7 @@ function renderAll(state) {
     photoURL: profile?.photoURL || "",
     xp: profile?.xp || 0,
     createdAt: formatDateOnly(profile?.createdAt),
-    siteTimeMs: profile?.siteTimeMs || 0,
+    siteTimeMs: resolvedSiteTimeMs,
     streak: profile?.streak?.current || 0,
     longest: profile?.longestStreak || profile?.streak?.longest || 0,
     privacyShowRank: profile?.privacySettings?.showRank !== false,
@@ -1860,7 +1889,10 @@ function start() {
     }
 
     currentState.user = user;
-    currentState.profile = profile || (user ? await getProfile(user.uid) : null);
+    currentState.profile = withResolvedOwnSiteTime(
+      profile || (user ? await getProfile(user.uid) : null),
+      user
+    );
     refreshLocalNotifications(user?.uid || "");
     renderAll(currentState);
 
@@ -1886,7 +1918,9 @@ function start() {
       ...currentState,
       ...state,
       user: loggedOut ? null : (state.user || authUser),
-      profile: loggedOut ? null : (state.profile || currentState.profile)
+      profile: loggedOut
+        ? null
+        : withResolvedOwnSiteTime(state.profile || currentState.profile, state.user || authUser)
     };
     renderAll(currentState);
   });

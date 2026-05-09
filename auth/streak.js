@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase-config.js";
-import { watchAuth, getProfile, formatSiteTimeDuration } from "./auth.js";
+import { watchAuth, getProfile, formatSiteTimeDuration, getResolvedProfileSiteTime } from "./auth.js";
 import { ensurePanategwaToast } from "./toast.js";
 
 import {
@@ -168,6 +168,11 @@ function prettyDateTime(value) {
     hour: "numeric",
     minute: "2-digit"
   });
+}
+
+function resolvedOwnSiteTimeMs(profile, user = currentUser) {
+  const uid = String(user?.uid || profile?.uid || "").trim();
+  return getResolvedProfileSiteTime(profile || {}, uid);
 }
 
 function clearCountdownTimer() {
@@ -440,7 +445,7 @@ function renderPage() {
 
         <div class="setting-card">
           <div class="setting-title">On the site for</div>
-          <div class="setting-desc">${formatSiteTimeDuration(profile?.siteTimeMs)}</div>
+          <div class="setting-desc">${formatSiteTimeDuration(resolvedOwnSiteTimeMs(profile), { includeSeconds: true })}</div>
         </div>
 
         <div class="setting-card">
@@ -485,7 +490,10 @@ function start() {
 
   watchAuth(async (user, profile) => {
     currentUser = user;
-    currentProfile = profile || null;
+    currentProfile = user ? {
+      ...(profile || {}),
+      siteTimeMs: getResolvedProfileSiteTime(profile || {}, user.uid)
+    } : null;
     viewingMonthKey = localMonthKey(new Date());
 
     if (user && !currentProfile) {

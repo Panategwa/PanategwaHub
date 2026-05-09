@@ -241,7 +241,7 @@ select:focus {
   overflow-x: hidden;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.42) rgba(255,255,255,0.04);
+  scrollbar-color: rgba(150, 150, 150, 0.4) rgba(255,255,255,0.04);
 }
 
 .menu-inner::-webkit-scrollbar,
@@ -681,27 +681,55 @@ main {
 .menu-music-controls {
   display: flex;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 4px;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .menu-music-control-button {
   flex: 1 1 0;
   margin: 0;
   min-width: 0;
-  padding: 7px 4px;
+  padding: 4px 2px;
   font-size: 0.92rem;
   line-height: 1;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015)),
-    rgba(255,255,255,0.02);
-  border-color: rgba(255,255,255,0.07);
-  box-shadow: 0 6px 14px rgba(2, 6, 23, 0.1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(248, 250, 252, 0.88);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  filter: none;
+  opacity: 0.86;
 }
 
 .menu-music-control-button.is-primary {
-  background:
-    linear-gradient(180deg, rgba(125, 211, 252, 0.14), rgba(96, 165, 250, 0.04)),
-    rgba(255,255,255,0.035);
+  color: rgba(186, 230, 253, 0.98);
+  opacity: 1;
+}
+
+.menu-music-control-button:hover,
+.menu-music-control-button:focus-visible {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  filter: none;
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.menu-music-control-icon {
+  width: 24px;
+  height: 24px;
+  display: block;
+  overflow: visible;
+}
+
+.menu-music-control-button.is-primary .menu-music-control-icon {
+  width: 25px;
+  height: 25px;
 }
 
 .menu-music-volume-block {
@@ -882,6 +910,13 @@ main {
   font-size: 11px;
   color: rgba(200, 200, 200, 0.7);
   margin-top: 2px;
+}
+
+.menu-site-time {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(226, 232, 240, 0.74);
 }
 
 
@@ -1935,6 +1970,67 @@ main {
       display: block;
       opacity: 0.78;
       line-height: 1.4;
+    }
+
+    .privacy-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .privacy-preview-card {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .privacy-preview-card.is-hidden {
+      opacity: 0.84;
+      border-color: rgba(248, 113, 113, 0.18);
+      background: rgba(127, 29, 29, 0.14);
+    }
+
+    .privacy-preview-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 10px;
+    }
+
+    .privacy-preview-card-top span {
+      font-size: 0.88rem;
+      opacity: 0.82;
+    }
+
+    .privacy-preview-card strong {
+      font-size: 0.96rem;
+      line-height: 1.35;
+    }
+
+    .privacy-preview-card small {
+      opacity: 0.72;
+      line-height: 1.4;
+    }
+
+    .privacy-inline-toggle {
+      margin: 0;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(248, 113, 113, 0.24);
+      background: rgba(127, 29, 29, 0.34);
+      color: #fecaca;
+      font-size: 0.76rem;
+      font-weight: 700;
+      box-shadow: none;
+      flex: 0 0 auto;
+    }
+
+    .privacy-inline-toggle:hover {
+      filter: none;
+      background: rgba(153, 27, 27, 0.5);
     }
 
     .messages-wrap {
@@ -3084,6 +3180,10 @@ main {
       }
 
       .field-row-inline {
+        grid-template-columns: 1fr;
+      }
+
+      .privacy-preview-grid {
         grid-template-columns: 1fr;
       }
     }

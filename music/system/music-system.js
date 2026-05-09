@@ -2,8 +2,8 @@ import {
   getToastAudioSettings,
   setToastAudioChannelVolume,
   toggleToastAudioChannelMute
-} from "../auth/toast.js";
-import { findMusicTrack, getMusicTracks } from "./music-library.js";
+} from "../../auth/toast.js";
+import { findMusicTrack, getMusicTracks } from "../library/music-library.js";
 
 const MUSIC_STATE_KEY = "ptg_music_state_v1";
 const MUSIC_PREFS_KEY = "ptg_music_prefs_v1";
@@ -52,6 +52,61 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function controlIcon(name, playing = false) {
+  if (name === "previous-track") {
+    return `
+      <svg viewBox="0 0 24 24" class="menu-music-control-icon" aria-hidden="true">
+        <path d="M17.5 7 9.5 12l8 5z" fill="currentColor"/>
+        <path d="M6.5 6v12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+      </svg>
+    `;
+  }
+
+  if (name === "seek-back") {
+    return `
+      <svg viewBox="0 0 24 24" class="menu-music-control-icon" aria-hidden="true">
+        <path d="M15.5 7 9.2 12l6.3 5z" fill="currentColor"/>
+        <path d="M10.2 7 3.9 12l6.3 5z" fill="currentColor" opacity="0.58"/>
+        <text x="17.4" y="18" text-anchor="middle" font-size="5.2" font-weight="700" fill="currentColor">10</text>
+      </svg>
+    `;
+  }
+
+  if (name === "seek-forward") {
+    return `
+      <svg viewBox="0 0 24 24" class="menu-music-control-icon" aria-hidden="true">
+        <path d="M8.5 7 14.8 12 8.5 17z" fill="currentColor"/>
+        <path d="M13.8 7 20.1 12l-6.3 5z" fill="currentColor" opacity="0.58"/>
+        <text x="6.6" y="18" text-anchor="middle" font-size="5.2" font-weight="700" fill="currentColor">10</text>
+      </svg>
+    `;
+  }
+
+  if (name === "next-track") {
+    return `
+      <svg viewBox="0 0 24 24" class="menu-music-control-icon" aria-hidden="true">
+        <path d="M8 7 16 12l-8 5z" fill="currentColor"/>
+        <path d="M17.5 6v12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+      </svg>
+    `;
+  }
+
+  if (playing) {
+    return `
+      <svg viewBox="0 0 24 24" class="menu-music-control-icon" aria-hidden="true">
+        <rect x="7" y="6.5" width="3.5" height="11" rx="1.1" fill="currentColor"/>
+        <rect x="13.5" y="6.5" width="3.5" height="11" rx="1.1" fill="currentColor"/>
+      </svg>
+    `;
+  }
+
+  return `
+    <svg viewBox="0 0 24 24" class="menu-music-control-icon" aria-hidden="true">
+      <path d="M8 6.8 17 12 8 17.2z" fill="currentColor"/>
+    </svg>
+  `;
 }
 
 function defaultTrackId() {
@@ -659,11 +714,11 @@ function renderMenuMusic() {
         </div>
 
         <div class="menu-music-controls">
-          <button type="button" class="menu-music-control-button" data-music-action="previous-track" title="Previous song" aria-label="Previous song">&#x23EE;&#xFE0F;</button>
-          <button type="button" class="menu-music-control-button" data-music-action="seek-back" title="Back 10 seconds" aria-label="Back 10 seconds">&#x23EA;</button>
-          <button type="button" class="menu-music-control-button is-primary" data-music-action="toggle-play" title="${currentState.isPlaying ? "Pause" : "Play"}" aria-label="${currentState.isPlaying ? "Pause" : "Play"}">${currentState.isPlaying ? "&#x23F8;&#xFE0F;" : "&#x25B6;&#xFE0F;"}</button>
-          <button type="button" class="menu-music-control-button" data-music-action="seek-forward" title="Forward 10 seconds" aria-label="Forward 10 seconds">&#x23E9;</button>
-          <button type="button" class="menu-music-control-button" data-music-action="next-track" title="Next song" aria-label="Next song">&#x23ED;&#xFE0F;</button>
+          <button type="button" class="menu-music-control-button" data-music-action="previous-track" title="Previous song" aria-label="Previous song">${controlIcon("previous-track")}</button>
+          <button type="button" class="menu-music-control-button" data-music-action="seek-back" title="Back 10 seconds" aria-label="Back 10 seconds">${controlIcon("seek-back")}</button>
+          <button type="button" class="menu-music-control-button is-primary" data-music-action="toggle-play" title="${currentState.isPlaying ? "Pause" : "Play"}" aria-label="${currentState.isPlaying ? "Pause" : "Play"}">${controlIcon("toggle-play", currentState.isPlaying)}</button>
+          <button type="button" class="menu-music-control-button" data-music-action="seek-forward" title="Forward 10 seconds" aria-label="Forward 10 seconds">${controlIcon("seek-forward")}</button>
+          <button type="button" class="menu-music-control-button" data-music-action="next-track" title="Next song" aria-label="Next song">${controlIcon("next-track")}</button>
         </div>
 
         <div class="menu-music-volume-block">

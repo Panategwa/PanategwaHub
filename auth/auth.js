@@ -64,8 +64,32 @@ export function normalizeSiteTimeMs(value) {
   return Number.isFinite(ms) && ms > 0 ? Math.floor(ms) : 0;
 }
 
-export function formatSiteTimeDuration(value) {
-  const totalMinutes = Math.floor(normalizeSiteTimeMs(value) / (60 * 1000));
+export function siteTimeLiveStorageKey(uid) {
+  return `ptg_site_time_live_${cleanText(uid)}`;
+}
+
+export function getLiveSiteTimeMs(uid, fallback = 0) {
+  const cleanUid = cleanText(uid);
+  const base = normalizeSiteTimeMs(fallback);
+  if (!cleanUid) return base;
+
+  try {
+    return Math.max(base, normalizeSiteTimeMs(localStorage.getItem(siteTimeLiveStorageKey(cleanUid))));
+  } catch {
+    return base;
+  }
+}
+
+export function getResolvedProfileSiteTime(profile, uid = auth.currentUser?.uid) {
+  const cleanUid = cleanText(uid || profile?.uid || "");
+  const base = normalizeSiteTimeMs(profile?.siteTimeMs);
+  return cleanUid ? getLiveSiteTimeMs(cleanUid, base) : base;
+}
+
+export function formatSiteTimeDuration(value, options = {}) {
+  const includeSeconds = !!options?.includeSeconds;
+  const totalSeconds = Math.floor(normalizeSiteTimeMs(value) / 1000);
+  const totalMinutes = Math.floor(totalSeconds / 60);
   const MINUTES_PER_HOUR = 60;
   const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
   const MINUTES_PER_WEEK = 7 * MINUTES_PER_DAY;
@@ -84,6 +108,7 @@ export function formatSiteTimeDuration(value) {
   const hours = Math.floor(remaining / MINUTES_PER_HOUR);
   remaining -= hours * MINUTES_PER_HOUR;
   const minutes = remaining;
+  const seconds = Math.max(0, totalSeconds - (totalMinutes * 60));
 
   const parts = [];
   if (years) parts.push(`${years} year${years === 1 ? "" : "s"}`);
@@ -92,6 +117,9 @@ export function formatSiteTimeDuration(value) {
   parts.push(`${days} day${days === 1 ? "" : "s"}`);
   parts.push(`${hours} hour${hours === 1 ? "" : "s"}`);
   parts.push(`${minutes} min${minutes === 1 ? "" : "s"}`);
+  if (includeSeconds) {
+    parts.push(`${seconds} sec${seconds === 1 ? "" : "s"}`);
+  }
   return parts.join(", ");
 }
 

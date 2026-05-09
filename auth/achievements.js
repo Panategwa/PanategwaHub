@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase-config.js";
-import { watchAuth, ensureUserProfile, normalizeSiteTimeMs } from "./auth.js";
+import { watchAuth, ensureUserProfile, normalizeSiteTimeMs, getLiveSiteTimeMs } from "./auth.js";
 import { ensurePanategwaToast } from "./toast.js";
 
 import {
@@ -474,6 +474,7 @@ let siteTimeFlushInFlight = null;
 
 const SYNC_INTERVAL_MS = 8000;
 const MIN_SYNC_GAP_MS = 4000;
+const SITE_TIME_TICK_MS = 1000;
 const SITE_TIME_FLUSH_MS = 60 * 1000;
 
 function pageId() {
@@ -597,6 +598,45 @@ function currentSiteTimeUid() {
   return String(trackedUser?.uid || auth.currentUser?.uid || "").trim();
 }
 
+function reconcileSiteTimePending(uid, baseValue = trackedProfile?.siteTimeMs || 0) {
+  const currentUid = String(uid || "").trim();
+  if (!currentUid) return;
+
+  const base = normalizeSiteTimeMs(baseValue);
+  const storedLive = getLiveSiteTimeMs(currentUid, base);
+  const requiredPending = Math.max(0, storedLive - base);
+
+  if (requiredPending > siteTimePendingMs) {
+    siteTimePendingMs = requiredPending;
+    savePendingSiteTime(currentUid, siteTimePendingMs);
+  }
+}
+
+function currentDisplayedSiteTimeMs() {
+  const uid = currentSiteTimeUid();
+  const base = normalizeSiteTimeMs(trackedProfile?.siteTimeMs || 0);
+  const storedLive = uid ? getLiveSiteTimeMs(uid, base) : base;
+  const live = siteTimeStartedAt ? Math.max(0, Date.now() - siteTimeStartedAt) : 0;
+  return normalizeSiteTimeMs(Math.max(storedLive, base + siteTimePendingMs + live));
+}
+
+function broadcastSiteTimeUpdate() {
+  const uid = currentSiteTimeUid();
+  if (!uid) return;
+  const siteTimeMs = currentDisplayedSiteTimeMs();
+
+  try {
+    localStorage.setItem(`ptg_site_time_live_${uid}`, String(siteTimeMs));
+  } catch {}
+
+  window.dispatchEvent(new CustomEvent("panategwa:sitetimechange", {
+    detail: {
+      uid,
+      siteTimeMs
+    }
+  }));
+}
+
 function clearSiteTimeInterval() {
   if (!siteTimeInterval) return;
   window.clearInterval(siteTimeInterval);
@@ -620,6 +660,7 @@ function pauseSiteTimeTracking() {
   captureSiteTimeElapsed();
   siteTimeStartedAt = 0;
   clearSiteTimeInterval();
+  broadcastSiteTimeUpdate();
 }
 
 async function flushPendingSiteTime(force = false) {
@@ -651,9 +692,7 @@ async function flushPendingSiteTime(force = false) {
         };
       }
 
-      window.dispatchEvent(new CustomEvent("panategwa:sitetimechange", {
-        detail: { uid, siteTimeMs: nextSiteTime }
-      }));
+      broadcastSiteTimeUpdate();
       scheduleAchievementSync(120, true);
     } catch (error) {
       console.error("Site time sync error:", error);
@@ -675,6 +714,8 @@ function resumeSiteTimeTracking() {
     siteTimePendingMs = loadPendingSiteTime(uid);
   }
 
+  reconcileSiteTimePending(uid, trackedProfile?.siteTimeMs);
+
   if (!siteTimeStartedAt) {
     siteTimeStartedAt = Date.now();
   }
@@ -682,9 +723,12 @@ function resumeSiteTimeTracking() {
   if (!siteTimeInterval) {
     siteTimeInterval = window.setInterval(() => {
       captureSiteTimeElapsed();
+      broadcastSiteTimeUpdate();
       flushPendingSiteTime(false);
-    }, SITE_TIME_FLUSH_MS);
+    }, SITE_TIME_TICK_MS);
   }
+
+  broadcastSiteTimeUpdate();
 
   if (siteTimePendingMs >= SITE_TIME_FLUSH_MS) {
     flushPendingSiteTime(true);
@@ -1049,6 +1093,7 @@ function startAccountWatcher() {
     trackedUser = user;
     trackedProfile = profile || trackedProfile;
     siteTimePendingMs = loadPendingSiteTime(user.uid);
+    reconcileSiteTimePending(user.uid, trackedProfile?.siteTimeMs);
     resumeSiteTimeTracking();
     scheduleAchievementSync(0, true);
   });
@@ -1066,6 +1111,8 @@ function startLiveProfileListener() {
     profileUnsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
       const freshProfile = snap.exists() ? snap.data() : null;
       trackedProfile = freshProfile;
+      reconcileSiteTimePending(user.uid, freshProfile?.siteTimeMs);
+      broadcastSiteTimeUpdate();
       renderAchievements(freshProfile);
 
       if (!trackedUser || !freshProfile) return;

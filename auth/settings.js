@@ -367,6 +367,17 @@ function bindButtons() {
   $("privacy-show-site-age")?.addEventListener("change", (event) => {
     applyPrivacySetting("showSiteAge", event.target.checked);
   });
+
+  document.body.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-privacy-toggle-key]");
+    if (!button) return;
+
+    const key = String(button.dataset.privacyToggleKey || "").trim();
+    const nextValue = String(button.dataset.privacyToggleValue || "").trim().toLowerCase() === "true";
+    if (!key) return;
+
+    applyPrivacySetting(key, nextValue);
+  });
 }
 
 function start() {

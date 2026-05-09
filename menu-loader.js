@@ -31,14 +31,14 @@ function ensureSharedSocialNotifications() {
 function ensureSharedMusic() {
   const alreadyLoaded = [...document.querySelectorAll("script[type='module']")].some((script) => {
     const src = script.getAttribute("src") || "";
-    return src === "audio/music-system.js" || src.endsWith("/audio/music-system.js");
+    return src === "music/system/music-system.js" || src.endsWith("/music/system/music-system.js");
   });
 
   if (alreadyLoaded) return;
 
   const script = document.createElement("script");
   script.type = "module";
-  script.src = "audio/music-system.js";
+  script.src = "music/system/music-system.js";
   script.dataset.panategwaMusic = "true";
   document.head.appendChild(script);
 }
@@ -58,6 +58,67 @@ function currentUid() {
   } catch {
     return "";
   }
+}
+
+function siteTimeStorageKey(uid) {
+  return `ptg_site_time_live_${String(uid || "").trim()}`;
+}
+
+function normalizeSiteTimeMs(value) {
+  const ms = Number(value || 0);
+  return Number.isFinite(ms) && ms > 0 ? Math.floor(ms) : 0;
+}
+
+function formatMenuSiteTime(value) {
+  const totalSeconds = Math.floor(normalizeSiteTimeMs(value) / 1000);
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const MINUTES_PER_HOUR = 60;
+  const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
+  const MINUTES_PER_WEEK = 7 * MINUTES_PER_DAY;
+  const MINUTES_PER_MONTH = 30 * MINUTES_PER_DAY;
+  const MINUTES_PER_YEAR = 365 * MINUTES_PER_DAY;
+
+  let remaining = totalMinutes;
+  const years = Math.floor(remaining / MINUTES_PER_YEAR);
+  remaining -= years * MINUTES_PER_YEAR;
+  const months = Math.floor(remaining / MINUTES_PER_MONTH);
+  remaining -= months * MINUTES_PER_MONTH;
+  const weeks = Math.floor(remaining / MINUTES_PER_WEEK);
+  remaining -= weeks * MINUTES_PER_WEEK;
+  const days = Math.floor(remaining / MINUTES_PER_DAY);
+  remaining -= days * MINUTES_PER_DAY;
+  const hours = Math.floor(remaining / MINUTES_PER_HOUR);
+  remaining -= hours * MINUTES_PER_HOUR;
+  const minutes = remaining;
+  const seconds = Math.max(0, totalSeconds - (totalMinutes * 60));
+
+  const parts = [];
+  if (years) parts.push(`${years}y`);
+  if (months) parts.push(`${months}mo`);
+  if (weeks) parts.push(`${weeks}w`);
+  if (days) parts.push(`${days}d`);
+  if (hours || parts.length) parts.push(`${hours}h`);
+  if (minutes || parts.length) parts.push(`${minutes}m`);
+  parts.push(`${seconds}s`);
+  return parts.join(" ");
+}
+
+function renderMenuSiteTime() {
+  const el = document.getElementById("menu-site-time");
+  if (!el) return;
+
+  const uid = currentUid();
+  if (!uid) {
+    el.textContent = "On the site for: --";
+    return;
+  }
+
+  let siteTimeMs = 0;
+  try {
+    siteTimeMs = normalizeSiteTimeMs(localStorage.getItem(siteTimeStorageKey(uid)));
+  } catch {}
+
+  el.textContent = `On the site for: ${formatMenuSiteTime(siteTimeMs)}`;
 }
 
 function socialUnreadCount(uid) {
@@ -187,6 +248,7 @@ document.addEventListener("DOMContentLoaded", function () {
     <div class="line">
       <div class="menu-main-title">The Panategwa Hub</div>
       <div class="menu-sub-title">0.0.1 - Alpha, Internal testing</div>
+      <div class="menu-site-time" id="menu-site-time">On the site for: --</div>
     </div>
   `;
 
@@ -241,7 +303,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
   menuContainer.innerHTML = menuHTML;
   renderSidebarAvatar();
+  renderMenuSiteTime();
   window.addEventListener("panategwa:notifications-changed", renderSidebarAvatar);
+  window.addEventListener("panategwa:sitetimechange", (event) => {
+    const detail = event?.detail || {};
+    const uid = String(detail.uid || "").trim();
+    if (!uid) return;
+
+    try {
+      localStorage.setItem(siteTimeStorageKey(uid), String(normalizeSiteTimeMs(detail.siteTimeMs)));
+    } catch {}
+
+    renderMenuSiteTime();
+  });
   window.addEventListener("storage", (event) => {
     if (!event.key) return;
     if (event.key === "ptg_logged_in"
@@ -250,6 +324,9 @@ document.addEventListener("DOMContentLoaded", function () {
       || event.key.startsWith("ptg_social_unread_count_")
       || event.key.startsWith("ptg_notifications_")) {
       renderSidebarAvatar();
+    }
+    if (event.key === "ptg_current_uid" || event.key.startsWith("ptg_site_time_live_")) {
+      renderMenuSiteTime();
     }
   });
 

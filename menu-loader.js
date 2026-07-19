@@ -247,7 +247,7 @@ document.addEventListener("DOMContentLoaded", function () {
   menuHTML += `
     <div class="line">
       <div class="menu-main-title">The Panategwa Hub</div>
-      <div class="menu-sub-title">0.0.2 - Alpha, Internal testing</div>
+      <div class="menu-sub-title">0.0.3 - Alpha, Internal testing</div>
       <div class="menu-site-time" id="menu-site-time">On the site for: --</div>
     </div>
   `;

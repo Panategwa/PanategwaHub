@@ -1,3 +1,6 @@
+// Note: Firebase API keys are public by design in client-side apps.
+// Keep the project config here. Do NOT put service account keys or secrets in this file.
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
   getAuth,

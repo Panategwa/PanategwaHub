@@ -321,30 +321,36 @@ async function translatePage(lang) {
 
   for (const node of nodes) {
     const original = ORIGINAL_TEXT.get(node);
-    if (!original || !original.trim()) continue;
-
-    applyText(node, original);
-
-    if (lang === "en") continue;
-
-    if (MANUAL_TRANSLATIONS[lang]?.[normalize(original)]) {
-      applyText(node, MANUAL_TRANSLATIONS[lang][normalize(original)]);
-      continue;
+    if (original && original.trim()) {
+      applyText(node, original);
     }
+  }
 
-    const protectedInfo = protectPhrases(original, lang);
-    const translated = await googleTranslate(protectedInfo.output, lang);
+  if (lang === "en") {
+    syncNavigationForLanguage();
+    isTranslating = false;
+    return;
+  }
 
-    let restored = restorePhrases(translated, protectedInfo.replacements);
+  const batchSize = 10;
+  for (let i = 0; i < nodes.length; i += batchSize) {
+    const batch = nodes.slice(i, i + batchSize);
+    await Promise.all(batch.map(async (node) => {
+      const original = ORIGINAL_TEXT.get(node);
+      if (!original || !original.trim()) return;
 
-    restored = restored
-      .replace(/:\s*/g, ": ")
-      .replace(/,\s*/g, ", ")
-      .replace(/;\s*/g, "; ");
+      if (MANUAL_TRANSLATIONS[lang]?.[normalize(original)]) {
+        applyText(node, MANUAL_TRANSLATIONS[lang][normalize(original)]);
+        return;
+      }
 
-    restored = restored.replace(/:([^\s])/g, ": $1");
-
-    applyText(node, restored);
+      const protectedInfo = protectPhrases(original, lang);
+      const translated = await googleTranslate(protectedInfo.output, lang);
+      let restored = restorePhrases(translated, protectedInfo.replacements);
+      restored = restored.replace(/:\s*/g, ": ").replace(/,\s*/g, ", ").replace(/;\s*/g, "; ");
+      restored = restored.replace(/:([^\s])/g, ": $1");
+      applyText(node, restored);
+    }));
   }
 
   syncNavigationForLanguage();

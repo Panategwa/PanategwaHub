@@ -32,6 +32,7 @@ let boundMenuEvents = false;
 let suppressPauseSync = false;
 let isSeeking = false;
 let draggedTrackId = "";
+let lastSaveTime = 0;
 
 function clampPercent(value, fallback = 0) {
   const next = Number(value);
@@ -369,7 +370,12 @@ function ensureAudioElement() {
     if (second === lastSyncedSecond) return;
     lastSyncedSecond = second;
     currentState.currentTime = clampTime(audioEl.currentTime);
-    saveState();
+    // Throttle saveState to every 5 seconds to reduce localStorage writes
+    const now = Date.now();
+    if (!lastSaveTime || now - lastSaveTime > 5000) {
+      lastSaveTime = now;
+      saveState();
+    }
     syncPlaybackUi();
   });
 

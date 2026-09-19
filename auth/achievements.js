@@ -847,8 +847,9 @@ function computeUnlocks(user, profile, pages) {
   const context = buildAchievementContext(user, profile, pages);
   const pending = new Set();
   let changed = true;
+  let maxIterations = 100;
 
-  while (changed) {
+  while (changed && maxIterations-- > 0) {
     changed = false;
 
     for (const achievement of ACHIEVEMENTS) {

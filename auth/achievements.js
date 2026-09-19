@@ -912,11 +912,13 @@ export async function syncAchievementProgress(user, profile) {
       lastLoginAt: data.lastLoginAt || serverTimestamp()
     };
 
+    const committedSiteTimeMs = Math.max(normalizeSiteTimeMs(data?.siteTimeMs), normalizeSiteTimeMs(profile?.siteTimeMs));
+
     if (shouldWrite) {
       tx.set(ref, nextDoc, { merge: true });
     }
 
-    result = { profile: nextDoc, newlyUnlocked: pending };
+    result = { profile: { ...nextDoc, siteTimeMs: committedSiteTimeMs }, newlyUnlocked: pending };
   });
 
   return result;
@@ -1165,6 +1167,7 @@ if (document.readyState === "loading") {
 } else {
   startAchievementSystem();
 }
+
 
 
 

@@ -599,44 +599,24 @@ function currentSiteTimeUid() {
 }
 
 function reconcileSiteTimePending(uid, baseValue = trackedProfile?.siteTimeMs || 0) {
-  const currentUid = String(uid || "").trim();
-  if (!currentUid) return;
-
-  const base = normalizeSiteTimeMs(baseValue);
-  const storedLive = getLiveSiteTimeMs(currentUid, base);
-  const requiredPending = Math.max(0, storedLive - base);
-
-  if (requiredPending > siteTimePendingMs) {
-    siteTimePendingMs = requiredPending;
-    savePendingSiteTime(currentUid, siteTimePendingMs);
-  }
+  siteTimePendingMs = 0;
+  savePendingSiteTime(uid, 0);
 }
 
 function currentDisplayedSiteTimeMs() {
-  const uid = currentSiteTimeUid();
   const base = normalizeSiteTimeMs(trackedProfile?.siteTimeMs || 0);
-  const storedLive = uid ? getLiveSiteTimeMs(uid, base) : base;
-  const live = siteTimeStartedAt ? Math.max(0, Date.now() - siteTimeStartedAt) : 0;
-  return normalizeSiteTimeMs(Math.max(storedLive, base + siteTimePendingMs + live));
+  const live = siteTimeStartedAt && !document.hidden ? Math.max(0, Date.now() - siteTimeStartedAt) : 0;
+  return normalizeSiteTimeMs(base + siteTimePendingMs + live);
 }
 
 function broadcastSiteTimeUpdate() {
   const uid = currentSiteTimeUid();
   if (!uid) return;
   const siteTimeMs = currentDisplayedSiteTimeMs();
-
-  try {
-    localStorage.setItem(`ptg_site_time_live_${uid}`, String(siteTimeMs));
-  } catch {}
-
   window.dispatchEvent(new CustomEvent("panategwa:sitetimechange", {
-    detail: {
-      uid,
-      siteTimeMs
-    }
+    detail: { uid, siteTimeMs }
   }));
 }
-
 function clearSiteTimeInterval() {
   if (!siteTimeInterval) return;
   window.clearInterval(siteTimeInterval);
@@ -645,17 +625,14 @@ function clearSiteTimeInterval() {
 
 function captureSiteTimeElapsed() {
   const uid = currentSiteTimeUid();
-  if (!uid || !siteTimeStartedAt) return 0;
-
+  if (!uid || !siteTimeStartedAt || document.hidden) return 0;
   const elapsed = Math.max(0, Date.now() - siteTimeStartedAt);
   if (!elapsed) return 0;
-
   siteTimePendingMs += elapsed;
   siteTimeStartedAt = Date.now();
   savePendingSiteTime(uid, siteTimePendingMs);
   return elapsed;
 }
-
 function pauseSiteTimeTracking() {
   captureSiteTimeElapsed();
   siteTimeStartedAt = 0;
@@ -709,17 +686,10 @@ async function flushPendingSiteTime(force = false) {
 function resumeSiteTimeTracking() {
   const uid = currentSiteTimeUid();
   if (!uid || document.hidden) return;
-
-  if (!siteTimePendingMs) {
-    siteTimePendingMs = loadPendingSiteTime(uid);
-  }
-
-  reconcileSiteTimePending(uid, trackedProfile?.siteTimeMs);
-
+  siteTimePendingMs = loadPendingSiteTime(uid);
   if (!siteTimeStartedAt) {
     siteTimeStartedAt = Date.now();
   }
-
   if (!siteTimeInterval) {
     siteTimeInterval = window.setInterval(() => {
       captureSiteTimeElapsed();
@@ -727,14 +697,11 @@ function resumeSiteTimeTracking() {
       flushPendingSiteTime(false);
     }, SITE_TIME_TICK_MS);
   }
-
   broadcastSiteTimeUpdate();
-
   if (siteTimePendingMs >= SITE_TIME_FLUSH_MS) {
     flushPendingSiteTime(true);
   }
 }
-
 function createdAtMs(value) {
   if (!value) return 0;
   if (typeof value.toMillis === "function") return value.toMillis();
@@ -1094,12 +1061,10 @@ function startAccountWatcher() {
     trackedUser = user;
     trackedProfile = profile || trackedProfile;
     siteTimePendingMs = loadPendingSiteTime(user.uid);
-    reconcileSiteTimePending(user.uid, trackedProfile?.siteTimeMs);
     resumeSiteTimeTracking();
     scheduleAchievementSync(0, true);
   });
 }
-
 function startLiveProfileListener() {
   watchAuth((user) => {
     if (profileUnsub) {
@@ -1112,7 +1077,6 @@ function startLiveProfileListener() {
     profileUnsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
       const freshProfile = snap.exists() ? snap.data() : null;
       trackedProfile = freshProfile;
-      reconcileSiteTimePending(user.uid, freshProfile?.siteTimeMs);
       broadcastSiteTimeUpdate();
       renderAchievements(freshProfile);
 
@@ -1135,7 +1099,6 @@ function startLiveProfileListener() {
     });
   });
 }
-
 function startReactiveSyncTriggers() {
   const scheduleSoon = () => scheduleAchievementSync(250, true);
   const scheduleSoft = () => scheduleAchievementSync(600, false);
@@ -1202,3 +1165,13 @@ if (document.readyState === "loading") {
 } else {
   startAchievementSystem();
 }
+
+
+
+
+
+
+
+
+
+

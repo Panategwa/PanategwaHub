@@ -69,17 +69,8 @@ export function siteTimeLiveStorageKey(uid) {
 }
 
 export function getLiveSiteTimeMs(uid, fallback = 0) {
-  const cleanUid = cleanText(uid);
-  const base = normalizeSiteTimeMs(fallback);
-  if (!cleanUid) return base;
-
-  try {
-    return Math.max(base, normalizeSiteTimeMs(localStorage.getItem(siteTimeLiveStorageKey(cleanUid))));
-  } catch {
-    return base;
-  }
+  return normalizeSiteTimeMs(fallback);
 }
-
 export function getResolvedProfileSiteTime(profile, uid = auth.currentUser?.uid) {
   const cleanUid = cleanText(uid || profile?.uid || "");
   const base = normalizeSiteTimeMs(profile?.siteTimeMs);
@@ -1219,3 +1210,4 @@ export function watchAuth(callback) {
     if (typeof unsub === "function") unsub();
   };
 }
+

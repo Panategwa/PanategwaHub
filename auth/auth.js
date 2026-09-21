@@ -1207,7 +1207,7 @@ export function watchAuth(callback) {
 
   return () => {
     cancelled = true;
-    if (typeof unsub === "function") unsub();
+    if (unsub) unsub();
   };
 }
 

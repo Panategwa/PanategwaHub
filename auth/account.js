@@ -58,6 +58,8 @@ const FRIENDS_SUBSECTIONS = new Set(["friends", "requests", "blocked"]);
 const SETTINGS_SUBSECTIONS = new Set(["account", "privacy"]);
 let copiedUserIdValue = null;
 let copiedUserIdUntil = 0;
+let accountUnsubs = [];
+let accountBound = false;
 let copiedUserIdTimer = null;
 let lastAchievementSignature = "";
 let authHydrated = false;
@@ -384,6 +386,16 @@ function openNotificationHref(href) {
       const targetId = String(url.searchParams.get("target") || "").trim() || null;
       window.openAccountArea(section, sub, targetId);
       return;
+    }
+
+    if (typeof window.PanategwaNavigate === "function" && window.PanategwaRouter && typeof window.PanategwaRouter.isInternalHref === "function") {
+      const ipage = window.PanategwaRouter.isInternalHref(url.pathname);
+      if (ipage) {
+        const params = {};
+        url.searchParams.forEach((value, key) => { params[key] = value; });
+        window.PanategwaNavigate(ipage, params);
+        return;
+      }
     }
 
     window.location.href = url.toString();
@@ -1832,7 +1844,19 @@ function bindNotifications() {
   });
 }
 
+function disposeAccountModule() {
+  for (let i = 0; i < accountUnsubs.length; i++) {
+    try { accountUnsubs[i](); } catch (e) { console.error("Account disposal error:", e); }
+  }
+  accountUnsubs = [];
+  accountBound = false;
+}
+
 function start() {
+  if (accountBound) disposeAccountModule();
+  accountBound = true;
+  accountUnsubs = [];
+
   bindNavigation();
   bindAuthForms();
   bindFriends();
@@ -1868,7 +1892,7 @@ function start() {
       renderAll(currentState);
     });
 
-  watchAuth(async (user, profile) => {
+  const __watchAuthUnsub = watchAuth(async (user, profile) => {
     authHydrated = true;
 
     const nextUid = user?.uid || "";
@@ -1905,8 +1929,9 @@ function start() {
       ? "Logged in and verified."
       : "Logged in. Verify your email to unlock account features.", "success");
   });
+  if (typeof __watchAuthUnsub === "function") accountUnsubs.push(__watchAuthUnsub);
 
-  subscribeSocial((state) => {
+  const __socialUnsub = subscribeSocial((state) => {
     const authUser = auth.currentUser || currentState.user || null;
     const loggedOut = !auth.currentUser && !state.user;
 
@@ -1924,13 +1949,15 @@ function start() {
     };
     renderAll(currentState);
   });
+  if (typeof __socialUnsub === "function") accountUnsubs.push(__socialUnsub);
 
-  subscribeStoredNotifications((notifications) => {
+  const __notificationsUnsub = subscribeStoredNotifications((notifications) => {
     currentState.localNotifications = notifications;
     renderAll(currentState);
   }, () => resolvedUser(currentState)?.uid || "");
+  if (typeof __notificationsUnsub === "function") accountUnsubs.push(__notificationsUnsub);
 
-  window.addEventListener("panategwa:sitetimechange", (event) => {
+  function __accountSiteTimeListener(event) {
     const detail = event?.detail || {};
     const uid = detail.uid || "";
     if (!uid || currentState.user?.uid !== uid || !currentState.profile) return;
@@ -1939,11 +1966,27 @@ function start() {
       siteTimeMs: Number(detail.siteTimeMs || 0)
     };
     renderAll(currentState);
-  });
+  }
+  window.addEventListener("panategwa:sitetimechange", __accountSiteTimeListener);
+  accountUnsubs.push(() => window.removeEventListener("panategwa:sitetimechange", __accountSiteTimeListener));
+}
+
+function __accountOnRouteChange(event) {
+  const detail = (event && event.detail) || {};
+  const page = String(detail.page || "");
+  if (page === "account-page.html") {
+    if (!accountBound) start();
+  } else {
+    disposeAccountModule();
+  }
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", start);
+  document.addEventListener("DOMContentLoaded", function () {
+    start();
+    window.addEventListener("panategwa:routechange", __accountOnRouteChange);
+  });
 } else {
   start();
+  window.addEventListener("panategwa:routechange", __accountOnRouteChange);
 }

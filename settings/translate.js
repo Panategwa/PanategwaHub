@@ -360,29 +360,26 @@ async function translatePage(lang) {
 function setLang(lang) {
   localStorage.setItem("lang", lang);
 
-  const url = new URL(window.location.href);
-
-  if (lang === "en") {
-    url.searchParams.delete("lang");
-  } else {
-    url.searchParams.set("lang", lang);
-  }
+  const params = {};
+  if (lang && lang !== "en") params.lang = lang;
 
   const size = getCurrentTextSize();
-  if (size && size !== "medium") {
-    url.searchParams.set("textsize", size);
-  } else {
-    url.searchParams.delete("textsize");
-  }
+  if (size && size !== "medium") params.textsize = size;
 
   const theme = getCurrentThemeName();
-  if (theme) {
-    url.searchParams.set("theme", theme);
+  if (theme) params.theme = theme;
+
+  if (typeof window.PanategwaRouter === "object" && typeof window.PanategwaRouter.syncParams === "function") {
+    window.PanategwaRouter.syncParams(params);
   } else {
-    url.searchParams.delete("theme");
+    const url = new URL(window.location.href);
+    if (lang && lang !== "en") url.searchParams.set("lang", lang); else url.searchParams.delete("lang");
+    if (size && size !== "medium") url.searchParams.set("textsize", size); else url.searchParams.delete("textsize");
+    if (theme) url.searchParams.set("theme", theme); else url.searchParams.delete("theme");
+    window.history.replaceState({}, "", url);
   }
 
-  window.location.href = url.toString();
+  translatePage();
 }
 
 function toggleLanguages() {
@@ -455,7 +452,18 @@ function initTranslate() {
     url.searchParams.delete("theme");
   }
 
-  window.history.replaceState({}, "", url);
+  const __routerParams = {};
+  const __langParam = url.searchParams.get("lang");
+  if (__langParam) __routerParams.lang = __langParam;
+  const __sizeParam = url.searchParams.get("textsize");
+  if (__sizeParam) __routerParams.textsize = __sizeParam;
+  const __themeParam = url.searchParams.get("theme");
+  if (__themeParam) __routerParams.theme = __themeParam;
+  if (typeof window.PanategwaRouter === "object" && typeof window.PanategwaRouter.syncParams === "function") {
+    window.PanategwaRouter.syncParams(__routerParams);
+  } else {
+    window.history.replaceState({}, "", url);
+  }
 
   syncNavigationForLanguage();
   startNavigationObserver();

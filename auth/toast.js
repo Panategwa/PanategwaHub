@@ -294,6 +294,16 @@ function openToastHref(href) {
       return;
     }
 
+    if (typeof window.PanategwaNavigate === "function" && window.PanategwaRouter && typeof window.PanategwaRouter.isInternalHref === "function") {
+      const ipage = window.PanategwaRouter.isInternalHref(url.pathname);
+      if (ipage) {
+        const params = {};
+        url.searchParams.forEach((value, key) => { params[key] = value; });
+        window.PanategwaNavigate(ipage, params);
+        return;
+      }
+    }
+
     window.location.href = url.toString();
   } catch {
     window.location.href = target;

@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
-  <script type="module" src="Music/system/music-system.js"></script>
+  <script type="module" src="music/system/music-system.js"></script>
   <script src="menu-loader.js" defer></script>
   <script src="settings/text-size.js" defer></script>
   <script src="settings/color-theme.js" defer></script>
@@ -45,7 +45,11 @@ document.querySelectorAll(".ideology-button").forEach(el => {
   el.addEventListener("click", () => {
     const ideology = el.dataset.ideology;
     if (ideology) {
-      window.location.href = `panategwa-d-ideologies-page.html?ideology=${ideology}`;
+      if (window.PanategwaNavigate) {
+        window.PanategwaNavigate("panategwa-d-ideologies-page.html", { ideology: ideology });
+      } else {
+        window.location.href = `panategwa-d-ideologies-page.html?ideology=${ideology}`;
+      }
     }
   });
 });
@@ -62,13 +66,25 @@ const ideologies = {
 
 // --- Get URL param ---
 function getParam(name) {
-  const params = new URLSearchParams(window.location.search);
-  return params.get(name);
+  var search;
+  if (window.PanategwaRouter && window.location.hash && window.location.hash.indexOf("#page=") === 0) {
+    var rest = window.location.hash.substring(6);
+    var amp = rest.indexOf("&");
+    var qs = amp !== -1 ? rest.substring(amp + 1) : "";
+    search = qs;
+  } else {
+    search = window.location.search.substring(1);
+  }
+  return new URLSearchParams(search).get(name);
 }
 
 // --- Go Back function ---
 function goBack() {
-  window.location.href = "panategwa-d-ideologies-page.html";
+  if (window.PanategwaNavigate) {
+    window.PanategwaNavigate("panategwa-d-ideologies-page.html", {});
+  } else {
+    window.location.href = "panategwa-d-ideologies-page.html";
+  }
 }
 
 // --- Show ideology ---

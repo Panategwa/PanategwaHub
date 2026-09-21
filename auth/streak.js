@@ -18,6 +18,9 @@ let currentProfile = null;
 let viewingMonthKey = "";
 let midnightTimer = null;
 let countdownTimer = null;
+let streakBound = false;
+let streakUnsubs = [];
+let streakTimers = [];
 
 function userRef(uid) {
   return doc(db, "users", uid);
@@ -382,6 +385,7 @@ function scheduleMidnightRefresh() {
     renderPage();
     scheduleMidnightRefresh();
   }, Math.max(1000, next.getTime() - now.getTime()));
+  streakTimers.push(midnightTimer);
 }
 
 function renderPage() {
@@ -483,12 +487,29 @@ function renderPage() {
   startCountdown();
 }
 
+function disposeStreakModule() {
+  for (let i = 0; i < streakUnsubs.length; i++) {
+    try { streakUnsubs[i](); } catch (e) { console.error("Streak disposal error:", e); }
+  }
+  streakUnsubs = [];
+  for (let i = 0; i < streakTimers.length; i++) {
+    try { window.clearTimeout(streakTimers[i]); } catch (e) {}
+    try { window.clearInterval(streakTimers[i]); } catch (e) {}
+  }
+  streakTimers = [];
+  streakBound = false;
+}
+
 function start() {
   const root = $("streak-root");
   if (!root) return;
+  if (streakBound) disposeStreakModule();
+  streakBound = true;
+  streakUnsubs = [];
+  streakTimers = [];
   ensurePanategwaToast();
 
-  watchAuth(async (user, profile) => {
+  const watchAuthUnsub = watchAuth(async (user, profile) => {
     currentUser = user;
     currentProfile = user ? {
       ...(profile || {}),
@@ -503,8 +524,9 @@ function start() {
     renderPage();
     scheduleMidnightRefresh();
   });
+  if (typeof watchAuthUnsub === "function") streakUnsubs.push(watchAuthUnsub);
 
-  window.addEventListener("panategwa:sitetimechange", (event) => {
+  function __streakSiteTimeListener(event) {
     const detail = event?.detail || {};
     const uid = String(detail.uid || "").trim();
     if (!uid || currentUser?.uid !== uid || !currentProfile) return;
@@ -513,11 +535,27 @@ function start() {
       siteTimeMs: Number(detail.siteTimeMs || 0)
     };
     renderPage();
-  });
+  }
+  window.addEventListener("panategwa:sitetimechange", __streakSiteTimeListener);
+  streakUnsubs.push(() => window.removeEventListener("panategwa:sitetimechange", __streakSiteTimeListener));
+}
+
+function __streakOnRouteChange(event) {
+  const detail = (event && event.detail) || {};
+  const page = String(detail.page || "");
+  if (page === "streak-page.html") {
+    if (!streakBound) start();
+  } else {
+    disposeStreakModule();
+  }
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", start);
+  document.addEventListener("DOMContentLoaded", function () {
+    start();
+    window.addEventListener("panategwa:routechange", __streakOnRouteChange);
+  });
 } else {
   start();
+  window.addEventListener("panategwa:routechange", __streakOnRouteChange);
 }

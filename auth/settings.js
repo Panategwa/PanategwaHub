@@ -32,15 +32,18 @@ const DEFAULT_AVATAR_ENTRY = AVATAR_PICKER_ENTRIES.find((entry) => entry.isDefau
 const AVATAR_ENTRY_MAP = new Map(AVATAR_PICKER_ENTRIES.filter((entry) => !entry.isDefault).map((entry) => [entry.id, entry]));
 let currentUser = null;
 let currentProfile = null;
+let settingsBound = false;
+let settingsUnsubs = [];
+let settingsWatchUnsub = null;
 const SETTING_STATUS_IDS = ["profile", "avatar", "email", "password", "actions", "danger", "privacy"];
 
 function escapeHtml(value) {
   return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+    .replaceAll("&", "&")
+    .replaceAll("<", "<")
+    .replaceAll(">", ">")
+    .replaceAll('"', """)
+    .replaceAll("'", "'");
 }
 
 function setStatus(message, kind = "info") {
@@ -177,7 +180,7 @@ function renderAvatarChoices() {
     ${AVATAR_PICKER_ENTRIES.filter((entry) => !entry.isDefault).map((entry) => `
       <button id="avatar-preset-${escapeHtml(entry.id)}-btn" type="button" class="avatar-choice">
         <img alt="" src="" />
-        <span data-avatar-name>${escapeHtml(entry.name)}</span>
+        <span data-avatar-name">${escapeHtml(entry.name)}</span>
         <small class="avatar-requirements">
           <span class="avatar-requirements-label">Requirements:</span>
           <span class="avatar-requirements-text" data-avatar-rank-note>${escapeHtml(entry.requirementText)}</span>
@@ -380,12 +383,24 @@ function bindButtons() {
   });
 }
 
+function disposeSettingsModule() {
+  for (let i = 0; i < settingsUnsubs.length; i++) {
+    try { settingsUnsubs[i](); } catch (e) { console.error("Settings disposal error:", e); }
+  }
+  settingsUnsubs = [];
+  settingsBound = false;
+}
+
 function start() {
+  if (settingsBound) disposeSettingsModule();
+  settingsBound = true;
+  settingsUnsubs = [];
+
   renderAvatarChoices();
   bindButtons();
   syncAvatarPresetLocks({});
 
-  watchAuth(async (user, profile) => {
+  settingsWatchUnsub = watchAuth(async (user, profile) => {
     currentUser = user || null;
     clearScopedStatuses();
     if (!user) {
@@ -400,10 +415,25 @@ function start() {
     syncAvatarPresetLocks(nextProfile);
     setStatus(user.emailVerified ? "Settings ready." : "Verify your email to unlock settings.", "info");
   });
+  if (typeof settingsWatchUnsub === "function") settingsUnsubs.push(settingsWatchUnsub);
+}
+
+function __settingsOnRouteChange(event) {
+  const detail = (event && event.detail) || {};
+  const page = String(detail.page || "");
+  if (page === "account-page.html") {
+    if (!settingsBound) start();
+  } else {
+    disposeSettingsModule();
+  }
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", start);
+  document.addEventListener("DOMContentLoaded", function () {
+    start();
+    window.addEventListener("panategwa:routechange", __settingsOnRouteChange);
+  });
 } else {
   start();
+  window.addEventListener("panategwa:routechange", __settingsOnRouteChange);
 }

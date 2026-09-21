@@ -1,4 +1,4 @@
-function ensureSharedAchievements() {
+﻿function ensureSharedAchievements() {
   const alreadyLoaded = [...document.querySelectorAll("script[type='module']")].some((script) => {
     const src = script.getAttribute("src") || "";
     return src === "auth/achievements.js" || src.endsWith("/auth/achievements.js");
@@ -198,12 +198,26 @@ window.PanategwaUpdateSidebarUnread = function () {
   renderSidebarAvatar();
 };
 
-window.PanategwaGoTo = function (url) {
-  try {
-    window.PanategwaMusic?.captureState?.();
-  } catch {}
-
-  window.location.href = String(url || "").trim();
+window.PanategwaGoTo = function (href) {
+  if (!href) return;
+  if (typeof window.PanategwaNavigate === "function" && window.PanategwaRouter && window.PanategwaRouter.isInternalHref) {
+    var page = window.PanategwaRouter.isInternalHref(href);
+    if (page) {
+      var params = {};
+      var qIndex = href.indexOf("?");
+      if (qIndex !== -1) {
+        var qs = href.substring(qIndex + 1);
+        var pairs = qs.split("&");
+        for (var i = 0; i < pairs.length; i++) {
+          var pair = pairs[i].split("=");
+          if (pair[0]) params[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1] || "");
+        }
+      }
+      window.PanategwaNavigate(page, params);
+      return;
+    }
+  }
+  window.location.href = href;
 };
 
 ensureSharedAchievements();
@@ -230,7 +244,18 @@ document.addEventListener("DOMContentLoaded", function () {
   ];
 
   const current = window.location.pathname.split("/").pop() || "index.html";
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = (function () {
+  if (window.PanategwaRouter && window.PanategwaRouter.getCurrentPage) {
+    var hash = window.location.hash;
+    if (hash && hash.indexOf("#page=") === 0) {
+      var rest = hash.substring(6);
+      var amp = rest.indexOf("&");
+      var qs = amp !== -1 ? rest.substring(amp + 1) : "";
+      return new URLSearchParams(qs);
+    }
+  }
+  return new URLSearchParams(window.location.search);
+})();
   const currentLang = urlParams.get("lang") || "en";
 
   function buildUrl(page) {

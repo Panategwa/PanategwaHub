@@ -2,11 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Panategwa Hub - Homepage</title>
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
-  <script type="module" src="Music/system/music-system.js"></script>
+  <script type="module" src="music/system/music-system.js"></script>
   <script src="menu-loader.js" defer></script>
+  <script src="router.js" defer></script>
+  <script src="mobile-menu.js" defer></script>
   <script src="settings/text-size.js" defer></script>
   <script src="settings/color-theme.js" defer></script>
   <script src="settings/translate.js" defer></script>
@@ -16,7 +19,9 @@
 <body>
 
   <!-- menu will inject here -->
-  <div id="menu-container"></div><br>
+  <div id="menu-container"></div>
+  <div id="page-content">
+    <br>
 
   <h3>Explore the fictional Panategwa star system.</h3>
 <h3>TEST</h3>
@@ -29,6 +34,7 @@
     <img src="images/yt-logo.png" class="yt-icon" alt="YouTube logo">
     Panategwa Gaming (YouTube Channel)
   </button>
+</div>
 </div>
 </body>
 </html>

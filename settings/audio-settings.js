@@ -8,6 +8,10 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
+let audioBound = false;
+let audioUnsubs = [];
+let audioListeners = [];
+
 function clampPercent(value, fallback = 0) {
   const next = Number(value);
   if (!Number.isFinite(next)) return fallback;
@@ -87,7 +91,18 @@ function sendTestPopup() {
   setScopedStatus("testing-status", "Test popup sent.", "success");
 }
 
+function wipeAudioElementListeners() {
+  for (let i = 0; i < audioListeners.length; i++) {
+    const el = audioListeners[i];
+    if (!el || !el.parentNode) continue;
+    const clone = el.cloneNode(true);
+    el.parentNode.replaceChild(clone, el);
+    audioListeners[i] = clone;
+  }
+}
+
 function bindAudioControls() {
+  wipeAudioElementListeners();
   $("mute-master-volume-btn")?.addEventListener("click", () => {
     const next = toggleToastAudioChannelMute("masterVolume");
     syncAudioControls(next);
@@ -150,9 +165,25 @@ function bindAudioControls() {
   window.addEventListener("storage", () => {
     syncAudioControls(getToastAudioSettings());
   });
+
+  // Track all interactive elements for disposal
+  ["mute-master-volume-btn", "mute-music-volume-btn", "mute-popup-volume-btn",
+   "master-volume-slider", "popup-volume-slider", "music-volume-slider",
+   "clear-all-popups-btn", "send-test-popup-btn"].forEach(function (id) {
+    var el = $(id);
+    if (el) audioListeners.push(el);
+  });
+}
+
+function disposeAudioModule() {
+  wipeAudioElementListeners();
+  audioUnsubs = [];
+  audioListeners = [];
+  audioBound = false;
 }
 
 function start() {
+  if (audioBound) disposeAudioModule(); audioBound = true; audioUnsubs = []; audioListeners = [];
   syncAudioControls();
   bindAudioControls();
 }
@@ -160,8 +191,22 @@ function start() {
 window.toggleAudioSettings = () => togglePanel("audio-message", "audio-options");
 window.toggleOtherSettings = () => togglePanel("other-message", "other-options");
 
+function __audioOnRouteChange(event) {
+  const detail = (event && event.detail) || {};
+  const page = String(detail.page || "");
+  if (page === "settings-page.html") {
+    if (!audioBound) start();
+  } else {
+    disposeAudioModule();
+  }
+}
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", start, { once: true });
+  document.addEventListener("DOMContentLoaded", function () {
+    start();
+    window.addEventListener("panategwa:routechange", __audioOnRouteChange);
+  });
 } else {
   start();
+  window.addEventListener("panategwa:routechange", __audioOnRouteChange);
 }

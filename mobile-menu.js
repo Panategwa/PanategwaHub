@@ -87,7 +87,7 @@
       "  width: 100%;",
       "  min-height: 56px;",
       "  padding: 8px 12px;",
-      "  background: color-mix(in srgb, var(--menu-bg, #111827) 94%, black 6%);",
+      "  background: rgba(15, 23, 42, 0.97);",
       "  border-bottom: 1px solid rgba(148, 163, 184, 0.25);",
       "  backdrop-filter: blur(18px);",
       "  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.18);",

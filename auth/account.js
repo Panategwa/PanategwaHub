@@ -1802,11 +1802,7 @@ function bindNotifications() {
         if (!item) return;
         const undoOps = [notificationReadOp(item, false)];
         const redoOps = [notificationReadOp(item, true)];
-        if (source === "social") {
-          await applyNotificationOps(redoOps);
-        } else {
-          await applyNotificationOps(redoOps);
-        }
+        await applyNotificationOps(redoOps);
         rememberNotificationHistory(undoOps, redoOps);
         return;
       }
@@ -1816,11 +1812,7 @@ function bindNotifications() {
         if (!item) return;
         const undoOps = [notificationReadOp(item, true)];
         const redoOps = [notificationReadOp(item, false)];
-        if (source === "social") {
-          await applyNotificationOps(redoOps);
-        } else {
-          await applyNotificationOps(redoOps);
-        }
+        await applyNotificationOps(redoOps);
         rememberNotificationHistory(undoOps, redoOps);
         return;
       }
@@ -1830,11 +1822,7 @@ function bindNotifications() {
         if (!item) return;
         const undoOps = [notificationDeleteUndoOp(item)];
         const redoOps = [notificationDeleteRedoOp(item)];
-        if (source === "social") {
-          await applyNotificationOps(redoOps);
-        } else {
-          await applyNotificationOps(redoOps);
-        }
+        await applyNotificationOps(redoOps);
         rememberNotificationHistory(undoOps, redoOps);
       }
     } catch (error) {

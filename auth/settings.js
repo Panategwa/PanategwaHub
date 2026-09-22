@@ -39,11 +39,11 @@ const SETTING_STATUS_IDS = ["profile", "avatar", "email", "password", "actions",
 
 function escapeHtml(value) {
   return String(value ?? "")
-    .replaceAll("&", "&")
-    .replaceAll("<", "<")
-    .replaceAll(">", ">")
-    .replaceAll('"', """)
-    .replaceAll("'", "'");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function setStatus(message, kind = "info") {

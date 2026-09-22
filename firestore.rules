@@ -20,8 +20,11 @@ service cloud.firestore {
 
     match /messages/{messageId} {
       allow read: if isParticipant(resource.data.participants);
-      allow create: if isParticipant(request.resource.data.participants);
-      allow update, delete: if isParticipant(resource.data.participants);
+      allow create: if isParticipant(request.resource.data.participants)
+        && request.resource.data.keys().hasOnly(["participants", "body", "senderId", "createdAt", "updatedAt"]);
+      allow update: if isParticipant(resource.data.participants)
+        && request.resource.data.participants == resource.data.participants;
+      allow delete: if isParticipant(resource.data.participants);
     }
   }
 }

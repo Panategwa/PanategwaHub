@@ -2,18 +2,16 @@
   if (window.__PANATEGWA_SETTINGS_BOOTSTRAPPED) return;
   window.__PANATEGWA_SETTINGS_BOOTSTRAPPED = true;
 
-  const BASE_URL = new URL(
-    ".",
-    document.currentScript?.src || window.location.href
-  );
-
+  // Use direct paths relative to the site root. This works correctly
+  // whether the script is loaded statically in <head> or dynamically
+  // by menu-loader.js (where document.currentScript is null).
   const MODULES = [
-    "translate.js",
-    "text-size.js",
-    "color-theme.js"
-  ].map(file => new URL(file, BASE_URL).href);
+    "settings/translate.js",
+    "settings/text-size.js",
+    "settings/color-theme.js"
+  ];
 
-  const ACHIEVEMENTS_MODULE = new URL("../auth/achievements.js", BASE_URL).href;
+  const ACHIEVEMENTS_MODULE = "auth/achievements.js";
 
   function loadScript(src) {
     return new Promise((resolve, reject) => {

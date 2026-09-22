@@ -37,7 +37,7 @@ body {
   padding-left: 220px;
   line-height: 1.6;
   min-height: 100vh;
-  font-size: var(--global-font-size);
+  font-size: var(--global-font-size, 16px);
   font-family: 'Rubik', 'Segoe UI', sans-serif;
   background-attachment: fixed;
 }
@@ -194,17 +194,17 @@ select:focus {
 .ethnotype {
   position: absolute;
   padding: 10px 16px;
-  background-color: rgb(255, 255, 255, 0.25);
+  background-color: rgba(255, 255, 255, 0.25);
   color: rgb(0, 0, 0);
   text-decoration: none;
   font-weight: bolder;
   border-radius: 6px;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Rubik', sans-serif;
   cursor: pointer;
 }
 
 .ethnotype:hover {
-  background-color: rgb(225, 225, 255, 0.5);
+  background-color: rgba(225, 225, 255, 0.5);
   color: rgb(0,0,0);
 }
 
@@ -224,7 +224,7 @@ select:focus {
   background: var(--menu-bg);
   overflow: hidden;
   z-index: 1000;
-  border-right: 1px solid color-mix(in srgb, var(--menu-bg) 5%, white 5%) ;
+  border-right: 1px solid rgba(255,255,255,0.08);
   backdrop-filter: blur(18px);
   box-shadow: 14px 0 32px rgba(2, 6, 23, 0.14);
 }

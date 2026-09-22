@@ -1,19 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Panategwa d Maps</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css" />
-  <script type="module" src="music/system/music-system.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panategwa d Maps</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="router.js" defer></script>
+  <script src="mobile-menu.js" defer></script>
   <script src="menu-loader.js" defer></script>
-  <script src="settings/text-size.js" defer></script>
-  <script src="settings/color-theme.js" defer></script>
-  <script src="settings/translate.js" defer></script>
-  <script src="settings/settings.js" defer></script>
-  <script type="module" src="auth/achievements.js"></script>
+</head>
 
 <style>
 
@@ -209,11 +205,13 @@ document.querySelectorAll(".ethnotype").forEach(el => {
     if (ethnotype) {
       // send to taxonomy page dynamically
       // Example: if your taxonomy page JS listens to URL params
-      if (window.PanategwaNavigate) {
+       if (window.PanategwaNavigate) {
         window.PanategwaNavigate("panategwa-d-life-page.html", { ethnotype: ethnotype });
       } else {
         window.location.href = `panategwa-d-life-page.html?ethnotype=${ethnotype}`;
       }
+    }
+  });
 });
 </script>
 

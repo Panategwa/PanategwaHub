@@ -102,12 +102,12 @@ function syncTextSizeInputs(size) {
     slider.value = String(px);
   }
   if (slider) {
-    slider.style.setProperty("--range-fill", ${((px - MIN_FONT_SIZE) / (MAX_FONT_SIZE - MIN_FONT_SIZE)) * 100}%);
+     slider.style.setProperty("--range-fill", `${((px - MIN_FONT_SIZE) / (MAX_FONT_SIZE - MIN_FONT_SIZE)) * 100}%`);
   }
 
   const value = document.getElementById("textsize-custom-value");
   if (value) {
-    value.textContent = ${px}px;
+    value.textContent = `${px}px`;
   }
 }
 
@@ -115,7 +115,7 @@ function applyFontSize(size) {
   const px = clampFontSize(size);
   const presetKey = getTextSizePresetKey(px);
 
-  document.documentElement.style.setProperty("--global-font-size", ${px}px);
+  document.documentElement.style.setProperty("--global-font-size", `${px}px`);
   localStorage.setItem("textsize_value", String(px));
   localStorage.setItem("textsize", presetKey === "custom" ? "custom" : presetKey);
 
@@ -138,7 +138,7 @@ function buildTextSizeButtons() {
   const container = document.getElementById("textsize-buttons");
   if (!container) return;
 
-  container.innerHTML = 
+  container.innerHTML = `
     <div class="settings-option-card textsize-settings-card">
       <div class="settings-card-heading">
         <strong>Presets</strong>
@@ -162,14 +162,14 @@ function buildTextSizeButtons() {
           id="textsize-custom-slider"
           class="audio-volume-slider"
           type="range"
-          min=""
-          max=""
+          min="12"
+          max="20"
           step="1"
-          value=""
+          value="16"
         />
       </div>
     </div>
-  ;
+  `;
 
   container.querySelectorAll("[data-textsize-preset]").forEach((btn) => {
     btn.addEventListener("click", () => setTextSize(btn.dataset.textsizePreset || "medium"));

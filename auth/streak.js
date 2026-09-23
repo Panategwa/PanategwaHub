@@ -540,22 +540,10 @@ function start() {
   streakUnsubs.push(() => window.removeEventListener("panategwa:sitetimechange", __streakSiteTimeListener));
 }
 
-function __streakOnRouteChange(event) {
-  const detail = (event && event.detail) || {};
-  const page = String(detail.page || "");
-  if (page === "streak-page.html") {
-    if (!streakBound) start();
-  } else {
-    disposeStreakModule();
-  }
-}
-
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", function () {
     start();
-    window.addEventListener("panategwa:routechange", __streakOnRouteChange);
   });
 } else {
   start();
-  window.addEventListener("panategwa:routechange", __streakOnRouteChange);
 }

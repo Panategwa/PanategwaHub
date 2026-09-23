@@ -171,19 +171,11 @@ function syncThemeUrl(name) {
     url.searchParams.delete("textsize");
   }
 
-  const __routerParams = {};
   const __langParam = url.searchParams.get("lang");
-  if (__langParam) __routerParams.lang = __langParam;
   const __sizeParam = url.searchParams.get("textsize");
-  if (__sizeParam) __routerParams.textsize = __sizeParam;
   const __themeParam = url.searchParams.get("theme");
-  if (__themeParam) __routerParams.theme = __themeParam;
 
-  if (typeof window.PanategwaRouter === "object" && typeof window.PanategwaRouter.syncParams === "function") {
-    window.PanategwaRouter.syncParams(__routerParams);
-  } else {
-    window.history.replaceState({}, "", url);
-  }
+  window.history.replaceState({}, "", url);
 }
 
 function setActiveThemeButton(name) {

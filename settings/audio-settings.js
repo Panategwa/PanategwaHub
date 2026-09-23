@@ -191,22 +191,10 @@ function start() {
 window.toggleAudioSettings = () => togglePanel("audio-message", "audio-options");
 window.toggleOtherSettings = () => togglePanel("other-message", "other-options");
 
-function __audioOnRouteChange(event) {
-  const detail = (event && event.detail) || {};
-  const page = String(detail.page || "");
-  if (page === "settings-page.html") {
-    if (!audioBound) start();
-  } else {
-    disposeAudioModule();
-  }
-}
-
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", function () {
     start();
-    window.addEventListener("panategwa:routechange", __audioOnRouteChange);
   });
 } else {
   start();
-  window.addEventListener("panategwa:routechange", __audioOnRouteChange);
 }

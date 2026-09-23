@@ -2,9 +2,9 @@
   if (window.__PANATEGWA_SETTINGS_BOOTSTRAPPED) return;
   window.__PANATEGWA_SETTINGS_BOOTSTRAPPED = true;
 
-  // Use direct paths relative to the site root. This works correctly
-  // whether the script is loaded statically in <head> or dynamically
-  // by menu-loader.js (where document.currentScript is null).
+  // Use direct paths relative to the site root.
+  // These scripts are loaded as classic scripts (not modules) because
+  // they declare global init functions (initTextSize, initTheme, initTranslate).
   const MODULES = [
     "settings/translate.js",
     "settings/text-size.js",

@@ -418,22 +418,10 @@ function start() {
   if (typeof settingsWatchUnsub === "function") settingsUnsubs.push(settingsWatchUnsub);
 }
 
-function __settingsOnRouteChange(event) {
-  const detail = (event && event.detail) || {};
-  const page = String(detail.page || "");
-  if (page === "account-page.html") {
-    if (!settingsBound) start();
-  } else {
-    disposeSettingsModule();
-  }
-}
-
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", function () {
     start();
-    window.addEventListener("panategwa:routechange", __settingsOnRouteChange);
   });
 } else {
   start();
-  window.addEventListener("panategwa:routechange", __settingsOnRouteChange);
 }

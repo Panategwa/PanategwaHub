@@ -388,16 +388,6 @@ function openNotificationHref(href) {
       return;
     }
 
-    if (typeof window.PanategwaNavigate === "function" && window.PanategwaRouter && typeof window.PanategwaRouter.isInternalHref === "function") {
-      const ipage = window.PanategwaRouter.isInternalHref(url.pathname);
-      if (ipage) {
-        const params = {};
-        url.searchParams.forEach((value, key) => { params[key] = value; });
-        window.PanategwaNavigate(ipage, params);
-        return;
-      }
-    }
-
     window.location.href = url.toString();
   } catch {
     window.location.href = target;
@@ -1959,22 +1949,10 @@ function start() {
   accountUnsubs.push(() => window.removeEventListener("panategwa:sitetimechange", __accountSiteTimeListener));
 }
 
-function __accountOnRouteChange(event) {
-  const detail = (event && event.detail) || {};
-  const page = String(detail.page || "");
-  if (page === "account-page.html") {
-    if (!accountBound) start();
-  } else {
-    disposeAccountModule();
-  }
-}
-
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", function () {
     start();
-    window.addEventListener("panategwa:routechange", __accountOnRouteChange);
   });
 } else {
   start();
-  window.addEventListener("panategwa:routechange", __accountOnRouteChange);
 }

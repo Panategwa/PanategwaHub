@@ -194,7 +194,6 @@ function buildThemeButtons() {
   if (!container) return;
 
   container.innerHTML = "";
-  container.classList.add("is-closed");
   container.style.display = "none";
 
   THEMES.forEach(theme => {

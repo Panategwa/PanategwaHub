@@ -83,14 +83,7 @@ def build_menu_html():
         """ + TOP_ICON + """
       </button>
     </div>
-
-    <div class="menu-section-label">Navigation</div>
-""" + "\n".join(links) + "\n\n" + """
-    <div class="menu-section-label">World Pages</div>
-""" + "\n".join(world_links) + "\n\n" + """
-    <div id="resize-handle"></div>
-  </div>
-</div>"""
+""" + "\n".join(links) + "\n" + "\n".join(world_links) + "\n\n    <div id=\"resize-handle\"></div>\n  </div>\n</div>"
 
 
 def regenerate_menu(filepath, filename):

@@ -400,7 +400,6 @@ function buildLanguageButtons() {
   if (!container) return;
 
   container.innerHTML = "";
-  container.classList.add("is-closed");
   container.style.display = "none";
 
   const currentLang = getCurrentLang();

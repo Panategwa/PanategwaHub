@@ -230,10 +230,25 @@
       }
     });
 
-    // Re-render on navigation (for SPA-like modules that dispatch events).
+    window.addEventListener("panategwa:sitetimechange", function (event) {
+      var uid = currentUid();
+      if (!uid) {
+        renderMenuSiteTime();
+        return;
+      }
+
+      var detail = event?.detail || {};
+      if (detail.uid && detail.uid === uid && Number(detail.siteTimeMs) > 0) {
+        try {
+          localStorage.setItem(siteTimeStorageKey(uid), String(detail.siteTimeMs));
+        } catch (e) {}
+      }
+
+      renderMenuSiteTime();
+    });
+
     window.addEventListener("panategwa:avatar-update", renderSidebarAvatar);
     window.addEventListener("panategwa:unread-update", renderSidebarAvatar);
-    window.addEventListener("panategwa:sitetimechange", renderMenuSiteTime);
   }
 
   window.PanategwaUpdateSidebarAvatar = function (avatarUrl) {

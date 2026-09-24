@@ -168,9 +168,11 @@
     var savedWidth = localStorage.getItem("menuWidth");
     if (savedWidth) {
       savedWidth = parseInt(savedWidth, 10);
-      menuContainer.style.width = savedWidth + "px";
-      if (menuContainer.style.width == savedWidth + "px") {
+      if (Number.isFinite(savedWidth) && savedWidth >= MIN_WIDTH && savedWidth <= MAX_WIDTH) {
+        menuContainer.style.width = savedWidth + "px";
         document.body.style.paddingLeft = savedWidth + "px";
+      } else {
+        document.body.style.paddingLeft = DEFAULT_WIDTH + "px";
       }
     } else {
       document.body.style.paddingLeft = DEFAULT_WIDTH + "px";

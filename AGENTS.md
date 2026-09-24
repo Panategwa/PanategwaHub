@@ -42,8 +42,8 @@ The sidebar (`#menu-container`) is present on every page with the same HTML stru
 - Header: title, subtitle, site time (`#_menu-site-time`)
 - Music slot (`#_menu-music-slot`) — populated by music-system.js
 - Icon buttons: settings, account (avatar), streak, top (scroll to top)
-- Page links: Home, Panategwa, Panategwa b–g (under "Pages" label)
-- World pages: D-Map, D-Life, D-Ideologies, Pitons, etc. (under "World Pages" label)
+- Page links: Home, Panategwa, Panategwa b–g (under "Navigation" label)
+- World pages: D-Map, D-Life, D-Ideologies, Pitons, Tri-Panats, Empire of Pitosia (under "World Pages" label)
 - Resize handle (`#_resize-handle`) — draggable to resize sidebar width
 
 Active link highlighting is handled by `site.js` comparing the current page filename

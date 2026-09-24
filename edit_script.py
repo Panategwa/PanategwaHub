@@ -1,11 +1,6 @@
-import os
-import re
+import os, re
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# ============================================================
-# PAGE DEFINITIONS
-# ============================================================
 
 MAIN_PAGES = [
     ("Home", "index.html"),
@@ -25,29 +20,7 @@ WORLD_PAGES = [
     ("Pitons", "pitons-page.html"),
     ("Tri-Panats", "tri-panategwaoi-anthropoi-civilis-page.html"),
     ("Empire of Pitosia", "empire-of-pitosia-page.html"),
-    ("Thrinsachelom", "thrinsachelom-history-page.html"),
-    ("Dendrospheres", "dendrospheres-page.html"),
-    ("Bathythalassas", "bathythalassas-gigaperipatitis-page.html"),
 ]
-
-PAGE_MODULES = {
-    "account-page.html": [
-        {"src": "auth/account.js", "type": "module"},
-        {"src": "auth/settings.js", "type": "module"},
-    ],
-    "settings-page.html": [
-        {"src": "settings/audio-settings.js", "type": "module"},
-    ],
-    "streak-page.html": [
-        {"src": "auth/streak.js", "type": "module"},
-    ],
-}
-
-SHARED_SCRIPTS = """  <script src="site.js" defer></script>
-  <script type="module" src="auth/achievements.js"></script>
-  <script type="module" src="auth/social.js"></script>
-  <script type="module" src="music/system/music-system.js"></script>
-  <script src="settings/settings.js" defer></script>"""
 
 SETTINGS_ICON = (
     '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">'
@@ -111,23 +84,13 @@ def build_menu_html():
       </button>
     </div>
 
-    <div class="menu-section-label">Pages</div>
-""" + "\n".join(links) + """
-
+    <div class="menu-section-label">Navigation</div>
+""" + "\n".join(links) + "\n\n" + """
     <div class="menu-section-label">World Pages</div>
-""" + "\n".join(world_links) + """
-
+""" + "\n".join(world_links) + "\n\n" + """
     <div id="resize-handle"></div>
   </div>
 </div>"""
-
-
-def build_head_scripts(filename):
-    scripts = [SHARED_SCRIPTS]
-    if filename in PAGE_MODULES:
-        for mod in PAGE_MODULES[filename]:
-            scripts.append('  <script type="module" src="{}"></script>'.format(mod["src"]))
-    return "\n".join(scripts)
 
 
 def regenerate_menu(filepath, filename):
@@ -138,7 +101,7 @@ def regenerate_menu(filepath, filename):
     menu_html = build_menu_html()
 
     content = re.sub(
-        r'<div id="menu-container">.*?</div>\s*\n\s*<div class="menu-inner">.*?</div>\s*\n\s*</div>',
+        r'<div id="menu-container">.*?<div id="resize-handle"></div>\s*</div>\s*</div>',
         menu_html,
         content,
         flags=re.DOTALL

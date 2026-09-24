@@ -74,10 +74,6 @@ function syncTextSizeUrl(size) {
     url.searchParams.delete("theme");
   }
 
-  const __langParam = url.searchParams.get("lang");
-  const __sizeParam = url.searchParams.get("textsize");
-  const __themeParam = url.searchParams.get("theme");
-
   window.history.replaceState({}, "", url);
 }
 
@@ -163,6 +159,8 @@ function buildTextSizeButtons() {
     </div>
   `;
 
+  container.style.display = "none";
+
   container.querySelectorAll("[data-textsize-preset]").forEach((btn) => {
     btn.addEventListener("click", () => setTextSize(btn.dataset.textsizePreset || "medium"));
   });
@@ -184,9 +182,9 @@ function toggleTextSizes() {
 
   if (!container || !msg) return;
 
-  const open = container.style.display === "block";
-  container.style.display = open ? "none" : "block";
-  msg.style.display = open ? "none" : "block";
+  const open = container.classList.toggle("is-open");
+  container.style.display = open ? "block" : "none";
+  msg.style.display = open ? "block" : "none";
 }
 
 function initTextSize() {

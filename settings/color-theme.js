@@ -171,10 +171,6 @@ function syncThemeUrl(name) {
     url.searchParams.delete("textsize");
   }
 
-  const __langParam = url.searchParams.get("lang");
-  const __sizeParam = url.searchParams.get("textsize");
-  const __themeParam = url.searchParams.get("theme");
-
   window.history.replaceState({}, "", url);
 }
 
@@ -198,6 +194,8 @@ function buildThemeButtons() {
   if (!container) return;
 
   container.innerHTML = "";
+  container.classList.add("is-closed");
+  container.style.display = "none";
 
   THEMES.forEach(theme => {
     const btn = document.createElement("button");
@@ -218,9 +216,9 @@ function toggleThemes() {
 
   if (!container || !msg) return;
 
-  const open = container.style.display === "block";
-  container.style.display = open ? "none" : "block";
-  msg.style.display = open ? "none" : "block";
+  const open = container.classList.toggle("is-open");
+  container.style.display = open ? "block" : "none";
+  msg.style.display = open ? "block" : "none";
 }
 
 function initTheme() {

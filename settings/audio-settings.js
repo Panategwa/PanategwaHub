@@ -67,9 +67,9 @@ function togglePanel(messageId, optionsId) {
   const options = $(optionsId);
   if (!message || !options) return;
 
-  const open = options.style.display === "block";
-  options.style.display = open ? "none" : "block";
-  message.style.display = open ? "none" : "block";
+  const open = options.classList.toggle("is-open");
+  options.style.display = open ? "block" : "none";
+  message.style.display = open ? "block" : "none";
 }
 
 function sendTestPopup() {
@@ -183,7 +183,12 @@ function disposeAudioModule() {
 }
 
 function start() {
-  if (audioBound) disposeAudioModule(); audioBound = true; audioUnsubs = []; audioListeners = [];
+  if (audioBound) {
+    disposeAudioModule();
+  }
+  audioBound = true;
+  audioUnsubs = [];
+  audioListeners = [];
   syncAudioControls();
   bindAudioControls();
 }

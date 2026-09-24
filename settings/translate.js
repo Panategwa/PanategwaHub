@@ -360,19 +360,25 @@ async function translatePage(lang) {
 function setLang(lang) {
   localStorage.setItem("lang", lang);
 
-  const params = {};
-  if (lang && lang !== "en") params.lang = lang;
-
   const size = getCurrentTextSize();
-  if (size && size !== "medium") params.textsize = size;
-
   const theme = getCurrentThemeName();
-  if (theme) params.theme = theme;
 
   const url = new URL(window.location.href);
-  if (lang && lang !== "en") url.searchParams.set("lang", lang); else url.searchParams.delete("lang");
-  if (size && size !== "medium") url.searchParams.set("textsize", size); else url.searchParams.delete("textsize");
-  if (theme) url.searchParams.set("theme", theme); else url.searchParams.delete("theme");
+  if (lang && lang !== "en") {
+    url.searchParams.set("lang", lang);
+  } else {
+    url.searchParams.delete("lang");
+  }
+  if (size && size !== "medium") {
+    url.searchParams.set("textsize", size);
+  } else {
+    url.searchParams.delete("textsize");
+  }
+  if (theme) {
+    url.searchParams.set("theme", theme);
+  } else {
+    url.searchParams.delete("theme");
+  }
   window.history.replaceState({}, "", url);
 
   translatePage();
@@ -384,9 +390,9 @@ function toggleLanguages() {
 
   if (!container || !msg) return;
 
-  const open = container.style.display === "block";
-  container.style.display = open ? "none" : "block";
-  msg.style.display = open ? "none" : "block";
+  const open = container.classList.toggle("is-open");
+  container.style.display = open ? "block" : "none";
+  msg.style.display = open ? "block" : "none";
 }
 
 function buildLanguageButtons() {
@@ -394,6 +400,7 @@ function buildLanguageButtons() {
   if (!container) return;
 
   container.innerHTML = "";
+  container.classList.add("is-closed");
   container.style.display = "none";
 
   const currentLang = getCurrentLang();

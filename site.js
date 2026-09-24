@@ -160,32 +160,36 @@
     var handle = document.getElementById("resize-handle");
     if (!handle) return;
 
-    var MIN_WIDTH = 315;
+    var MIN_WIDTH = 220;
     var MAX_WIDTH = 500;
-    var DEFAULT_WIDTH = 350;
+    var DEFAULT_WIDTH = 280;
     var isResizing = false;
+    var dragStartX = 0;
+    var dragStartWidth = 0;
 
     var savedWidth = localStorage.getItem("menuWidth");
+    var initialWidth = DEFAULT_WIDTH;
     if (savedWidth) {
       savedWidth = parseInt(savedWidth, 10);
       if (Number.isFinite(savedWidth) && savedWidth >= MIN_WIDTH && savedWidth <= MAX_WIDTH) {
-        menuContainer.style.width = savedWidth + "px";
-        document.body.style.paddingLeft = savedWidth + "px";
-      } else {
-        document.body.style.paddingLeft = DEFAULT_WIDTH + "px";
+        initialWidth = savedWidth;
       }
-    } else {
-      document.body.style.paddingLeft = DEFAULT_WIDTH + "px";
     }
+    menuContainer.style.width = initialWidth + "px";
+    document.body.style.paddingLeft = initialWidth + "px";
 
-    handle.addEventListener("mousedown", function () {
+    handle.addEventListener("mousedown", function (event) {
       isResizing = true;
+      dragStartX = event.clientX;
+      dragStartWidth = menuContainer.offsetWidth;
       document.body.style.userSelect = "none";
+      event.preventDefault();
     });
 
     document.addEventListener("mousemove", function (event) {
       if (!isResizing) return;
-      var newWidth = event.clientX;
+      var deltaX = event.clientX - dragStartX;
+      var newWidth = dragStartWidth + deltaX;
       if (newWidth < MIN_WIDTH) newWidth = MIN_WIDTH;
       if (newWidth > MAX_WIDTH) newWidth = MAX_WIDTH;
       menuContainer.style.width = newWidth + "px";

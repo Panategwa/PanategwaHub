@@ -13,24 +13,6 @@
   };
 
   // ========================================================
-  // Active link highlighting
-  // ========================================================
-  function highlightActiveLink() {
-    var currentPage = window.location.pathname.split("/").pop() || "index.html";
-    var buttons = document.querySelectorAll(".menu-button");
-    buttons.forEach(function (btn) {
-      var target = btn.getAttribute("data-target-page") || "";
-      btn.classList.toggle("active", target === currentPage);
-    });
-
-    var iconButtons = document.querySelectorAll(".menu-icon-button");
-    iconButtons.forEach(function (btn) {
-      var target = btn.getAttribute("data-target-page") || "";
-      btn.classList.toggle("active-icon", target === currentPage);
-    });
-  }
-
-  // ========================================================
   // Avatar rendering
   // ========================================================
   function defaultAvatarIcon() {
@@ -285,7 +267,6 @@
   // Initialization
   // ========================================================
   function init() {
-    highlightActiveLink();
     renderSidebarAvatar();
     renderMenuSiteTime();
     initResizeHandle();

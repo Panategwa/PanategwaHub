@@ -9,19 +9,23 @@ Each page is a standalone HTML file with static navigation via normal `<a href>`
 
 ### Multi-Page Static Navigation
 
-1. **`js/site.js`** — Handles dynamic sidebar features: active link highlighting,
-   avatar rendering, site time display, and sidebar resize handle. Also provides
-   `window.PanategwaGoTo(href)` which simply sets `window.location.href`.
-2. **`css/styles.css`** — Contains all site styles, including the fixed sidebar layout
+1. **`js/menu.js`** — Owns the entire sidebar: the `PAGES` list, the icons, the
+   rendered markup, and active link highlighting. Every page includes it and holds
+   only an empty `<div id="menu-container"></div>`, so the menu is edited in one place.
+2. **`js/site.js`** — Handles dynamic sidebar behavior: avatar rendering, site time
+   display, and the sidebar resize handle. Also provides `window.PanategwaGoTo(href)`
+   which simply sets `window.location.href`.
+3. **`css/styles.css`** — Contains all site styles, including the fixed sidebar layout
    (`#menu-container` at 280px default width, `body` padding-left: 280px).
-3. **Static sidebar menu** — Each HTML page contains the full sidebar menu HTML
-   inline (same structure on every page). Menu links are normal `<a>` tags.
+4. **Shared sidebar** — Rendered at runtime by `js/menu.js`; no page inlines menu markup.
 
 ### Script Includes
 
-Each page includes these scripts in `<head>`:
+Each page includes these scripts in `<head>`. Order matters: `js/menu.js` must come
+before `js/site.js` so the sidebar exists before the behavior code attaches to it.
 
-- **`js/site.js`** (defer) — Sidebar enhancements (active highlights, avatar, resize)
+- **`js/menu.js`** (defer) — Renders the sidebar and highlights the active link
+- **`js/site.js`** (defer) — Sidebar behavior (avatar, site time, resize)
 - **`auth/achievements.js`** (type=module) — Achievement system (self-initializing on DOMContentLoaded)
 - **`auth/social.js`** (type=module) — Friends/messages system (self-initializing on import)
 - **`music/system/music-system.js`** (type=module) — Music player (self-initializing on DOMContentLoaded)
@@ -37,20 +41,20 @@ Pages that need extra functionality include additional module scripts:
 
 ### Sidebar Menu
 
-The sidebar (`#menu-container`) is present on every page with the same HTML structure:
+The sidebar (`#menu-container`) is present on every page, rendered at runtime by
+`js/menu.js`, with this structure:
 
 - Header: title, subtitle, site time (`#menu-site-time`)
 - Music slot (`#menu-music-slot`) — populated by music-system.js
 - Icon buttons: settings, account (avatar), streak, top (scroll to top)
-- Page links in a single `.menu-group` column: Home, Panategwa (the G5V star),
-  then the planets Panategwa b–g. These are the only menu destinations; the
-  D-Map, D-Life, D-Ideologies, Pitons, Tri-Panats, Empire of Pitosia, Dendrospheres,
-  Bathythalassas and Thrinsachelom pages stay reachable only via direct links and
-  in-page buttons.
+- Page links in a single column: Home, Panategwa (the G5V star), then the planets
+  Panategwa b–g. These are the only menu destinations; the D-Map, D-Life,
+  D-Ideologies, Pitons, Tri-Panats, Empire of Pitosia, Dendrospheres, Bathythalassas
+  and Thrinsachelom pages stay reachable only via direct links and in-page buttons.
 - Right-edge resize handle (`#resize-handle`, `aria-orientation="vertical"`) —
   drag, mouse-wheel, or arrow keys
 
-Active link highlighting is handled by `js/site.js` comparing the current page filename
+Active link highlighting is handled by `js/menu.js` comparing the current page filename
 to each link's `data-target-page` attribute.
 
 ### Site Time Display
@@ -79,6 +83,7 @@ Keep these storage keys in sync when changing the tracking code.
   <title>Your Page Title</title>
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
+  <script src="js/menu.js" defer></script>
   <script src="js/site.js" defer></script>
   <script type="module" src="auth/achievements.js"></script>
   <script type="module" src="auth/social.js"></script>
@@ -86,17 +91,14 @@ Keep these storage keys in sync when changing the tracking code.
   <script src="settings/settings.js" defer></script>
 </head>
 <body>
-  <div id="menu-container">
-    <!-- Sidebar menu HTML (same on every page) -->
-    ...sidebar content...
-  </div>
+  <div id="menu-container"></div>
   <!-- Page content here -->
 </body>
 </html>
 ```
 
-2. **Add to the sidebar menu** — Update `tools/build_menu.py` to include the new page in
-   the `MAIN_PAGES` list, then re-run it to regenerate all pages.
+2. **Add to the sidebar menu** — Add an entry to the `PAGES` array in `js/menu.js`.
+   Every page picks it up automatically; no page needs editing.
    Afterwards run `python tools/verify_site.py` to confirm every page's links and
    menu markup are intact.
 
@@ -126,7 +128,8 @@ Keep these storage keys in sync when changing the tracking code.
 │   └── music-library.md      # How to add tracks to the music library
 ├── images/                   # Site images
 ├── js/
-│   └── site.js               # Sidebar enhancements (active links, avatar, site time, resize)
+│   ├── menu.js                 # Sidebar markup, page list, active link highlighting
+│   └── site.js                 # Sidebar behavior (avatar, site time, resize)
 ├── settings/
 │   ├── settings.js           # Bootstrap loader for settings scripts
 │   ├── text-size.js          # Text size customization
@@ -140,6 +143,5 @@ Keep these storage keys in sync when changing the tracking code.
 │       ├── music-library.js  # Music tracks library
 │       └── *.mp3             # Audio files
 └── tools/
-    ├── build_menu.py         # Regenerates the sidebar menu across all pages
-    └── verify_site.py        # Checks links, asset paths, and menu structure
+    └── verify_site.py        # Checks links, asset paths, and shared menu wiring
 ```

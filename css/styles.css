@@ -232,7 +232,7 @@ select:focus {
 
 .menu-scroll {
   position: relative;
-  width: calc(100% - 10px);
+  width: calc(100% - 12px);
   height: 100%;
   box-sizing: border-box;
   padding: 12px 12px 18px 12px;
@@ -274,45 +274,58 @@ select:focus {
   position: absolute;
   top: 0;
   right: 0;
-  width: 10px;
+  bottom: 0;
+  width: 12px;
   height: 100%;
   padding: 0;
   margin: 0;
   border: 0;
-  border-left: 1px solid rgba(191, 219, 254, 0.14);
-  background: linear-gradient(90deg, rgba(148,163,184,0.04), rgba(191,219,254,0.14));
+  background: transparent;
   cursor: col-resize;
   touch-action: none;
   z-index: 4;
+}
+
+#resize-handle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 3px;
+  background: rgba(191, 219, 254, 0.22);
   transition: background 0.16s ease, box-shadow 0.16s ease;
 }
 
 #resize-handle span {
   position: absolute;
   top: 50%;
-  left: 50%;
-  width: 2px;
-  height: 44px;
-  margin: 0;
-  transform: translate(-50%, -50%);
-  border-radius: 999px;
-  background: rgba(226, 232, 240, 0.5);
+  right: 1px;
+  width: 1px;
+  height: 60px;
+  transform: translateY(-50%);
+  background: rgba(226, 232, 240, 0.55);
   transition: background 0.16s ease, height 0.16s ease;
 }
 
 #resize-handle:hover,
 #resize-handle:focus-visible,
 #resize-handle.is-active {
-  background: linear-gradient(90deg, rgba(59,130,246,0.22), rgba(125,211,252,0.42));
-  box-shadow: -3px 0 14px rgba(2, 6, 23, 0.3);
   outline: none;
+}
+
+#resize-handle:hover::before,
+#resize-handle:focus-visible::before,
+#resize-handle.is-active::before {
+  background: rgba(125, 211, 252, 0.75);
+  box-shadow: -2px 0 10px rgba(125, 211, 252, 0.35);
 }
 
 #resize-handle:hover span,
 #resize-handle:focus-visible span,
 #resize-handle.is-active span {
-  background: rgba(226, 232, 240, 0.9);
-  height: 64px;
+  background: rgba(226, 232, 240, 0.95);
+  height: 90px;
 }
 
 /* =========================

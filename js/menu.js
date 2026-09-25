@@ -8,15 +8,19 @@
   // and nothing more than an empty <div id="menu-container"></div>. The markup
   // below is rendered into that container, so adding or removing a page only
   // ever means editing PAGES here.
+  //
+  // URLs are repo-relative. They are resolved against the current page's depth
+  // at runtime, so the same menu works from the root and from the nested
+  // main-pages/<body>/<page>/ folders.
   var PAGES = [
-    { name: "Home", url: "index.html" },
-    { name: "Panategwa", url: "panategwa-page.html" },
-    { name: "Panategwa b", url: "panategwa-b-page.html" },
-    { name: "Panategwa c", url: "panategwa-c-page.html" },
-    { name: "Panategwa d", url: "panategwa-d-page.html" },
-    { name: "Panategwa e", url: "panategwa-e-page.html" },
-    { name: "Panategwa f", url: "panategwa-f-page.html" },
-    { name: "Panategwa g", url: "panategwa-g-page.html" }
+    { name: "Home", url: "main-pages/home/home-page/index.html" },
+    { name: "Panategwa", url: "main-pages/panategwa/panategwa-page/panategwa-page.html" },
+    { name: "Panategwa b", url: "main-pages/panategwa-b/panategwa-b-page/panategwa-b-page.html" },
+    { name: "Panategwa c", url: "main-pages/panategwa-c/panategwa-c-page/panategwa-c-page.html" },
+    { name: "Panategwa d", url: "main-pages/panategwa-d/panategwa-d-page/panategwa-d-page.html" },
+    { name: "Panategwa e", url: "main-pages/panategwa-e/panategwa-e-page/panategwa-e-page.html" },
+    { name: "Panategwa f", url: "main-pages/panategwa-f/panategwa-f-page/panategwa-f-page.html" },
+    { name: "Panategwa g", url: "main-pages/panategwa-g/panategwa-g-page/panategwa-g-page.html" }
   ];
 
   var SETTINGS_ICON =
@@ -38,16 +42,30 @@
     return String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
   }
 
+  // Relative prefix that walks from the current page back to the repo root.
+  // "" for a root page, "../../../" for main-pages/<body>/<page>/file.html.
+  function rootPrefix() {
+    var segments = window.location.pathname.split("/").filter(Boolean);
+    var depth = Math.max(0, segments.length - 1);
+    return depth > 0 ? new Array(depth + 1).join("../") : "";
+  }
+
+  function pageUrl(url) {
+    return rootPrefix() + url;
+  }
+
   function renderPageLinks() {
+    var prefix = rootPrefix();
     return PAGES.map(function (page) {
-      var url = escapeAttr(page.url);
-      return '    <a href="' + url + '" class="menu-button" data-target-page="' + url + '">'
+      var href = escapeAttr(prefix + page.url);
+      return '    <a href="' + href + '" class="menu-button" data-target-page="' + href + '">'
         + escapeAttr(page.name) + "</a>";
     }).join("\n");
   }
 
   function renderIconLink(href, title, icon, inner) {
-    return '      <a href="' + href + '" class="menu-icon-button" data-target-page="' + href + '" title="'
+    var target = pageUrl(href);
+    return '      <a href="' + target + '" class="menu-icon-button" data-target-page="' + target + '" title="'
       + title + '">\n        ' + (inner || icon) + "\n      </a>";
   }
 
@@ -97,12 +115,38 @@
     var currentPage = currentPageName();
 
     document.querySelectorAll(".menu-button").forEach(function (btn) {
-      btn.classList.toggle("active", btn.getAttribute("data-target-page") === currentPage);
+      var isActive = btn.getAttribute("data-target-page") === currentPage;
+      btn.classList.toggle("active", isActive);
+      // The page you are already on is inert: no click, no hover styling,
+      // but still focusable so keyboard users keep their place in the menu.
+      if (isActive) {
+        btn.setAttribute("aria-current", "page");
+        btn.setAttribute("aria-disabled", "true");
+      } else {
+        btn.removeAttribute("aria-current");
+        btn.removeAttribute("aria-disabled");
+      }
     });
 
     document.querySelectorAll(".menu-icon-button").forEach(function (btn) {
-      btn.classList.toggle("active-icon", btn.getAttribute("data-target-page") === currentPage);
+      var isActive = btn.getAttribute("data-target-page") === currentPage;
+      btn.classList.toggle("active-icon", isActive);
+      if (isActive) {
+        btn.setAttribute("aria-current", "page");
+        btn.setAttribute("aria-disabled", "true");
+      } else {
+        btn.removeAttribute("aria-current");
+        btn.removeAttribute("aria-disabled");
+      }
     });
+  }
+
+  function blockDisabledClicks(event) {
+    var target = event.target.closest ? event.target.closest('[aria-disabled="true"]') : null;
+    if (target) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
   }
 
   function render() {
@@ -110,10 +154,14 @@
     if (!container) return;
     container.innerHTML = buildMenuHtml();
     highlightActiveLink();
+    container.addEventListener("click", blockDisabledClicks, true);
   }
 
-  // Exposed so other modules can read the canonical page list.
+  // Exposed so other modules can reach root-level pages (account, settings,
+  // streak) from anywhere in the tree, and read the canonical page list.
+  window.PanategwaRoot = rootPrefix();
   window.PanategwaMenuPages = PAGES;
+  window.PanategwaPageUrl = pageUrl;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", render);

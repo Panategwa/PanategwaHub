@@ -13,10 +13,14 @@
 
   const ACHIEVEMENTS_MODULE = "auth/achievements.js";
 
+  function siteRoot() {
+    return (typeof window !== "undefined" && window.PanategwaRoot) || "";
+  }
+
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const script = document.createElement("script");
-      script.src = src;
+      script.src = siteRoot() + src;
       script.async = false;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error(`Failed to load ${src}`));
@@ -25,16 +29,20 @@
   }
 
   function ensureModule(src, marker) {
+    const root = siteRoot();
     const existing = [...document.querySelectorAll("script[type='module']")].some((script) => {
       const current = script.getAttribute("src") || "";
-      return current === src || current.endsWith("/auth/achievements.js") || script.dataset[marker] === "true";
+      return current === src
+        || current === root + src
+        || current.endsWith("/auth/achievements.js")
+        || script.dataset[marker] === "true";
     });
 
     if (existing) return;
 
     const script = document.createElement("script");
     script.type = "module";
-    script.src = src;
+    script.src = root + src;
     script.dataset[marker] = "true";
     document.head.appendChild(script);
   }

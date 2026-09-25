@@ -337,7 +337,8 @@ function buildAccountHref(section, sub = null, targetId = null) {
   if (sub) params.set("sub", String(sub || "").trim());
   if (targetId) params.set("target", String(targetId || "").trim());
   const query = params.toString();
-  return query ? `account-page.html?${query}` : "account-page.html";
+  const root = typeof window !== "undefined" && window.PanategwaRoot ? window.PanategwaRoot : "";
+  return query ? `${root}account-page.html?${query}` : `${root}account-page.html`;
 }
 
 function socialNotificationHref(message) {
@@ -366,7 +367,8 @@ function localNotificationHref(entry) {
   }
 
   if (kind === "streak") {
-    return "streak-page.html";
+    const streakRoot = typeof window !== "undefined" && window.PanategwaRoot ? window.PanategwaRoot : "";
+    return `${streakRoot}streak-page.html`;
   }
 
   return String(entry?.href || "").trim();

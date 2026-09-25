@@ -1,138 +1,125 @@
+// ========================================================
+// Theme system
+// ========================================================
+// A theme only declares FIVE base colours. Everything else
+// the UI needs — sidebar fill, button outlines, hover
+// states, borders, glows, shadows, scrollbars, focus rings —
+// is derived from those five in css/styles.css using
+// color-mix(). Adding a theme is five lines, and nothing
+// else in the stylesheet has to be touched.
+//
+//   --c-base    page background
+//   --c-panel   sidebar / card surface (usually base, darker or tinted)
+//   --c-accent  links, highlights, active states
+//   --c-line    borders, dividers, scrollbars
+//   --c-text    body text
 const THEMES = [
   {
     name: "Panategwa Mode (Default)",
-    vars: {
-      "--bg-color": "#0f172a",
-      "--text-color": "#e5edf8",
-      "--menu-bg": "rgba(15, 23, 42, 0.72)",
-      "--menu-button": "rgba(148, 163, 184, 0.14)",
-      "--link-color": "#b8dcff",
-      "--button-text": "#f8fafc",
-      "--preview-bg": "#0f172a",
-      "--preview-text": "#e5edf8"
+    colors: {
+      "--c-base": "#121a2c",
+      "--c-panel": "#0b1424",
+      "--c-accent": "#60a5fa",
+      "--c-line": "#94a3b8",
+      "--c-text": "#e7edf7"
     }
   },
   {
     name: "Dark Mode",
-    vars: {
-      "--bg-color": "#090d16",
-      "--text-color": "#eef2f8",
-      "--menu-bg": "rgba(9, 13, 22, 0.82)",
-      "--menu-button": "rgba(148, 163, 184, 0.12)",
-      "--link-color": "#94c9ff",
-      "--button-text": "#ffffff",
-      "--preview-bg": "#090d16",
-      "--preview-text": "#eef2f8"
+    colors: {
+      "--c-base": "#090d16",
+      "--c-panel": "#060a11",
+      "--c-accent": "#60a5fa",
+      "--c-line": "#94a3b8",
+      "--c-text": "#eef2f8"
     }
   },
   {
     name: "Light Mode",
-    vars: {
-      "--bg-color": "#f6f8fb",
-      "--text-color": "#0f172a",
-      "--menu-bg": "rgba(255, 255, 255, 0.78)",
-      "--menu-button": "rgba(148, 163, 184, 0.16)",
-      "--link-color": "#2563eb",
-      "--button-text": "#0f172a",
-      "--preview-bg": "#f6f8fb",
-      "--preview-text": "#0f172a"
+    colors: {
+      "--c-base": "#f6f8fb",
+      "--c-panel": "#ffffff",
+      "--c-accent": "#2563eb",
+      "--c-line": "#64748b",
+      "--c-text": "#0f172a"
     }
   },
   {
     name: "Ocean",
-    vars: {
-      "--bg-color": "#0a2233",
-      "--text-color": "#d9efff",
-      "--menu-bg": "rgba(10, 34, 51, 0.72)",
-      "--menu-button": "rgba(103, 232, 249, 0.14)",
-      "--link-color": "#67e8f9",
-      "--button-text": "#eafaff",
-      "--preview-bg": "#0a2233",
-      "--preview-text": "#d9efff"
+    colors: {
+      "--c-base": "#0a2233",
+      "--c-panel": "#071a28",
+      "--c-accent": "#22d3ee",
+      "--c-line": "#7dd3fc",
+      "--c-text": "#d9efff"
     }
   },
   {
     name: "Neon",
-    vars: {
-      "--bg-color": "#050505",
-      "--text-color": "#39ff14",
-      "--menu-bg": "rgba(10, 10, 10, 0.9)",
-      "--menu-button": "rgba(255, 0, 255, 0.25)",
-      "--link-color": "#00ffff",
-      "--button-text": "#39ff14",
-      "--preview-bg": "#050505",
-      "--preview-text": "#39ff14"
+    colors: {
+      "--c-base": "#050505",
+      "--c-panel": "#0a0a0a",
+      "--c-accent": "#00ffff",
+      "--c-line": "#ff00ff",
+      "--c-text": "#39ff14"
     }
   },
   {
     name: "Space",
-    vars: {
-      "--bg-color": "#0c1222",
-      "--text-color": "#d4ddff",
-      "--menu-bg": "rgba(12, 18, 34, 0.78)",
-      "--menu-button": "rgba(129, 140, 248, 0.14)",
-      "--link-color": "#a5b4fc",
-      "--button-text": "#ffffff",
-      "--preview-bg": "#0c1222",
-      "--preview-text": "#d4ddff"
+    colors: {
+      "--c-base": "#0c1222",
+      "--c-panel": "#080d1a",
+      "--c-accent": "#818cf8",
+      "--c-line": "#a5b4fc",
+      "--c-text": "#d4ddff"
     }
   },
   {
     name: "Sunset",
-    vars: {
-      "--bg-color": "rgb(30, 10, 25)",
-      "--text-color": "#ffe6d5",
-      "--menu-bg": "rgba(120, 40, 60, 0.5)",
-      "--menu-button": "rgba(255, 120, 80, 0.25)",
-      "--link-color": "#ff9a76",
-      "--button-text": "#fff0e6",
-      "--preview-bg": "rgb(30, 10, 25)",
-      "--preview-text": "#ffe6d5"
+    colors: {
+      "--c-base": "#1e0a19",
+      "--c-panel": "#2a0f1c",
+      "--c-accent": "#fb7185",
+      "--c-line": "#fdba74",
+      "--c-text": "#ffe6d5"
     }
   },
   {
     name: "Forest",
-    vars: {
-      "--bg-color": "#0b1f14",
-      "--text-color": "#d7f7e3",
-      "--menu-bg": "rgba(20, 60, 40, 0.7)",
-      "--menu-button": "rgba(60, 140, 90, 0.25)",
-      "--link-color": "#7cf2b3",
-      "--button-text": "#eafff4",
-      "--preview-bg": "#0b1f14",
-      "--preview-text": "#d7f7e3"
+    colors: {
+      "--c-base": "#0b1f14",
+      "--c-panel": "#07170f",
+      "--c-accent": "#34d399",
+      "--c-line": "#6ee7b7",
+      "--c-text": "#d7f7e3"
     }
   },
   {
     name: "Ice",
-    vars: {
-      "--bg-color": "#0a1a2a",
-      "--text-color": "#d9f2ff",
-      "--menu-bg": "rgba(180, 220, 255, 0.15)",
-      "--menu-button": "rgba(120, 200, 255, 0.25)",
-      "--link-color": "#8ad7ff",
-      "--button-text": "#e8f7ff",
-      "--preview-bg": "#0a1a2a",
-      "--preview-text": "#d9f2ff"
+    colors: {
+      "--c-base": "#0a1a2a",
+      "--c-panel": "#07131f",
+      "--c-accent": "#38bdf8",
+      "--c-line": "#bae6fd",
+      "--c-text": "#d9f2ff"
     }
   },
   {
     name: "Midnight Blue",
-    vars: {
-      "--bg-color": "#050816",
-      "--text-color": "#cbd5ff",
-      "--menu-bg": "rgba(10, 20, 60, 0.85)",
-      "--menu-button": "rgba(70, 90, 200, 0.25)",
-      "--link-color": "#7aa2ff",
-      "--button-text": "#ffffff",
-      "--preview-bg": "#050816",
-      "--preview-text": "#cbd5ff"
+    colors: {
+      "--c-base": "#050816",
+      "--c-panel": "#03050f",
+      "--c-accent": "#7aa2ff",
+      "--c-line": "#93a5fd",
+      "--c-text": "#cbd5ff"
     }
   }
 ];
 
 function applyTheme(theme) {
-  for (const [key, value] of Object.entries(theme.vars)) {
+  // Only the five base colours are written; every derived token updates
+  // automatically because css/styles.css mixes them from these.
+  for (const [key, value] of Object.entries(theme.colors)) {
     document.documentElement.style.setProperty(key, value);
   }
 
@@ -174,12 +161,6 @@ function syncThemeUrl(name) {
   window.history.replaceState({}, "", url);
 }
 
-function setActiveThemeButton(name) {
-  document.querySelectorAll("#theme-buttons button").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.theme === name);
-  });
-}
-
 function setTheme(name) {
   const theme = THEMES.find(t => t.name === name);
   if (!theme) return;
@@ -202,8 +183,8 @@ function buildThemeButtons() {
     btn.className = "theme-button";
     btn.dataset.theme = theme.name;
     btn.textContent = theme.name;
-    btn.style.background = theme.vars["--preview-bg"];
-    btn.style.color = theme.vars["--preview-text"];
+    btn.style.background = theme.colors["--c-base"];
+    btn.style.color = theme.colors["--c-text"];
     btn.onclick = () => setTheme(theme.name);
     container.appendChild(btn);
   });

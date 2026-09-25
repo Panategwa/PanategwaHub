@@ -204,7 +204,8 @@ function buildAccountHref(section, sub = null, targetId = null) {
   if (targetId) params.set("target", targetId);
   const queryString = params.toString();
   const root = typeof window !== "undefined" && window.PanategwaRoot ? window.PanategwaRoot : "";
-  return queryString ? `${root}account-page.html?${queryString}` : `${root}account-page.html`;
+  const page = `${root}main-pages/account/account-page.html`;
+  return queryString ? `${page}?${queryString}` : page;
 }
 
 function userRef(uid) {

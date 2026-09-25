@@ -338,7 +338,8 @@ function buildAccountHref(section, sub = null, targetId = null) {
   if (targetId) params.set("target", String(targetId || "").trim());
   const query = params.toString();
   const root = typeof window !== "undefined" && window.PanategwaRoot ? window.PanategwaRoot : "";
-  return query ? `${root}account-page.html?${query}` : `${root}account-page.html`;
+  const page = `${root}main-pages/account/account-page.html`;
+  return query ? `${page}?${query}` : page;
 }
 
 function socialNotificationHref(message) {
@@ -368,7 +369,7 @@ function localNotificationHref(entry) {
 
   if (kind === "streak") {
     const streakRoot = typeof window !== "undefined" && window.PanategwaRoot ? window.PanategwaRoot : "";
-    return `${streakRoot}streak-page.html`;
+    return `${streakRoot}main-pages/streak/streak-page.html`;
   }
 
   return String(entry?.href || "").trim();

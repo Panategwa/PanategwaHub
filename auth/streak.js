@@ -311,7 +311,7 @@ async function claimStreak() {
       window.PanategwaToast({
         title: "Streak",
         body: "You already claimed today.",
-        href: `${window.PanategwaRoot || ""}streak-page.html`,
+        href: `${window.PanategwaRoot || ""}main-pages/streak/streak-page.html`,
         duration: 5000,
         persist: false,
         kind: "streak"
@@ -364,7 +364,7 @@ async function claimStreak() {
     window.PanategwaToast({
       title: "Streak claimed",
       body: `You claimed ${reward} XP from your day ${nextDay} streak.`,
-      href: `${window.PanategwaRoot || ""}streak-page.html`,
+      href: `${window.PanategwaRoot || ""}main-pages/streak/streak-page.html`,
       duration: 5000,
       persist: true,
       kind: "streak",

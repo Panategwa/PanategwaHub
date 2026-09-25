@@ -42,16 +42,53 @@
     return String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
   }
 
-  // Relative prefix that walks from the current page back to the repo root.
-  // "" for a root page, "../../" for main-pages/<body>/file.html.
-  function rootPrefix() {
+  // Absolute URL of the site root, ending in "/".
+  //
+  // The site is published under a subpath
+  // (https://panategwa.github.io/PanategwaHub/), so walking up from the current
+  // page's pathname would climb past the repo root and drop the
+  // "/PanategwaHub/" segment, sending links to
+  // https://panategwa.github.io/main-pages/... This script's own URL always
+  // ends in "/js/menu.js", so trimming those two segments off it yields the
+  // real root regardless of the current page's depth or where the site is
+  // mounted.
+  function computeRoot() {
+    var script = document.currentScript;
+    var src = script && script.src;
+    if (src) {
+      try {
+        var url = new URL(src, window.location.href);
+        var trimmed = url.pathname.replace(/\/js\/menu\.js$/, "/");
+        if (trimmed !== url.pathname) {
+          url.pathname = trimmed;
+          url.search = "";
+          url.hash = "";
+          return url.href;
+        }
+      } catch (err) {
+        // Fall through to the relative prefix below.
+      }
+    }
+
+    // Fallback for when the script URL is unavailable: "../../"-style prefix
+    // relative to the current page. "" at the repo root, "../../" for
+    // main-pages/<body>/file.html.
     var segments = window.location.pathname.split("/").filter(Boolean);
     var depth = Math.max(0, segments.length - 1);
     return depth > 0 ? new Array(depth + 1).join("../") : "";
   }
 
+  // Resolved eagerly, while this classic script is still executing:
+  // document.currentScript is only set for the duration of a script's own run,
+  // and render() happens later on DOMContentLoaded.
+  var ROOT = computeRoot();
+
+  function rootPrefix() {
+    return ROOT;
+  }
+
   function pageUrl(url) {
-    return rootPrefix() + url;
+    return ROOT + url;
   }
 
   function renderPageLinks() {
@@ -81,11 +118,11 @@
       '    <div id="menu-music-slot"></div>',
       "",
       '    <div class="line icons">',
-      renderIconLink("settings-page.html", "Site settings", SETTINGS_ICON),
+      renderIconLink("main-pages/settings/settings-page.html", "Site settings", SETTINGS_ICON),
       "",
-      renderIconLink("account-page.html", "Account", "", '        <span id="menu-account-button" style="display:inline-flex; align-items:center; justify-content:center;"></span>'),
+      renderIconLink("main-pages/account/account-page.html", "Account", "", '        <span id="menu-account-button" style="display:inline-flex; align-items:center; justify-content:center;"></span>'),
       "",
-      renderIconLink("streak-page.html", "Streak", STREAK_ICON),
+      renderIconLink("main-pages/streak/streak-page.html", "Streak", STREAK_ICON),
       "",
       '      <button class="menu-icon-button"',
       '        onclick="window.scrollTo({top:0, behavior:\'smooth\'})"',

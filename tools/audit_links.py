@@ -126,6 +126,7 @@ for script in scripts:
 with open(os.path.join(ROOT, "js", "menu.js"), encoding="utf-8") as fh:
     menu_source = fh.read()
 menu_pages = re.findall(r'name:\s*"([^"]+)",\s*url:\s*"([^"]+)"', menu_source)
+icon_pages = re.findall(r'renderIconLink\(\s*"([^"]+)"\s*,\s*"([^"]+)"', menu_source)
 
 print("=" * 70)
 print("MENU")
@@ -136,12 +137,13 @@ for name, url in menu_pages:
     if not exists:
         failures.append(f"menu.js: '{name}' points at missing {url}")
 
-for icon, page in [("settings", "settings-page.html"), ("account", "account-page.html"),
-                   ("streak", "streak-page.html")]:
-    where = PAGE_SET.get(page)
-    print(f"  {'OK ' if where else 'BAD'}  icon:{icon:<11} -> {where or page}")
-    if not where:
-        failures.append(f"menu.js: icon '{icon}' points at missing {page}")
+# Icons are resolved as repo-relative URLs, so check the exact target rather
+# than matching a bare filename anywhere in the tree.
+for url, label in icon_pages:
+    exists = os.path.exists(os.path.join(ROOT, *url.split("/")))
+    print(f"  {'OK ' if exists else 'BAD'}  icon:{label:<11} -> {url}")
+    if not exists:
+        failures.append(f"menu.js: icon '{label}' points at missing {url}")
 
 print()
 print("=" * 70)

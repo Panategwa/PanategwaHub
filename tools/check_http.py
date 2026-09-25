@@ -15,6 +15,7 @@ NAV = re.compile(
 )
 ANY = re.compile(r'(?:href|src)="([^"#]+)"')
 MENU_URL = re.compile(r'url:\s*"([^"]+)"')
+MENU_ICON_URL = re.compile(r'renderIconLink\(\s*"([^"]+)"')
 
 
 def get(path):
@@ -74,7 +75,7 @@ for page in pages:
 # Menu links, resolved the way menu.js does at runtime.
 with open(os.path.join(ROOT, "js", "menu.js"), encoding="utf-8") as fh:
     menu_source = fh.read()
-for url in MENU_URL.findall(menu_source):
+for url in MENU_URL.findall(menu_source) + MENU_ICON_URL.findall(menu_source):
     checked += 1
     code, _ = get(url)
     if code != 200:

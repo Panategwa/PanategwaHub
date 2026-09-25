@@ -980,7 +980,7 @@ function emitAchievementToasts(user, newlyUnlocked) {
     window.PanategwaToast({
       title: "Achievement unlocked",
       body: `${achievement.name}\n+${achievement.reward} XP`,
-      href: `account-page.html?tab=progress&target=${encodeURIComponent(id)}`,
+      href: `${(typeof window !== "undefined" && window.PanategwaRoot) || ""}main-pages/account/account-page.html?tab=progress&target=${encodeURIComponent(id)}`,
       duration: 5000,
       persist: true,
       kind: "achievement",

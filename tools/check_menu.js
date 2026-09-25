@@ -31,6 +31,11 @@ function run(pagePath) {
   const container = makeElement();
   container.attrs.id = "menu-container";
 
+  // The real script tag resolves menu.js to an absolute URL, which is what the
+  // browser hands to document.currentScript.src.
+  const scriptUrl = "https://panategwa.github.io/PanategwaHub/js/menu.js";
+  const root = "https://panategwa.github.io/PanategwaHub/";
+
   let pageAnchors = null;
   let iconAnchors = null;
 
@@ -49,6 +54,7 @@ function run(pagePath) {
 
   const document = {
     readyState: "complete",
+    currentScript: { src: scriptUrl },
     documentElement: { style: { setProperty() {} } },
     getElementById: (id) => (id === "menu-container" ? container : null),
     querySelectorAll: (sel) => {
@@ -66,28 +72,26 @@ function run(pagePath) {
     createElement: makeElement
   };
 
-  const window = { location: { pathname: pagePath, href: "http://x" + pagePath } };
-  vm.runInContext(source, vm.createContext({ window, document, console, Array, Math, Object, String }));
+  const window = { location: { pathname: pagePath, href: "https://panategwa.github.io/PanategwaHub" + pagePath } };
+  vm.runInContext(source, vm.createContext({ window, document, console, Array, Math, Object, String, URL }));
 
   pageAnchors = pageAnchors || parseAnchors("menu-button");
   iconAnchors = iconAnchors || parseAnchors("menu-icon-button");
 
-  return { window, html: container.innerHTML, pageAnchors, iconAnchors };
+  return { window, html: container.innerHTML, pageAnchors, iconAnchors, root };
 }
 
 const cases = [
-  { path: "/main-pages/home/home-page.html", depth: 2, active: "home-page.html" },
-  { path: "/main-pages/panategwa-d/panategwa-d-page.html", depth: 2, active: "panategwa-d-page.html" },
-  { path: "/main-pages/panategwa-d/panategwa-d-map-page.html", depth: 2, active: null },
-  { path: "/main-pages/account/account-page.html", depth: 2, active: "account-page.html" },
-  { path: "/main-pages/settings/settings-page.html", depth: 2, active: "settings-page.html" },
-  { path: "/streak-page.html", depth: 0, active: "streak-page.html" }
+  { path: "/main-pages/home/home-page.html", active: "home-page.html" },
+  { path: "/main-pages/panategwa-d/panategwa-d-page.html", active: "panategwa-d-page.html" },
+  { path: "/main-pages/panategwa-d/panategwa-d-map-page.html", active: null },
+  { path: "/main-pages/account/account-page.html", active: "account-page.html" },
+  { path: "/main-pages/settings/settings-page.html", active: "settings-page.html" }
 ];
 
 let failures = 0;
 for (const test of cases) {
-  const prefix = "../".repeat(test.depth);
-  const { window, html, pageAnchors, iconAnchors } = run(test.path);
+  const { window, html, pageAnchors, iconAnchors, root } = run(test.path);
 
   if (!html.includes('id="menu-container"') && !html.includes("menu-scroll")) {
     console.log("FAIL sidebar not rendered at", test.path);
@@ -101,22 +105,25 @@ for (const test of cases) {
 
   for (const el of pageAnchors) {
     const target = el.getAttribute("data-target-page");
-    if (!target.startsWith(prefix) || !target.includes("main-pages/")) {
-      console.log("FAIL link not correctly rooted:", target, "at", test.path);
+    // The site is served from https://panategwa.github.io/PanategwaHub/, so
+    // every link must be absolute and keep the /PanategwaHub/ prefix. A
+    // "../../"-style relative link would climb out of the repo.
+    if (!target.startsWith(root) || !target.includes("main-pages/")) {
+      console.log("FAIL link not rooted at the site root:", target, "at", test.path);
       failures++;
       break;
     }
   }
 
-  for (const need of ["settings-page.html", "account-page.html", "streak-page.html"]) {
-    if (!html.includes(prefix + need)) {
-      console.log("FAIL icon link missing or mis-rooted:", prefix + need, "at", test.path);
+  for (const need of ["main-pages/settings/settings-page.html", "main-pages/account/account-page.html", "main-pages/streak/streak-page.html"]) {
+    if (!html.includes(root + need)) {
+      console.log("FAIL icon link missing or mis-rooted:", root + need, "at", test.path);
       failures++;
     }
   }
 
-  if (window.PanategwaRoot !== prefix) {
-    console.log("FAIL PanategwaRoot =", JSON.stringify(window.PanategwaRoot), "expected", JSON.stringify(prefix));
+  if (window.PanategwaRoot !== root) {
+    console.log("FAIL PanategwaRoot =", JSON.stringify(window.PanategwaRoot), "expected", JSON.stringify(root));
     failures++;
   }
 
@@ -144,4 +151,4 @@ if (failures) {
   console.log(failures + " failure(s)");
   process.exit(1);
 }
-console.log("OK: menu renders with correct depth prefixes, active state, and inert current-page button");
+console.log("OK: menu links are absolute and keep the /PanategwaHub/ mount, with correct active state and an inert current-page button");

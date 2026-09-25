@@ -41,11 +41,26 @@ main-pages/
 ### Page Depth
 
 Every content page sits two levels deep (`main-pages/<body>/<page>.html`), so asset
-references are prefixed with `../../`. `js/menu.js` computes that prefix at runtime
-from `window.location.pathname` and exposes it as `window.PanategwaRoot`. Any module
-that builds a URL to a root-level page (account, settings, streak) must prefix it
-with `window.PanategwaRoot`, otherwise it breaks on nested pages.
-`settings/settings.js` does this for the scripts it injects.
+references in `<head>` are prefixed with `../../`. Those relative paths are fine on
+their own: the browser resolves them against the current page's URL, which already
+includes the mount point.
+
+What is *not* fine is rebuilding the site root by counting `../` segments, because
+the site is published under a subpath
+(`https://panategwa.github.io/PanategwaHub/`). Climbing out of
+`/PanategwaHub/main-pages/panategwa-b/` yields `/`, not `/PanategwaHub/`, so links
+would land on `https://panategwa.github.io/main-pages/...`. `js/menu.js` therefore
+derives the root from `document.currentScript.src` — its own URL always ends in
+`/js/menu.js`, so trimming those two segments gives the real root on any mount path
+or page depth — and publishes it as an absolute URL on `window.PanategwaRoot`.
+Any module that builds a URL to another page or asset
+(`settings/settings.js`, `auth/account.js`, `auth/social.js`, `auth/streak.js`,
+`auth/achievements.js`) must prefix it with `window.PanategwaRoot`. Because that
+value is absolute rather than `"../../"`-style, the module may be included from
+anywhere in the tree.
+
+Account, settings, and streak live under `main-pages/`, not at the repo root, so
+build their URLs as `PanategwaRoot + "main-pages/<name>/<name>-page.html"`.
 
 Navigation targets appear in three forms, and all three break independently if their
 paths go stale:
@@ -58,7 +73,8 @@ paths go stale:
 Run all three before committing; they catch different classes of breakage:
 
 - `python tools/verify_site.py` — structure, depth prefixes, the entry stub
-- `node tools/check_menu.js` — renders the sidebar headlessly at several depths
+- `node tools/check_menu.js` — renders the sidebar headlessly at several page paths
+  and asserts every link is absolute and keeps the `/PanategwaHub/` mount prefix
 - `python tools/audit_links.py` — every link, button and menu entry; also reports
   orphan pages that nothing links to
 - `python tools/check_http.py` — same, but over HTTP (needs `python -m http.server`)

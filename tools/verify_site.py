@@ -39,14 +39,16 @@ if root_pages != ["index.html"]:
     failures.append(f"root should hold only the index.html entry stub, found: {root_pages}")
 
 # The entry stub must point at the real home page, or the site root 404s.
+HOME = "main-pages/home/home-page.html"
+
 with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as fh:
     stub = fh.read()
-if 'url=main-pages/home/home-page/index.html' not in stub:
-    failures.append("index.html entry stub does not point at the home page")
-if os.path.join(ROOT, "main-pages", "home", "home-page", "index.html") not in [
-    os.path.join(ROOT, *p.split("/")) for p in PAGES
-]:
-    failures.append("the home page the stub points at is missing")
+if f"url={HOME}" not in stub:
+    failures.append(f"index.html entry stub does not point at {HOME}")
+if f'location.replace("{HOME}")' not in stub:
+    failures.append("index.html entry stub does not forward via location.replace")
+if HOME not in PAGES:
+    failures.append(f"the home page the stub points at is missing: {HOME}")
 
 checked = 0
 for rel_path in PAGES:

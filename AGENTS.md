@@ -9,12 +9,12 @@ Content pages live under `main-pages/<body>/<page>/`, so the repo root only hold
 shared asset folders plus a small `index.html` entry stub. That stub is what makes
 `https://panategwa.github.io/PanategwaHub/` land on the home page: GitHub Pages
 serves static files only and has no redirect rule, so the stub meta-refreshes to
-`main-pages/home/home-page/index.html`. If the home page ever moves, update the stub's
+`main-pages/home/home-page.html`. If the home page ever moves, update the stub's
 `url=` and `location.replace` targets, or the site root will 404.
 
 ```
 main-pages/
-  home/home-page/index.html
+  home/home-page.html
   account/account-page.html
   settings/settings-page.html
   streak/streak-page.html
@@ -40,12 +40,29 @@ main-pages/
 
 ### Page Depth
 
-Content pages sit three levels deep, so every asset reference is prefixed with
-`../../../`. `js/menu.js` computes that prefix at runtime from
-`window.location.pathname` and exposes it as `window.PanategwaRoot`. Any module
-that builds a URL to a root-level page (account, settings, streak) must prefix it
-with `window.PanategwaRoot`, otherwise it breaks on nested pages.
-`settings/settings.js` does this for the scripts it injects.
+Content pages sit three levels deep (`main-pages/<body>/<page>/<page>.html`), so most
+asset references are prefixed with `../../../`. A few sit shallower — the home page and
+the account/settings/streak pages are at depth 2 and use `../../`. `js/menu.js`
+computes that prefix at runtime from `window.location.pathname` and exposes it as
+`window.PanategwaRoot`. Any module that builds a URL to a root-level page
+(account, settings, streak) must prefix it with `window.PanategwaRoot`, otherwise it
+breaks on nested pages. `settings/settings.js` does this for the scripts it injects.
+
+Navigation targets appear in three forms, and all three break independently if their
+paths go stale:
+1. `href` / `src` attributes in HTML,
+2. inline `location.href` / `location.replace` / `window.open` targets in `onclick`,
+3. page URLs built inside JS modules.
+
+### Verification
+
+Run all three before committing; they catch different classes of breakage:
+
+- `python tools/verify_site.py` — structure, depth prefixes, the entry stub
+- `node tools/check_menu.js` — renders the sidebar headlessly at several depths
+- `python tools/audit_links.py` — every link, button and menu entry; also reports
+  orphan pages that nothing links to
+- `python tools/check_http.py` — same, but over HTTP (needs `python -m http.server`)
 
 ## Architecture
 
@@ -208,7 +225,10 @@ Keep these storage keys in sync when changing the tracking code.
 │       ├── music-library.js  # Music tracks library
 │       └── *.mp3             # Audio files
 └── tools/
-    └── verify_site.py        # Checks links, asset paths, and shared menu wiring
+    ├── audit_links.py         # Inventory of every link/button, plus orphan pages
+    ├── check_http.py          # Same checks over HTTP
+    ├── check_menu.js          # Headless sidebar render check
+    └── verify_site.py         # Structure, depth prefixes, entry stub
 ```
 
 ### Site Time Display

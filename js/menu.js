@@ -13,7 +13,7 @@
   // at runtime, so the same menu works from the root and from the nested
   // main-pages/<body>/<page>/ folders.
   var PAGES = [
-    { name: "Home", url: "main-pages/home/home-page/index.html" },
+    { name: "Home", url: "main-pages/home/home-page.html" },
     { name: "Panategwa", url: "main-pages/panategwa/panategwa-page/panategwa-page.html" },
     { name: "Panategwa b", url: "main-pages/panategwa-b/panategwa-b-page/panategwa-b-page.html" },
     { name: "Panategwa c", url: "main-pages/panategwa-c/panategwa-c-page/panategwa-c-page.html" },

@@ -93,6 +93,10 @@
     return "ptg_site_time_live_" + String(uid || "").trim();
   }
 
+  function siteTimePendingStorageKey(uid) {
+    return "ptg_site_time_pending_" + String(uid || "").trim();
+  }
+
   function normalizeSiteTimeMs(value) {
     var ms = Number(value || 0);
     return Number.isFinite(ms) && ms > 0 ? Math.floor(ms) : 0;
@@ -132,6 +136,28 @@
     return parts.join(" ");
   }
 
+  var liveSiteTimeMs = 0;
+
+  function setLiveSiteTime(value) {
+    var next = normalizeSiteTimeMs(value);
+    if (next >= liveSiteTimeMs) liveSiteTimeMs = next;
+    return liveSiteTimeMs;
+  }
+
+  function readStoredSiteTimeMs(uid) {
+    var stored = 0;
+    try {
+      stored = normalizeSiteTimeMs(localStorage.getItem(siteTimeStorageKey(uid)));
+    } catch (e) {}
+
+    var pending = 0;
+    try {
+      pending = normalizeSiteTimeMs(sessionStorage.getItem(siteTimePendingStorageKey(uid)));
+    } catch (e) {}
+
+    return Math.max(stored, pending);
+  }
+
   function renderMenuSiteTime() {
     var el = document.getElementById("menu-site-time");
     if (!el) return;
@@ -142,11 +168,7 @@
       return;
     }
 
-    var siteTimeMs = 0;
-    try {
-      siteTimeMs = normalizeSiteTimeMs(localStorage.getItem(siteTimeStorageKey(uid)));
-    } catch (e) {}
-
+    var siteTimeMs = setLiveSiteTime(readStoredSiteTimeMs(uid));
     el.textContent = "On the site for: " + formatMenuSiteTime(siteTimeMs);
   }
 
@@ -278,7 +300,9 @@
         || event.key.startsWith("ptg_notifications_")) {
         renderSidebarAvatar();
       }
-      if (event.key === "ptg_current_uid" || event.key.startsWith("ptg_site_time_live_")) {
+      if (event.key === "ptg_current_uid"
+        || event.key.startsWith("ptg_site_time_live_")
+        || event.key.startsWith("ptg_site_time_pending_")) {
         renderMenuSiteTime();
       }
     });
@@ -290,8 +314,9 @@
         return;
       }
 
-      var detail = event?.detail || {};
+      var detail = event && event.detail ? event.detail : {};
       if (detail.uid && detail.uid === uid && Number(detail.siteTimeMs) > 0) {
+        setLiveSiteTime(detail.siteTimeMs);
         try {
           localStorage.setItem(siteTimeStorageKey(uid), String(detail.siteTimeMs));
         } catch (e) {}

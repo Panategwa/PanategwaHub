@@ -9,10 +9,10 @@ Each page is a standalone HTML file with static navigation via normal `<a href>`
 
 ### Multi-Page Static Navigation
 
-1. **`site.js`** — Handles dynamic sidebar features: active link highlighting,
+1. **`js/site.js`** — Handles dynamic sidebar features: active link highlighting,
    avatar rendering, site time display, and sidebar resize handle. Also provides
    `window.PanategwaGoTo(href)` which simply sets `window.location.href`.
-2. **`styles.css`** — Contains all site styles, including the fixed sidebar layout
+2. **`css/styles.css`** — Contains all site styles, including the fixed sidebar layout
    (`#menu-container` at 280px default width, `body` padding-left: 280px).
 3. **Static sidebar menu** — Each HTML page contains the full sidebar menu HTML
    inline (same structure on every page). Menu links are normal `<a>` tags.
@@ -21,7 +21,7 @@ Each page is a standalone HTML file with static navigation via normal `<a href>`
 
 Each page includes these scripts in `<head>`:
 
-- **`site.js`** (defer) — Sidebar enhancements (active highlights, avatar, resize)
+- **`js/site.js`** (defer) — Sidebar enhancements (active highlights, avatar, resize)
 - **`auth/achievements.js`** (type=module) — Achievement system (self-initializing on DOMContentLoaded)
 - **`auth/social.js`** (type=module) — Friends/messages system (self-initializing on import)
 - **`music/system/music-system.js`** (type=module) — Music player (self-initializing on DOMContentLoaded)
@@ -39,14 +39,30 @@ Pages that need extra functionality include additional module scripts:
 
 The sidebar (`#menu-container`) is present on every page with the same HTML structure:
 
-- Header: title, subtitle, site time (`#_menu-site-time`)
-- Music slot (`#_menu-music-slot`) — populated by music-system.js
+- Header: title, subtitle, site time (`#menu-site-time`)
+- Music slot (`#menu-music-slot`) — populated by music-system.js
 - Icon buttons: settings, account (avatar), streak, top (scroll to top)
-- Page links: Home, Panategwa, Panategwa b–g, D-Map, D-Life, D-Ideologies, Pitons, Tri-Panats, Empire of Pitosia
+- Page links, grouped in two `.menu-group` blocks separated by `.menu-divider`:
+  Home, Panategwa, Panategwa b–g, then D-Map, D-Life, D-Ideologies, Pitons,
+  Tri-Panats, Empire of Pitosia
 - Fixed resize footer (`#resize-handle`) — drag, mouse-wheel, arrow-key, or double-click resize
 
-Active link highlighting is handled by `site.js` comparing the current page filename
+Active link highlighting is handled by `js/site.js` comparing the current page filename
 to each link's `data-target-page` attribute.
+
+### Site Time Display
+
+`auth/achievements.js` owns time tracking: it accumulates `siteTimePendingMs`, writes
+it to `sessionStorage["ptg_site_time_pending_<uid>"]`, and dispatches
+`panategwa:sitetimechange` with `{ uid, siteTimeMs }` every second.
+
+`js/site.js` renders the sidebar clock from three sources, taking the largest value so
+the display never moves backwards:
+1. the in-memory `liveSiteTimeMs` cache fed by the `panategwa:sitetimechange` payload,
+2. `localStorage["ptg_site_time_live_<uid>"]` (the persisted last-known value),
+3. `sessionStorage["ptg_site_time_pending_<uid>"]` (this tab's unspent elapsed time).
+
+Keep these storage keys in sync when changing the tracking code.
 
 ## How to Add a New Page
 
@@ -59,8 +75,8 @@ to each link's `data-target-page` attribute.
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Your Page Title</title>
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-  <script src="site.js" defer></script>
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="js/site.js" defer></script>
   <script type="module" src="auth/achievements.js"></script>
   <script type="module" src="auth/social.js"></script>
   <script type="module" src="music/system/music-system.js"></script>
@@ -76,8 +92,10 @@ to each link's `data-target-page` attribute.
 </html>
 ```
 
-2. **Add to the sidebar menu** — Update `edit_script.py` to include the new page in
+2. **Add to the sidebar menu** — Update `tools/build_menu.py` to include the new page in
    the `MAIN_PAGES` or `WORLD_PAGES` list, then re-run it to regenerate all pages.
+   Afterwards run `python tools/verify_site.py` to confirm every page's links and
+   menu markup are intact.
 
 3. **Add page-specific modules** — Add a `<script type="module" src="...">` include
    in the `<head>` for any module the page needs (e.g., `auth/account.js`).
@@ -86,11 +104,9 @@ to each link's `data-target-page` attribute.
 
 ```
 ├── *.html                    # Content pages (static multi-page navigation)
-├── site.js                   # Sidebar enhancements (active links, avatar, resize)
-├── styles.css                # All site styles
+├── AGENTS.md                 # This guide
 ├── firestore.rules           # Firebase Firestore security rules
-├── firebase-debug.log        # Firebase debug log (gitignored)
-├── edit_script.py            # Utility script for bulk HTML generation
+├── .gitignore                # Ignores firebase-debug.log, __pycache__, node_modules
 ├── auth/
 │   ├── firebase-config.js    # Firebase initialization
 │   ├── auth.js               # Core auth + profile logic
@@ -100,16 +116,27 @@ to each link's `data-target-page` attribute.
 │   ├── streak.js             # Streak page module
 │   ├── achievements.js       # Achievement system
 │   └── toast.js              # Toast notifications + audio
+├── css/
+│   └── styles.css            # All site styles
+├── docs/
+│   ├── years.txt             # Lore note: world year length
+│   └── music-library.md      # How to add tracks to the music library
+├── images/                   # Site images
+├── js/
+│   └── site.js               # Sidebar enhancements (active links, avatar, site time, resize)
 ├── settings/
 │   ├── settings.js           # Bootstrap loader for settings scripts
 │   ├── text-size.js          # Text size customization
 │   ├── color-theme.js        # Color theme selection
 │   ├── translate.js          # Language translation
 │   └── audio-settings.js     # Audio settings page module
-└── music/
-    ├── system/
-    │   └── music-system.js   # Music player
-    └── library/
-        ├── music-library.js  # Music tracks library
-        └── *.mp3            # Audio files
+├── music/
+│   ├── system/
+│   │   └── music-system.js   # Music player
+│   └── library/
+│       ├── music-library.js  # Music tracks library
+│       └── *.mp3             # Audio files
+└── tools/
+    ├── build_menu.py         # Regenerates the sidebar menu across all pages
+    └── verify_site.py        # Checks links, asset paths, and menu structure
 ```

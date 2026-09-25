@@ -1,6 +1,6 @@
 import os, re
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 MAIN_PAGES = [
     ("Home", "index.html"),
@@ -40,7 +40,6 @@ TOP_ICON = (
     '</svg>'
 )
 
-
 def build_menu_html():
     links = []
     for name, url in MAIN_PAGES:
@@ -53,6 +52,9 @@ def build_menu_html():
         world_links.append(
             '      <a href="{url}" class="menu-button" data-target-page="{url}">{name}</a>'.format(url=url, name=name)
         )
+
+    main_block = "\n".join(links)
+    world_block = "\n".join(world_links)
 
     return """<div id="menu-container">
   <div class="menu-scroll">
@@ -83,7 +85,16 @@ def build_menu_html():
         """ + TOP_ICON + """
       </button>
     </div>
-""" + "\n".join(links) + "\n" + "\n".join(world_links) + """
+
+    <div class="menu-group">
+""" + main_block + """
+    </div>
+
+    <div class="menu-divider"></div>
+
+    <div class="menu-group">
+""" + world_block + """
+    </div>
   </div>
 
   <div class="menu-resize-footer">

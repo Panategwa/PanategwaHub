@@ -35,8 +35,18 @@ if "main-pages/" not in [p.split("/")[0] for p in PAGES if "/" in p]:
     pass
 
 root_pages = [p for p in PAGES if "/" not in p]
-if root_pages:
-    failures.append(f"unexpected root-level pages: {root_pages}")
+if root_pages != ["index.html"]:
+    failures.append(f"root should hold only the index.html entry stub, found: {root_pages}")
+
+# The entry stub must point at the real home page, or the site root 404s.
+with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as fh:
+    stub = fh.read()
+if 'url=main-pages/home/home-page/index.html' not in stub:
+    failures.append("index.html entry stub does not point at the home page")
+if os.path.join(ROOT, "main-pages", "home", "home-page", "index.html") not in [
+    os.path.join(ROOT, *p.split("/")) for p in PAGES
+]:
+    failures.append("the home page the stub points at is missing")
 
 checked = 0
 for rel_path in PAGES:
@@ -56,6 +66,12 @@ for rel_path in PAGES:
 
     if text.count("</head>") != 1:
         failures.append(f"{rel_path} -> </head> count {text.count('</head>')}")
+
+    # The root index.html is a redirect stub, not a full page, so the shared
+    # sidebar and depth-prefix rules do not apply to it.
+    if rel_path == "index.html":
+        continue
+
     if '<div id="menu-container"></div>' not in text:
         failures.append(f"{rel_path} -> sidebar markup is inlined instead of shared")
     if 'class="menu-button"' in text:

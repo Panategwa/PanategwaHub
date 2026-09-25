@@ -6,8 +6,11 @@ The Panategwa Hub is a static HTML/CSS/JS website with Firebase Auth + Firestore
 Each page is a standalone HTML file with static navigation via normal `<a href>` links.
 
 Content pages live under `main-pages/<body>/<page>/`, so the repo root only holds the
-shared asset folders. Every page in the site is inside `main-pages/`; there is no
-`index.html` at the root, so `/` is not a valid page.
+shared asset folders plus a small `index.html` entry stub. That stub is what makes
+`https://panategwa.github.io/PanategwaHub/` land on the home page: GitHub Pages
+serves static files only and has no redirect rule, so the stub meta-refreshes to
+`main-pages/home/home-page/index.html`. If the home page ever moves, update the stub's
+`url=` and `location.replace` targets, or the site root will 404.
 
 ```
 main-pages/
@@ -168,9 +171,7 @@ Keep these storage keys in sync when changing the tracking code.
 ## Directory Structure
 
 ```
-├── account-page.html          # (pages now live under main-pages/)
-├── settings-page.html
-├── streak-page.html
+├── index.html                 # Entry stub — forwards the site root to the home page
 ├── main-pages/                # All content pages, grouped by body
 │   └── <body>/<page>/<page>.html
 ├── AGENTS.md                 # This guide

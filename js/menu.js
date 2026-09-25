@@ -10,17 +10,17 @@
   // ever means editing PAGES here.
   //
   // URLs are repo-relative. They are resolved against the current page's depth
-  // at runtime, so the same menu works from the root and from the nested
-  // main-pages/<body>/<page>/ folders.
+  // at runtime, so the same menu works from the root and from the
+  // main-pages/<body>/ folders.
   var PAGES = [
     { name: "Home", url: "main-pages/home/home-page.html" },
-    { name: "Panategwa", url: "main-pages/panategwa/panategwa-page/panategwa-page.html" },
-    { name: "Panategwa b", url: "main-pages/panategwa-b/panategwa-b-page/panategwa-b-page.html" },
-    { name: "Panategwa c", url: "main-pages/panategwa-c/panategwa-c-page/panategwa-c-page.html" },
-    { name: "Panategwa d", url: "main-pages/panategwa-d/panategwa-d-page/panategwa-d-page.html" },
-    { name: "Panategwa e", url: "main-pages/panategwa-e/panategwa-e-page/panategwa-e-page.html" },
-    { name: "Panategwa f", url: "main-pages/panategwa-f/panategwa-f-page/panategwa-f-page.html" },
-    { name: "Panategwa g", url: "main-pages/panategwa-g/panategwa-g-page/panategwa-g-page.html" }
+    { name: "Panategwa", url: "main-pages/panategwa/panategwa-page.html" },
+    { name: "Panategwa b", url: "main-pages/panategwa-b/panategwa-b-page.html" },
+    { name: "Panategwa c", url: "main-pages/panategwa-c/panategwa-c-page.html" },
+    { name: "Panategwa d", url: "main-pages/panategwa-d/panategwa-d-page.html" },
+    { name: "Panategwa e", url: "main-pages/panategwa-e/panategwa-e-page.html" },
+    { name: "Panategwa f", url: "main-pages/panategwa-f/panategwa-f-page.html" },
+    { name: "Panategwa g", url: "main-pages/panategwa-g/panategwa-g-page.html" }
   ];
 
   var SETTINGS_ICON =
@@ -43,7 +43,7 @@
   }
 
   // Relative prefix that walks from the current page back to the repo root.
-  // "" for a root page, "../../../" for main-pages/<body>/<page>/file.html.
+  // "" for a root page, "../../" for main-pages/<body>/file.html.
   function rootPrefix() {
     var segments = window.location.pathname.split("/").filter(Boolean);
     var depth = Math.max(0, segments.length - 1);

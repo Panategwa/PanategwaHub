@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panategwa d Maps</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../css/styles.css" />
+  <script src="../../js/menu.js" defer></script>
+  <script src="../../js/site.js" defer></script>
+  <script type="module" src="../../auth/achievements.js"></script>
+  <script type="module" src="../../auth/social.js"></script>
+  <script type="module" src="../../music/system/music-system.js"></script>
+  <script src="../../settings/settings.js" defer></script>
+  <style>
+
+  /* Ethnotype locations */
+
+.pitosians{
+  top:20.5%;
+  left:37%;
+  font-size:20px;
+  padding:20px 20px;
+}
+
+.prokheevanians{
+  top:34.5%;
+  left:28.5%;
+  font-size:11px;
+  padding:10px 10px;
+}
+
+.rashooties{
+  top:30%;
+  left:5%;
+  font-size:20px;
+  padding:20px 20px;
+}
+
+.mazunians{
+  top:54%;
+  left:11%;
+  font-size:13px;
+  padding:12px 12px;
+}
+
+.mazukhalians{
+  top:49%;
+  left:0.5%;
+  font-size:13px;
+  padding:12px 12px;
+}
+
+.foozeens{
+  top:67%;
+  left:17%;
+  font-size:13px;
+  padding:12px 12px;
+}
+
+.jamuhairies{
+  top:49%;
+  left:30%;
+  font-size:15px;
+  padding:11px 11px;
+}
+
+.jamuhalies{
+  top:59.5%;
+  left:27%;
+  font-size:15px;
+  padding:11px 11px;
+}
+
+.arifalums{
+  top:72%;
+  left:32%;
+  font-size:14px;
+  padding:13px 13px;
+}
+
+.amronians{
+  top:46.5%;
+  left:19.5%;
+  font-size:10px;
+  padding:10px 10px;
+}
+.mohambus{
+  top:44.5%;
+  left:11.5%;
+  font-size:10px;
+  padding:10px 10px;
+}
+.dawooshamoods{
+  top:20.5%;
+  left:6.5%;
+  font-size:10px;
+  padding:8px 8px;
+}
+.camebaptrons{
+  top:15%;
+  left:14%;
+  font-size:10px;
+  padding:9px 9px;
+}
+.archiburgs{
+  top:8%;
+  left:8.5%;
+  font-size:10px;
+  padding:9px 9px;
+}
+.hamdungs{
+  top:85%;
+  left:17%;
+  font-size:15px;
+  padding:11px 11px;
+}
+.rayajamadars{
+  top:65%;
+  left:57%;
+  font-size:12px;
+  padding:11px 11px;
+}
+.omahassas{
+  top:72%;
+  left:62%;
+  font-size:9px;
+  padding:8px 8px;
+}
+
+.neevekians{
+  top:55.5%;
+  left:48.5%;
+  font-size:9px;
+  padding:8px 8px;
+}
+
+.krishlavanians{
+ top:51.5%;
+   left:53%;
+   font-size:10px;
+   padding:9px 9px;
+}
+
+.rehalians{
+ top:68%;
+   left: 46%;
+   font-size:15px;
+   padding:12px 12px;
+}
+
+</style>
+</head>
+<body>
+  <div id="menu-container"></div>
+
+<h1 style="margin-top:40px;">Map views of Panategwa d</h1>
+
+<button onclick="showMap('images/panategwa-d-map.jpg')">Map</button>
+
+<button onclick="showMap('images/panategwa-d-tectonic-plates-map.jpg')">Tectonic Plates</button>
+
+<button onclick="showMap('images/panategwa-d-tectonic-plates-movement-map.jpg')">Plate Movement</button>
+
+<div class="container">
+
+<img id="map-image" src="../../images/panategwa-d-map.jpg" alt="Map of Panategwa d">
+
+<!-- Ethnotype buttons -->
+<a class="ethnotype pitosians" data-ethnotype="Pitosians" href="panategwa-d-life-page.html?ethnotype=Pitosians">Pitosians</a>
+<a class="ethnotype rashooties" data-ethnotype="Rashooties" href="panategwa-d-life-page.html?ethnotype=Rashooties">Rashooties</a>
+<a class="ethnotype mazunians" data-ethnotype="Mazunians" href="panategwa-d-life-page.html?ethnotype=Mazunians">Mazunians</a>
+<a class="ethnotype jamuhairies" data-ethnotype="Jamuhairies" href="panategwa-d-life-page.html?ethnotype=Jamuhairies">Jamuhairies</a>
+<a class="ethnotype arifalums" data-ethnotype="Arifalums" href="panategwa-d-life-page.html?ethnotype=Arifalums">Arifalums</a>
+<a class="ethnotype foozeens" data-ethnotype="Foozeens" href="panategwa-d-life-page.html?ethnotype=Foozeens">Foozeens</a>
+<a class="ethnotype amronians" data-ethnotype="Amronians" href="panategwa-d-life-page.html?ethnotype=Amronians">Amronians</a>
+<a class="ethnotype mohambus" data-ethnotype="Mohambus" href="panategwa-d-life-page.html?ethnotype=Mohambus">Mohambus</a>
+<a class="ethnotype dawooshamoods" data-ethnotype="Dawooshamoods" href="panategwa-d-life-page.html?ethnotype=Dawooshamoods">Dawooshamoods</a>
+<a class="ethnotype camebaptrons" data-ethnotype="Camebaptrons" href="panategwa-d-life-page.html?ethnotype=Camebaptrons">Camebaptrons</a>
+<a class="ethnotype archiburgs" data-ethnotype="Archiburgs" href="panategwa-d-life-page.html?ethnotype=Archiburgs">Archiburgs</a>
+<a class="ethnotype hamdungs" data-ethnotype="Hamdungs" href="panategwa-d-life-page.html?ethnotype=Hamdungs">Hamdungs</a>
+<a class="ethnotype mazukhalians" data-ethnotype="Mazukhalians" href="panategwa-d-life-page.html?ethnotype=Mazukhalians">Mazukhalians</a>
+<a class="ethnotype jamuhalies" data-ethnotype="Jamuhalies" href="panategwa-d-life-page.html?ethnotype=Jamuhalies">Jamuhalies</a>
+<a class="ethnotype rayajamadars" data-ethnotype="Rayajamadars" href="panategwa-d-life-page.html?ethnotype=Rayajamadars">Rayajamadars</a>
+<a class="ethnotype omahassas" data-ethnotype="Omahassas" href="panategwa-d-life-page.html?ethnotype=Omahassas">Omahassas</a>
+<a class="ethnotype neevekians" data-ethnotype="Neevekians" href="panategwa-d-life-page.html?ethnotype=Neevekians">Neevekians</a>
+<a class="ethnotype krishlavanians" data-ethnotype="Krishlavanians" href="panategwa-d-life-page.html?ethnotype=Krishlavanians">Krishlavanians</a>
+<a class="ethnotype prokheevanians" data-ethnotype="Prokheevanians" href="panategwa-d-life-page.html?ethnotype=Prokheevanians">Prokheevanians</a>
+<a class="ethnotype rehalians" data-ethnotype="Rehalians" href="panategwa-d-life-page.html?ethnotype=Rehalians">Rehalians</a>
+
+</div>
+
+<script defer>
+function showMap(filename){
+  document.getElementById("map-image").src = filename;
+}
+
+    // Optional: intercept clicks and send to JS function if you want dynamic behavior
+    document.querySelectorAll(".ethnotype").forEach(el => {
+      el.addEventListener("click", e => {
+        const ethnotype = el.dataset.ethnotype;
+        if (ethnotype) {
+          window.location.href = `panategwa-d-life-page.html?ethnotype=${ethnotype}`;
+        }
+      });
+    });
+</script>
+
+</body>
+</html>

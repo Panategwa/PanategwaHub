@@ -5,7 +5,7 @@
 The Panategwa Hub is a static HTML/CSS/JS website with Firebase Auth + Firestore backend.
 Each page is a standalone HTML file with static navigation via normal `<a href>` links.
 
-Content pages live under `main-pages/<body>/<page>/`, so the repo root only holds the
+Content pages live under `main-pages/<body>/`, so the repo root only holds the
 shared asset folders plus a small `index.html` entry stub. That stub is what makes
 `https://panategwa.github.io/PanategwaHub/` land on the home page: GitHub Pages
 serves static files only and has no redirect rule, so the stub meta-refreshes to
@@ -18,35 +18,34 @@ main-pages/
   account/account-page.html
   settings/settings-page.html
   streak/streak-page.html
-  panategwa/panategwa-page/panategwa-page.html
-  panategwa-b/panategwa-b-page/panategwa-b-page.html
-  panategwa-c/panategwa-c-page/panategwa-c-page.html
+  panategwa/panategwa-page.html
+  panategwa-b/panategwa-b-page.html
+  panategwa-c/panategwa-c-page.html
   panategwa-d/
-    panategwa-d-page/panategwa-d-page.html
-    panategwa-d-map/panategwa-d-map-page.html
-    panategwa-d-life/panategwa-d-life-page.html
-    panategwa-d-ideologies/panategwa-d-ideologies-page.html
-    pitons/pitons-page.html
-    empire-of-pitosia/empire-of-pitosia-page.html
-    thrinsachelom-history/thrinsachelom-history-page.html
-    bathythalassas-gigaperipatitis/bathythalassas-gigaperipatitis-page.html
-    tri-panategwaoi-anthropoi-civilis/tri-panategwaoi-anthropoi-civilis-page.html
+    panategwa-d-page.html
+    panategwa-d-map-page.html
+    panategwa-d-life-page.html
+    panategwa-d-ideologies-page.html
+    pitons-page.html
+    empire-of-pitosia-page.html
+    thrinsachelom-history-page.html
+    bathythalassas-gigaperipatitis-page.html
+    tri-panategwaoi-anthropoi-civilis-page.html
   panategwa-e/
-    panategwa-e-page/panategwa-e-page.html
-    dendrospheres/dendrospheres-page.html
-  panategwa-f/panategwa-f-page/panategwa-f-page.html
-  panategwa-g/panategwa-g-page/panategwa-g-page.html
+    panategwa-e-page.html
+    dendrospheres-page.html
+  panategwa-f/panategwa-f-page.html
+  panategwa-g/panategwa-g-page.html
 ```
 
 ### Page Depth
 
-Content pages sit three levels deep (`main-pages/<body>/<page>/<page>.html`), so most
-asset references are prefixed with `../../../`. A few sit shallower — the home page and
-the account/settings/streak pages are at depth 2 and use `../../`. `js/menu.js`
-computes that prefix at runtime from `window.location.pathname` and exposes it as
-`window.PanategwaRoot`. Any module that builds a URL to a root-level page
-(account, settings, streak) must prefix it with `window.PanategwaRoot`, otherwise it
-breaks on nested pages. `settings/settings.js` does this for the scripts it injects.
+Every content page sits two levels deep (`main-pages/<body>/<page>.html`), so asset
+references are prefixed with `../../`. `js/menu.js` computes that prefix at runtime
+from `window.location.pathname` and exposes it as `window.PanategwaRoot`. Any module
+that builds a URL to a root-level page (account, settings, streak) must prefix it
+with `window.PanategwaRoot`, otherwise it breaks on nested pages.
+`settings/settings.js` does this for the scripts it injects.
 
 Navigation targets appear in three forms, and all three break independently if their
 paths go stale:
@@ -152,8 +151,8 @@ Keep these storage keys in sync when changing the tracking code.
 
 ## How to Add a New Page
 
-1. **Create the file** at `main-pages/<body>/<page>/<page>-page.html` (or, for a page
-   belonging to an existing body, a new folder beside its siblings), using this head:
+1. **Create the file** at `main-pages/<body>/<page>.html` (or, for a page belonging
+   to an existing body, a new file beside its siblings), using this head:
 ```html
 <!DOCTYPE html>
 <html lang="en">
@@ -162,13 +161,13 @@ Keep these storage keys in sync when changing the tracking code.
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Your Page Title</title>
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../../../css/styles.css" />
-  <script src="../../../js/menu.js" defer></script>
-  <script src="../../../js/site.js" defer></script>
-  <script type="module" src="../../../auth/achievements.js"></script>
-  <script type="module" src="../../../auth/social.js"></script>
-  <script type="module" src="../../../music/system/music-system.js"></script>
-  <script src="../../../settings/settings.js" defer></script>
+  <link rel="stylesheet" href="../../css/styles.css" />
+  <script src="../../js/menu.js" defer></script>
+  <script src="../../js/site.js" defer></script>
+  <script type="module" src="../../auth/achievements.js"></script>
+  <script type="module" src="../../auth/social.js"></script>
+  <script type="module" src="../../music/system/music-system.js"></script>
+  <script src="../../settings/settings.js" defer></script>
 </head>
 <body>
   <div id="menu-container"></div>
@@ -190,7 +189,7 @@ Keep these storage keys in sync when changing the tracking code.
 ```
 ├── index.html                 # Entry stub — forwards the site root to the home page
 ├── main-pages/                # All content pages, grouped by body
-│   └── <body>/<page>/<page>.html
+│   └── <body>/<page>.html
 ├── AGENTS.md                 # This guide
 ├── firestore.rules           # Firebase Firestore security rules
 ├── .gitignore                # Ignores firebase-debug.log, __pycache__, node_modules

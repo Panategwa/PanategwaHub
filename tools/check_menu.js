@@ -77,8 +77,8 @@ function run(pagePath) {
 
 const cases = [
   { path: "/main-pages/home/home-page.html", depth: 2, active: "home-page.html" },
-  { path: "/main-pages/panategwa-d/panategwa-d-page/panategwa-d-page.html", depth: 3, active: "panategwa-d-page.html" },
-  { path: "/main-pages/panategwa-d/panategwa-d-map/panategwa-d-map-page.html", depth: 3, active: null },
+  { path: "/main-pages/panategwa-d/panategwa-d-page.html", depth: 2, active: "panategwa-d-page.html" },
+  { path: "/main-pages/panategwa-d/panategwa-d-map-page.html", depth: 2, active: null },
   { path: "/main-pages/account/account-page.html", depth: 2, active: "account-page.html" },
   { path: "/main-pages/settings/settings-page.html", depth: 2, active: "settings-page.html" },
   { path: "/streak-page.html", depth: 0, active: "streak-page.html" }

@@ -62,6 +62,43 @@ h1, h2, h3 {
   letter-spacing: -0.02em;
 }
 
+/* ========================================================
+   GLOBAL SCROLLBAR
+   Applies to every scrollable element on every page — the
+   document, the sidebar, settings panels, message lists,
+   and anything added later. No per-element styling needed.
+   ======================================================== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.75) rgba(2, 6, 23, 0.45);
+}
+
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(2, 6, 23, 0.45);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.75);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.9);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 h1 {
   font-size: clamp(2.4rem, 4vw, 3.4rem);
   margin-bottom: 0.5rem;
@@ -232,41 +269,14 @@ select:focus {
 
 .menu-scroll {
   position: relative;
-  width: calc(100% - 12px);
+  width: calc(100% - 18px);
   height: 100%;
   box-sizing: border-box;
-  padding: 12px 12px 18px 12px;
+  padding: 12px 14px 18px 12px;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(150, 150, 150, 0.4) rgba(255,255,255,0.04);
-}
-
-.menu-scroll::-webkit-scrollbar,
-.menu-music-track-list::-webkit-scrollbar {
-  width: 10px;
-}
-
-.menu-scroll::-webkit-scrollbar-track,
-.menu-music-track-list::-webkit-scrollbar-track {
-  background: rgba(255,255,255,0.04);
-  border-radius: 999px;
-}
-
-.menu-scroll::-webkit-scrollbar-thumb,
-.menu-music-track-list::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.42);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.menu-scroll::-webkit-scrollbar-thumb:hover,
-.menu-music-track-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(191, 219, 254, 0.48);
-  background-clip: padding-box;
 }
 
 /* RESIZE HANDLE */
@@ -275,7 +285,7 @@ select:focus {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 12px;
+  width: 18px;
   height: 100%;
   padding: 0;
   margin: 0;
@@ -292,19 +302,21 @@ select:focus {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 3px;
-  background: rgba(191, 219, 254, 0.22);
+  width: 7px;
+  background: linear-gradient(90deg, rgba(71, 85, 105, 0.55), rgba(100, 116, 139, 0.8));
+  box-shadow: -1px 0 8px rgba(2, 6, 23, 0.45);
   transition: background 0.16s ease, box-shadow 0.16s ease;
 }
 
 #resize-handle span {
   position: absolute;
   top: 50%;
-  right: 1px;
-  width: 1px;
-  height: 60px;
+  right: 3px;
+  width: 3px;
+  height: 80px;
   transform: translateY(-50%);
-  background: rgba(226, 232, 240, 0.55);
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.65);
   transition: background 0.16s ease, height 0.16s ease;
 }
 
@@ -317,15 +329,15 @@ select:focus {
 #resize-handle:hover::before,
 #resize-handle:focus-visible::before,
 #resize-handle.is-active::before {
-  background: rgba(125, 211, 252, 0.75);
-  box-shadow: -2px 0 10px rgba(125, 211, 252, 0.35);
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.7), rgba(125, 211, 252, 0.9));
+  box-shadow: -2px 0 14px rgba(56, 189, 248, 0.4);
 }
 
 #resize-handle:hover span,
 #resize-handle:focus-visible span,
 #resize-handle.is-active span {
-  background: rgba(226, 232, 240, 0.95);
-  height: 90px;
+  background: rgba(255, 255, 255, 0.95);
+  height: 120px;
 }
 
 /* =========================
@@ -628,6 +640,7 @@ main {
 
 .menu-button {
   display: block;
+  box-sizing: border-box;
   width: 100%;
   margin: 2px 0;
   padding: 0.5em 0.65em;
@@ -866,8 +879,6 @@ main {
   max-height: 150px;
   overflow: auto;
   padding-right: 2px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.25) rgba(255,255,255,0.04);
 }
 
 .menu-music-track-row {

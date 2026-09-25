@@ -136,7 +136,7 @@
       "",
       '  <div id="resize-handle" role="separator" tabindex="0"',
       '    aria-label="Resize sidebar. Drag, scroll, or use the left and right arrow keys."',
-      '    aria-orientation="vertical" title="Drag or scroll to resize"><span></span></div>'
+      '    aria-orientation="vertical" title="Drag or scroll to resize"><span aria-hidden="true"></span></div>'
     ].join("\n");
   }
 

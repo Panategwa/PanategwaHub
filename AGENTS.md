@@ -148,8 +148,15 @@ A theme declares only **five** base colours in `settings/color-theme.js`:
 Everything else in `css/styles.css` is derived from those five with `color-mix()`,
 so adding or retuning a theme never requires editing the stylesheet. When styling new
 components, use the derived tokens (`--surface-border`, `--menu-button-outline`,
-`--focus-ring`, `--scrollbar-thumb`, …) rather than literal colours, or they will not
-respond to themes.
+`--focus-ring`, `--scrollbar-thumb`, `--handle-grip-color`, …) rather than literal
+colours, or they will not respond to themes.
+
+Never reuse one custom-property name for two different types. A `:root` colour named
+`--handle-bar` and a `#menu-container` length named `--handle-bar` are distinct
+declarations, and the inner one shadows the outer — so `background: var(--handle-bar)`
+resolves to a length, which is invalid at computed-value time and silently paints
+nothing. Geometry is `-width` / `-height` suffixed and declared on the component
+(`--handle-bar-width`); colours are `-color` suffixed and declared in `:root`.
 
 ### Site Time Display
 

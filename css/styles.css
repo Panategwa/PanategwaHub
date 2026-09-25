@@ -70,10 +70,15 @@
   --scrollbar-thumb: color-mix(in srgb, var(--c-line) 55%, var(--c-base));
   --scrollbar-thumb-hover: color-mix(in srgb, var(--c-line) 85%, var(--c-text));
   --scrollbar-track: color-mix(in srgb, var(--c-base) 70%, black);
-  --handle-bar: color-mix(in srgb, var(--c-line) 55%, var(--c-base));
-  --handle-bar-hover: color-mix(in srgb, var(--c-accent) 55%, var(--c-line));
-  --handle-grip: color-mix(in srgb, var(--c-text) 55%, var(--c-line));
-  --handle-grip-hover: var(--c-text);
+  /* --- derived: resize handle ---
+     Geometry lives on #menu-container as --handle-*-width; these are the
+     colours. The two namespaces must stay separate — a single name used for
+     both makes `background: var(--handle-bar)` resolve to a length, which is
+     invalid at computed-value time and silently paints nothing. */
+  --handle-bar-color: color-mix(in srgb, var(--c-line) 22%, transparent);
+  --handle-bar-color-hover: color-mix(in srgb, var(--c-accent) 55%, var(--c-line));
+  --handle-grip-color: color-mix(in srgb, var(--c-text) 45%, var(--c-line));
+  --handle-grip-color-hover: var(--c-text);
 }
 
 /* =========================
@@ -315,8 +320,8 @@ select:focus {
 #menu-container {
   --menu-pad: 14px;
   --menu-handle-width: 24px;
-  --handle-bar: 12px;
-  --handle-grip: 4px;
+  --handle-bar-width: 12px;
+  --handle-grip-width: 4px;
   position: fixed;
   top: 0;
   left: 0;
@@ -355,7 +360,10 @@ select:focus {
   -webkit-user-select: none;
 }
 
-/* RESIZE HANDLE */
+/* RESIZE HANDLE
+   The handle is always visible, not just on hover: a faint full-height seam
+   marks the draggable edge and a muted grip pill in the middle signals "this
+   moves". Hover/focus/drag only brighten and grow what is already there. */
 #resize-handle {
   position: absolute;
   top: 0;
@@ -378,8 +386,8 @@ select:focus {
   top: 0;
   right: 0;
   bottom: 0;
-  width: var(--handle-bar, 12px);
-  background: var(--handle-bar);
+  width: var(--handle-bar-width, 12px);
+  background: var(--handle-bar-color);
   transition: background 0.16s ease;
 }
 
@@ -387,32 +395,39 @@ select:focus {
 #resize-handle span {
   position: absolute;
   top: 50%;
-  right: calc((var(--handle-bar, 12px) - var(--handle-grip, 4px)) / 2);
-  width: var(--handle-grip, 4px);
-  height: 72px;
+  right: calc((var(--handle-bar-width, 12px) - var(--handle-grip-width, 4px)) / 2);
+  width: var(--handle-grip-width, 4px);
+  height: 88px;
   transform: translateY(-50%);
   border-radius: 999px;
-  background: var(--handle-grip);
+  background: var(--handle-grip-color);
   transition: background 0.16s ease, height 0.16s ease;
 }
 
 #resize-handle:hover,
-#resize-handle:focus-visible,
 #resize-handle.is-active {
   outline: none;
+}
+
+/* Keyboard users get the same focus ring every other control uses — without
+   this the handle had `outline: none` and no replacement, so it was
+   focusable but invisible. */
+#resize-handle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
 }
 
 #resize-handle:hover::before,
 #resize-handle:focus-visible::before,
 #resize-handle.is-active::before {
-  background: var(--handle-bar-hover);
+  background: var(--handle-bar-color-hover);
 }
 
 #resize-handle:hover span,
 #resize-handle:focus-visible span,
 #resize-handle.is-active span {
-  background: var(--handle-grip-hover);
-  height: 96px;
+  background: var(--handle-grip-color-hover);
+  height: 116px;
 }
 
 /* =========================

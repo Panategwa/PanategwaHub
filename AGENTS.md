@@ -42,10 +42,13 @@ The sidebar (`#menu-container`) is present on every page with the same HTML stru
 - Header: title, subtitle, site time (`#menu-site-time`)
 - Music slot (`#menu-music-slot`) — populated by music-system.js
 - Icon buttons: settings, account (avatar), streak, top (scroll to top)
-- Page links, grouped in two `.menu-group` blocks separated by `.menu-divider`:
-  Home, Panategwa, Panategwa b–g, then D-Map, D-Life, D-Ideologies, Pitons,
-  Tri-Panats, Empire of Pitosia
-- Fixed resize footer (`#resize-handle`) — drag, mouse-wheel, arrow-key, or double-click resize
+- Page links in a single `.menu-group` column: Home, Panategwa (the G5V star),
+  then the planets Panategwa b–g. These are the only menu destinations; the
+  D-Map, D-Life, D-Ideologies, Pitons, Tri-Panats, Empire of Pitosia, Dendrospheres,
+  Bathythalassas and Thrinsachelom pages stay reachable only via direct links and
+  in-page buttons.
+- Right-edge resize handle (`#resize-handle`, `aria-orientation="vertical"`) —
+  drag, mouse-wheel, or arrow keys
 
 Active link highlighting is handled by `js/site.js` comparing the current page filename
 to each link's `data-target-page` attribute.
@@ -93,7 +96,7 @@ Keep these storage keys in sync when changing the tracking code.
 ```
 
 2. **Add to the sidebar menu** — Update `tools/build_menu.py` to include the new page in
-   the `MAIN_PAGES` or `WORLD_PAGES` list, then re-run it to regenerate all pages.
+   the `MAIN_PAGES` list, then re-run it to regenerate all pages.
    Afterwards run `python tools/verify_site.py` to confirm every page's links and
    menu markup are intact.
 

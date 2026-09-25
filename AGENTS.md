@@ -13,7 +13,7 @@ Each page is a standalone HTML file with static navigation via normal `<a href>`
    avatar rendering, site time display, and sidebar resize handle. Also provides
    `window.PanategwaGoTo(href)` which simply sets `window.location.href`.
 2. **`styles.css`** — Contains all site styles, including the fixed sidebar layout
-   (`#menu-container` at 220px width, `body` padding-left: 220px).
+   (`#menu-container` at 280px default width, `body` padding-left: 280px).
 3. **Static sidebar menu** — Each HTML page contains the full sidebar menu HTML
    inline (same structure on every page). Menu links are normal `<a>` tags.
 
@@ -42,9 +42,8 @@ The sidebar (`#menu-container`) is present on every page with the same HTML stru
 - Header: title, subtitle, site time (`#_menu-site-time`)
 - Music slot (`#_menu-music-slot`) — populated by music-system.js
 - Icon buttons: settings, account (avatar), streak, top (scroll to top)
-- Page links: Home, Panategwa, Panategwa b–g (under "Navigation" label)
-- World pages: D-Map, D-Life, D-Ideologies, Pitons, Tri-Panats, Empire of Pitosia (under "World Pages" label)
-- Resize handle (`#_resize-handle`) — draggable to resize sidebar width
+- Page links: Home, Panategwa, Panategwa b–g, D-Map, D-Life, D-Ideologies, Pitons, Tri-Panats, Empire of Pitosia
+- Fixed resize footer (`#resize-handle`) — drag, mouse-wheel, arrow-key, or double-click resize
 
 Active link highlighting is handled by `site.js` comparing the current page filename
 to each link's `data-target-page` attribute.

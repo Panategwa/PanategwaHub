@@ -55,7 +55,7 @@ def build_menu_html():
         )
 
     return """<div id="menu-container">
-  <div class="menu-inner">
+  <div class="menu-scroll">
     <div class="line">
       <div class="menu-main-title">The Panategwa Hub</div>
       <div class="menu-sub-title">0.0.3 - Alpha, Internal testing</div>
@@ -83,7 +83,20 @@ def build_menu_html():
         """ + TOP_ICON + """
       </button>
     </div>
-""" + "\n".join(links) + "\n" + "\n".join(world_links) + "\n\n    <div id=\"resize-handle\"></div>\n  </div>\n</div>"
+""" + "\n".join(links) + "\n" + "\n".join(world_links) + """
+  </div>
+
+  <div class="menu-resize-footer">
+    <div
+      id="resize-handle"
+      role="separator"
+      tabindex="0"
+      aria-label="Resize sidebar. Use left and right arrow keys or the mouse wheel."
+      aria-orientation="horizontal"
+    ><span></span></div>
+    <small>Drag or scroll to resize</small>
+  </div>
+</div>"""
 
 
 def regenerate_menu(filepath, filename):
@@ -94,7 +107,7 @@ def regenerate_menu(filepath, filename):
     menu_html = build_menu_html()
 
     content = re.sub(
-        r'<div id="menu-container">.*?<div id="resize-handle"></div>\s*</div>\s*</div>',
+        r'<div id="menu-container">.*?(?:<div id="resize-handle"></div>|<div class="menu-resize-footer">.*?</small>)\s*</div>\s*</div>',
         menu_html,
         content,
         flags=re.DOTALL

@@ -166,6 +166,31 @@
     var isResizing = false;
     var dragStartX = 0;
     var dragStartWidth = 0;
+    var frameId = 0;
+    var pendingWidth = 0;
+
+    function clampWidth(value) {
+      return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(value)));
+    }
+
+    function paintWidth(value) {
+      pendingWidth = clampWidth(value);
+      if (frameId) return;
+      frameId = window.requestAnimationFrame(function () {
+        frameId = 0;
+        menuContainer.style.width = pendingWidth + "px";
+        document.body.style.paddingLeft = pendingWidth + "px";
+        handle.setAttribute("aria-valuenow", String(pendingWidth));
+      });
+    }
+
+    function saveWidth(value) {
+      try {
+        localStorage.setItem("menuWidth", String(clampWidth(
+          Number.isFinite(value) ? value : menuContainer.offsetWidth
+        )));
+      } catch (e) {}
+    }
 
     var savedWidth = localStorage.getItem("menuWidth");
     var initialWidth = DEFAULT_WIDTH;
@@ -177,36 +202,60 @@
     }
     menuContainer.style.width = initialWidth + "px";
     document.body.style.paddingLeft = initialWidth + "px";
+    handle.setAttribute("aria-valuemin", String(MIN_WIDTH));
+    handle.setAttribute("aria-valuemax", String(MAX_WIDTH));
+    handle.setAttribute("aria-valuenow", String(initialWidth));
 
-    handle.addEventListener("mousedown", function (event) {
+    handle.addEventListener("pointerdown", function (event) {
+      if (event.button !== 0) return;
       isResizing = true;
       dragStartX = event.clientX;
       dragStartWidth = menuContainer.offsetWidth;
+      handle.classList.add("is-active");
       document.body.style.userSelect = "none";
+      handle.setPointerCapture(event.pointerId);
       event.preventDefault();
     });
 
-    document.addEventListener("mousemove", function (event) {
+    handle.addEventListener("pointermove", function (event) {
       if (!isResizing) return;
-      var deltaX = event.clientX - dragStartX;
-      var newWidth = dragStartWidth + deltaX;
-      if (newWidth < MIN_WIDTH) newWidth = MIN_WIDTH;
-      if (newWidth > MAX_WIDTH) newWidth = MAX_WIDTH;
-      menuContainer.style.width = newWidth + "px";
-      document.body.style.paddingLeft = newWidth + "px";
+      paintWidth(dragStartWidth + event.clientX - dragStartX);
     });
 
-    document.addEventListener("mouseup", function () {
+    function finishResize(event) {
       if (!isResizing) return;
       isResizing = false;
+      handle.classList.remove("is-active");
       document.body.style.userSelect = "auto";
-      localStorage.setItem("menuWidth", String(menuContainer.offsetWidth));
+      if (event.pointerId != null && handle.hasPointerCapture(event.pointerId)) {
+        handle.releasePointerCapture(event.pointerId);
+      }
+      saveWidth(pendingWidth || menuContainer.offsetWidth);
+    }
+
+    handle.addEventListener("pointerup", finishResize);
+    handle.addEventListener("pointercancel", finishResize);
+
+    handle.addEventListener("wheel", function (event) {
+      var direction = event.deltaY < 0 ? 1 : -1;
+      var multiplier = event.deltaMode === 1 ? 18 : event.deltaMode === 2 ? 100 : 1;
+      var step = Math.max(8, Math.min(36, Math.abs(event.deltaY) * multiplier));
+      paintWidth(menuContainer.offsetWidth + direction * step);
+      saveWidth(pendingWidth);
+      event.preventDefault();
+    }, { passive: false });
+
+    handle.addEventListener("keydown", function (event) {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      var direction = event.key === "ArrowRight" ? 1 : -1;
+      paintWidth(menuContainer.offsetWidth + direction * 12);
+      saveWidth(pendingWidth);
+      event.preventDefault();
     });
 
     handle.addEventListener("dblclick", function () {
-      menuContainer.style.width = DEFAULT_WIDTH + "px";
-      document.body.style.paddingLeft = DEFAULT_WIDTH + "px";
-      localStorage.setItem("menuWidth", String(DEFAULT_WIDTH));
+      paintWidth(DEFAULT_WIDTH);
+      saveWidth(pendingWidth);
     });
   }
 

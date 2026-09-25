@@ -216,6 +216,10 @@
       dragStartX = event.clientX;
       dragStartWidth = menuContainer.offsetWidth;
       handle.classList.add("is-active");
+      // Suppress CSS transitions while dragging so the sidebar tracks the
+      // pointer exactly instead of easing behind it.
+      menuContainer.classList.add("is-resizing");
+      document.body.classList.add("is-resizing");
       document.body.style.userSelect = "none";
       handle.setPointerCapture(event.pointerId);
       event.preventDefault();
@@ -230,7 +234,9 @@
       if (!isResizing) return;
       isResizing = false;
       handle.classList.remove("is-active");
-      document.body.style.userSelect = "auto";
+      menuContainer.classList.remove("is-resizing");
+      document.body.classList.remove("is-resizing");
+      document.body.style.userSelect = "";
       if (event.pointerId != null && handle.hasPointerCapture(event.pointerId)) {
         handle.releasePointerCapture(event.pointerId);
       }

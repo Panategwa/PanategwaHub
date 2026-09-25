@@ -40,10 +40,17 @@ body {
   font-size: var(--global-font-size, 16px);
   font-family: 'Rubik', 'Segoe UI', sans-serif;
   background-attachment: fixed;
+  transition: padding-left 0.14s ease;
+}
+
+/* Keep page content in step with the sidebar without snapping. */
+body.is-resizing {
+  transition: none;
 }
 
 html {
   font-size: var(--global-font-size, 16px);
+  scroll-behavior: smooth;
 }
 
 img {
@@ -253,7 +260,9 @@ select:focus {
 
 #menu-container {
   --menu-pad: 14px;
-  --menu-handle-width: 24px;
+  --menu-handle-width: 30px;
+  --handle-bar: 17px;
+  --handle-grip: 5px;
   position: fixed;
   top: 0;
   left: 0;
@@ -267,7 +276,15 @@ select:focus {
   border-right: 1px solid rgba(255,255,255,0.08);
   backdrop-filter: blur(18px);
   box-shadow: 14px 0 32px rgba(2, 6, 23, 0.14);
-  transition: width 0.12s ease;
+  transition: width 0.14s ease;
+  will-change: width;
+}
+
+/* While dragging, the sidebar must track the pointer exactly — no easing. */
+#menu-container.is-resizing,
+#menu-container.is-resizing .menu-scroll {
+  transition: none;
+  cursor: col-resize;
 }
 
 .menu-scroll {
@@ -280,6 +297,8 @@ select:focus {
   overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* RESIZE HANDLE */
@@ -288,7 +307,7 @@ select:focus {
   top: 0;
   right: 0;
   bottom: 0;
-  width: var(--menu-handle-width, 24px);
+  width: var(--menu-handle-width, 30px);
   height: 100%;
   padding: 0;
   margin: 0;
@@ -305,21 +324,22 @@ select:focus {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 11px;
-  background: linear-gradient(90deg, rgba(51, 65, 85, 0.9), rgba(100, 116, 139, 0.95));
-  box-shadow: -1px 0 10px rgba(2, 6, 23, 0.5);
-  transition: background 0.16s ease, box-shadow 0.16s ease;
+  width: var(--handle-bar, 17px);
+  background: linear-gradient(90deg, rgba(51, 65, 85, 0.92), rgba(100, 116, 139, 0.96));
+  box-shadow: -1px 0 12px rgba(2, 6, 23, 0.5);
+  transition: background 0.16s ease, box-shadow 0.16s ease, width 0.16s ease;
 }
 
+/* Centered on the visible bar, not on the wider hit area. */
 #resize-handle span {
   position: absolute;
   top: 50%;
-  right: 4px;
-  width: 4px;
-  height: 100px;
+  right: calc((var(--handle-bar, 17px) - var(--handle-grip, 5px)) / 2);
+  width: var(--handle-grip, 5px);
+  height: 110px;
   transform: translateY(-50%);
   border-radius: 999px;
-  background: rgba(226, 232, 240, 0.7);
+  background: rgba(226, 232, 240, 0.72);
   transition: background 0.16s ease, height 0.16s ease;
 }
 
@@ -340,7 +360,7 @@ select:focus {
 #resize-handle:focus-visible span,
 #resize-handle.is-active span {
   background: rgba(255, 255, 255, 0.95);
-  height: 150px;
+  height: 160px;
 }
 
 /* =========================
@@ -659,6 +679,12 @@ main {
   background: rgba(96, 165, 250, 0.08);
   color: #ffffff;
   border-color: rgba(148, 163, 184, 0.24);
+}
+
+.menu-button:focus-visible,
+.menu-icon-button:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.85);
+  outline-offset: 2px;
 }
 
 .menu-button.active {

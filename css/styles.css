@@ -627,6 +627,7 @@ main {
 }
 
 .menu-button {
+  display: block;
   width: 100%;
   margin: 2px 0;
   padding: 0.5em 0.65em;

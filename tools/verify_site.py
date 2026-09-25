@@ -35,8 +35,7 @@ if "main-pages/" not in [p.split("/")[0] for p in PAGES if "/" in p]:
     pass
 
 root_pages = [p for p in PAGES if "/" not in p]
-expected_root = {"account-page.html", "settings-page.html", "streak-page.html"}
-if set(root_pages) != expected_root:
+if root_pages:
     failures.append(f"unexpected root-level pages: {root_pages}")
 
 checked = 0

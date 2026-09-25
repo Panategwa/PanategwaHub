@@ -111,11 +111,16 @@
     return path || "index.html";
   }
 
+  // data-target-page holds a repo-relative path, so compare on the filename.
+  function pageName(url) {
+    return String(url || "").split("?")[0].split("#")[0].split("/").pop() || "";
+  }
+
   function highlightActiveLink() {
     var currentPage = currentPageName();
 
     document.querySelectorAll(".menu-button").forEach(function (btn) {
-      var isActive = btn.getAttribute("data-target-page") === currentPage;
+      var isActive = pageName(btn.getAttribute("data-target-page")) === currentPage;
       btn.classList.toggle("active", isActive);
       // The page you are already on is inert: no click, no hover styling,
       // but still focusable so keyboard users keep their place in the menu.
@@ -129,7 +134,7 @@
     });
 
     document.querySelectorAll(".menu-icon-button").forEach(function (btn) {
-      var isActive = btn.getAttribute("data-target-page") === currentPage;
+      var isActive = pageName(btn.getAttribute("data-target-page")) === currentPage;
       btn.classList.toggle("active-icon", isActive);
       if (isActive) {
         btn.setAttribute("aria-current", "page");

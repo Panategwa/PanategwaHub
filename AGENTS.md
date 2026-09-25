@@ -6,11 +6,15 @@ The Panategwa Hub is a static HTML/CSS/JS website with Firebase Auth + Firestore
 Each page is a standalone HTML file with static navigation via normal `<a href>` links.
 
 Content pages live under `main-pages/<body>/<page>/`, so the repo root only holds the
-account, settings and streak pages plus the shared asset folders.
+shared asset folders. Every page in the site is inside `main-pages/`; there is no
+`index.html` at the root, so `/` is not a valid page.
 
 ```
 main-pages/
   home/home-page/index.html
+  account/account-page.html
+  settings/settings-page.html
+  streak/streak-page.html
   panategwa/panategwa-page/panategwa-page.html
   panategwa-b/panategwa-b-page/panategwa-b-page.html
   panategwa-c/panategwa-c-page/panategwa-c-page.html
@@ -164,7 +168,7 @@ Keep these storage keys in sync when changing the tracking code.
 ## Directory Structure
 
 ```
-├── account-page.html          # Root-level utility pages (depth 0)
+├── account-page.html          # (pages now live under main-pages/)
 ├── settings-page.html
 ├── streak-page.html
 ├── main-pages/                # All content pages, grouped by body

@@ -281,14 +281,9 @@
     handle.addEventListener("pointerup", finishResize);
     handle.addEventListener("pointercancel", finishResize);
 
-    handle.addEventListener("wheel", function (event) {
-      var direction = event.deltaY < 0 ? 1 : -1;
-      var multiplier = event.deltaMode === 1 ? 18 : event.deltaMode === 2 ? 100 : 1;
-      var step = Math.max(8, Math.min(36, Math.abs(event.deltaY) * multiplier));
-      paintWidth(menuContainer.offsetWidth + direction * step);
-      saveWidth(pendingWidth);
-      event.preventDefault();
-    }, { passive: false });
+    // No wheel handler: scrolling over the handle used to change the width,
+    // which made the sidebar jump whenever the cursor happened to cross it
+    // during ordinary page scrolling. Drag, arrow keys, or double-click.
 
     handle.addEventListener("keydown", function (event) {
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;

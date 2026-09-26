@@ -95,7 +95,7 @@ is never part of a code change here.
 
 `js/router.js` turns an internal link click into a `fetch` plus a content swap, so
 the document is never reloaded and the sidebar is never rebuilt. It is imported
-last by `js/page-init.js`, and it is the only reason music survives navigation: the
+last by `js/page-imports.js`, and it is the only reason music survives navigation: the
 `<audio>` element in `music-system.js` is a JS variable rather than part of the
 markup, so a real page load used to throw it away mid-track.
 
@@ -112,18 +112,19 @@ They are listed in `SHELL_NODE_IDS` in `js/router.js`. **If a new module appends
 node straight to `document.body` and expects it to outlive navigation, add its id
 there**, or it will be destroyed on the first navigation.
 
-Per-route `<head>` contents are applied from the fetched page rather than from a
-registry, so **a new page needs no router wiring** — the existing workflow still
-holds: write the HTML, add it to the `PAGES` list in `menu.js`. Stylesheets are
-added and removed to match, and inline scripts are re-executed.
+Stylesheets are added and removed to match the incoming page, and inline scripts
+are re-executed, both read from the fetched page's own `<head>`. **A new page
+needs no router wiring** — the existing workflow still holds: write the HTML, add
+it to the `PAGES` list in `menu.js`.
 
-Page-specific modules are imported with a cache-busting query, because a plain
+Page-specific modules come from the `PAGE_MODULES` registry inside
+`js/page-imports.js`, keyed by page filename, so no page carries a second
+`<script type="module">` tag and `page-imports.js` is the only file anyone has
+to edit. They are imported with a cache-busting query, because a plain
 `import()` of an already-evaluated URL is a no-op and the destination page would
-come up dead. The one exception is `js/page-init.js` itself, which must never run
-twice: re-running it would attach a second music player, a second site-time
-tracker and a second set of Firestore listeners. Because those fresh instances
-re-attach `document`- and `window`-level listeners and Firestore subscriptions,
-each page-specific module registers its existing dispose function:
+come up dead. Because those fresh instances re-attach `document`- and
+`window`-level listeners and Firestore subscriptions, each page-specific module
+registers its existing dispose function:
 
 ```js
 window.PanategwaRouteDispose = window.PanategwaRouteDispose || {};
@@ -138,6 +139,18 @@ content, but one on `document.body` is not.
 The router falls back to a real `location.href` navigation if the fetch fails,
 so a broken or redirected response lands the user on a working page rather than a
 half-swapped document.
+
+Not all navigation is a link. Most of it in the pages is
+`<button onclick="window.location.href='...'">`, which a link-based handler never
+sees, so `onScriptedClick` listens in the **capture** phase and matches a narrow
+pattern: a location assignment to a quoted literal ending in `.html`. Capture is
+required because by the time a bubble-phase listener runs, the inline handler has
+already assigned to `location.href` and the document is already unloading. It
+deliberately ignores anchors, leaving those to the bubble-phase path, because
+document-level capture also runs before `menu.js`'s own capture listener on
+`#menu-container` and would otherwise steal clicks on the current page's inert
+menu button. **A new scripted navigation that computes its URL will not be
+matched** and will do a full page load, so write the literal path instead.
 
 Pages remain complete standalone documents. Direct links, no-JS, GitHub Pages and
 `tools/audit_links.py` all behave exactly as before, because each page still works
@@ -161,10 +174,10 @@ when loaded directly — the router is an enhancement layered on top.
 Every content page loads exactly one shared script:
 
 ```html
-<script type="module" src="../../js/page-init.js"></script>
+<script type="module" src="../../js/page-imports.js"></script>
 ```
 
-`js/page-init.js` statically imports the shared modules, in this order, and static
+`js/page-imports.js` statically imports the shared modules, in this order, and static
 imports evaluate depth-first in source order, so the order below is guaranteed
 rather than dependent on `<head>` layout:
 
@@ -192,13 +205,19 @@ module). `settings.js` still resolves its dynamic script paths through
 
 ### Page-Specific Modules
 
-Page-specific modules are deliberately *not* in `page-init.js`. The pages that need
-them keep their own `<script type="module">` tag after the `page-init.js` tag, so they
-still evaluate after everything it pulls in:
+Page-specific modules live in the `PAGE_MODULES` registry in
+`js/page-imports.js`, keyed by page filename, and are loaded dynamically so they
+evaluate only on the page that needs them — after everything the shared imports
+above have already booted:
 
 - **`account-page.html`** → `auth/account.js`, `auth/settings.js`
 - **`settings-page.html`** → `settings/audio-settings.js`
 - **`streak-page.html`** → `auth/streak.js`
+
+**A page carries exactly one `<script type="module">` tag**, the one pointing at
+`page-imports.js`. `tools/verify_site.py` fails the build if a page has a second
+module tag or references a shared module directly, so the entry file stays the
+only place shared code is wired up.
 
 ### Sidebar Menu
 
@@ -213,7 +232,7 @@ The sidebar (`#menu-container`) is present on every page, rendered at runtime by
   D-Ideologies, Pitons, Tri-Panats, Empire of Pitosia, Dendrospheres, Bathythalassas
   and Thrinsachelom pages stay reachable only via direct links and in-page buttons.
 - Right-edge resize handle (`#resize-handle`, `aria-orientation="vertical"`) —
-  drag, mouse-wheel, or arrow keys
+  drag or arrow keys
 
 Active link highlighting is handled by `js/menu.js` comparing the current page filename
 to each link's `data-target-page` attribute. The button for the page you are already on
@@ -298,7 +317,7 @@ Keep these storage keys in sync when changing the tracking code.
   <link rel="stylesheet" href="../../styles/general.css" />
   <link rel="stylesheet" href="../../styles/menu.css" />
   <link rel="stylesheet" href="../../styles/secondary.css" />
-  <script type="module" src="../../js/page-init.js"></script>
+  <script type="module" src="../../js/page-imports.js"></script>
 </head>
 <body>
   <div id="menu-container"></div>
@@ -312,8 +331,10 @@ Keep these storage keys in sync when changing the tracking code.
    Afterwards run `python tools/verify_site.py` to confirm every page's links and
    menu markup are intact.
 
-3. **Add page-specific modules** — Add a `<script type="module" src="...">` include
-   in the `<head>` for any module the page needs (e.g., `auth/account.js`).
+3. **Add page-specific modules** — Add an entry to `PAGE_MODULES` in
+   `js/page-imports.js` if the page needs a module of its own (e.g.
+   `auth/account.js`). Do not add a second `<script type="module">` tag to the
+   page; `tools/verify_site.py` will fail the build if you do.
 
 ## Directory Structure
 
@@ -345,7 +366,7 @@ Keep these storage keys in sync when changing the tracking code.
 │   └── music-library.md      # How to add tracks to the music library
 ├── images/                   # Site images
 ├── js/
-│   ├── page-init.js             # The one shared entry point every page loads
+│   ├── page-imports.js             # The one shared entry point every page loads
 │   ├── menu.js                 # Sidebar markup, page list, active link highlighting
 │   └── site.js                 # Sidebar behavior (avatar, site time, resize)
 ├── settings/

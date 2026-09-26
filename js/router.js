@@ -22,27 +22,20 @@
 //     document that works on its own, so direct links, no-JS, GitHub Pages and
 //     tools/audit_links.py all keep behaving exactly as before.
 //
-//   * A new page needs no router wiring. The router reads the incoming page's
-//     own <head> and applies whatever it finds there, so the existing workflow
+//   * A new page needs no router wiring. The router applies whatever the
+//     incoming page's own <head> declares, and page-specific modules come from
+//     the PAGE_MODULES registry in page-imports.js, so the existing workflow
 //     still holds: write the HTML, add it to the PAGES list in menu.js.
 //
-//   * Only #menu-container is preserved. Every other child of <body> is the
+//   * Only the shell nodes are preserved. Every other child of <body> is the
 //     page's own content and is replaced wholesale.
 //
 //   * Stylesheets are added and removed to match the incoming page, so
 //     account.css follows you to the account page and leaves again.
 //
-//   * Page-specific modules are imported with a cache-busting query, because a
-//     plain dynamic import of an already-evaluated URL is a no-op and the page
-//     you just navigated to would come up dead. Those modules already call
-//     start() when the document is no longer loading, so a fresh instance
-//     initialises correctly.
-//
-//   * The one exception to cache-busting is the shared shell entry, which must
-//     never run twice: re-running it would attach a second music player, a
-//     second site-time tracker and a second set of Firestore listeners.
-
-var SHELL_ENTRY = "js/page-init.js";
+//   * Both link clicks and the onclick="window.location.href='...'" buttons the
+//     pages use are intercepted. A button that is left to the browser is a full
+//     document load, which is the entire problem this file exists to avoid.
 
 // Nodes that belong to the shell rather than to the page. The sidebar is the
 // obvious one, but two modules append their own element straight to <body>:
@@ -52,7 +45,6 @@ var SHELL_ENTRY = "js/page-init.js";
 // Naming them here keeps the owning modules untouched.
 var SHELL_NODE_IDS = ["menu-container", "ptg-site-music", "achievement-toast-stack"];
 
-var routeToken = 0;
 var managedStyles = [];
 var navigations = 0;
 var restoreFocus = true;
@@ -93,6 +85,40 @@ function shouldHandleLink(anchor, event) {
   if (anchor.closest('[aria-disabled="true"]')) return false;
 
   return true;
+}
+
+// ========================================================
+// Navigation that is not a link
+// ========================================================
+// Most in-page navigation is `<button onclick="window.location.href='...'">`,
+// not an <a href>. A button is invisible to a link-based click handler, so
+// every one of them was still doing a full document load -- the sidebar rebuilt
+// itself and the music restarted, which is exactly the bug this file removes.
+// The Panategwa letter pages looked fine only because they are reached from the
+// sidebar, which is made of links.
+//
+// The pattern is deliberately narrow: a location assignment to a quoted literal
+// ending in .html. Anything computed, or a non-page URL, is left to run
+// normally rather than guessed at. This also covers window.location.assign and
+// .replace, and PanategwaGoTo(), which sets location.href internally.
+var SCRIPTED_NAV = /(?:window\.)?location(?:\.href\s*=|\.assign\s*\(|\.replace\s*\()\s*['"]([^'"]+\.html(?:\?[^'"]*)?)['"]/i;
+
+function scriptedNavigationTarget(element) {
+  var node = element;
+
+  // The handler may sit on the element or on an ancestor it is nested in.
+  while (node && node !== document.body) {
+    if (node.getAttribute) {
+      var source = node.getAttribute("onclick");
+      if (source) {
+        var match = source.match(SCRIPTED_NAV);
+        if (match) return match[1];
+      }
+    }
+    node = node.parentNode;
+  }
+
+  return null;
 }
 
 // ========================================================
@@ -184,31 +210,18 @@ function runInlineScripts(doc, pageUrl) {
   }
 }
 
-function applyModules(doc, pageUrl) {
-  var scripts = doc.querySelectorAll('script[type="module"][src]');
-  var jobs = [];
-
-  for (var i = 0; i < scripts.length; i++) {
-    var url = absolute(scripts[i].getAttribute("src"), pageUrl);
-    if (!url || !isSameSite(url)) continue;
-
-    var isShell = /(^|\/)js\/page-init\.js$/.test(url.pathname);
-    var href = url.href;
-    if (!isShell) {
-      routeToken += 1;
-      href += (url.search ? "&" : "?") + "r=" + routeToken;
-    }
-    jobs.push(import(href));
+// The incoming page's own modules come from the PAGE_MODULES registry in
+// page-imports.js rather than from its <head>, so every page can carry the
+// single shared entry script and nothing else. page-imports.js cannot be
+// imported back from here without a cycle, hence the hook.
+function applyModules() {
+  if (typeof window.PanategwaLoadPageModules !== "function") return;
+  try {
+    var path = window.location.pathname.split("/").pop();
+    window.PanategwaLoadPageModules(path || "index.html");
+  } catch (error) {
+    console.error("Router: could not resolve modules for this page", error);
   }
-
-  // Deliberately not awaited. A page-specific module that throws must not be
-  // able to strand the navigation half-applied; the content and the URL are
-  // already correct by the time these resolve.
-  jobs.forEach(function (job) {
-    job.catch(function (error) {
-      console.error("Router: route module failed to load", error);
-    });
-  });
 }
 
 function applyDocumentMeta(doc) {
@@ -324,7 +337,7 @@ function navigate(url, options) {
 
       // After the URL has moved, so relative paths in the new page resolve
       // against the new location.
-      applyModules(doc, url.href);
+      applyModules();
       onRouteReady(false);
     })
     .catch(function (error) {
@@ -338,13 +351,9 @@ function navigate(url, options) {
     });
 }
 
-function onDocumentClick(event) {
-  var anchor = event.target.closest ? event.target.closest("a[href]") : null;
-  if (!anchor || !shouldHandleLink(anchor, event)) return;
-
-  var url = absolute(anchor.getAttribute("href"));
-  if (!url || !isSameSite(url)) return;
-
+// Resolves a candidate destination and either navigates or decides it is not a
+// route after all. Shared by the link path and the scripted path.
+function handleRoute(url, event) {
   // A bare #fragment is a jump within this page, not a route. Let it through
   // unless the target is missing, in which case the top of the page is the
   // most useful interpretation.
@@ -373,6 +382,41 @@ function onDocumentClick(event) {
   navigate(url, { history: "push" });
 }
 
+function onDocumentClick(event) {
+  var anchor = event.target.closest ? event.target.closest("a[href]") : null;
+  if (!anchor || !shouldHandleLink(anchor, event)) return;
+
+  var url = absolute(anchor.getAttribute("href"));
+  if (!url || !isSameSite(url)) return;
+
+  handleRoute(url, event);
+}
+
+// Runs in the capture phase, which is the only way to stop an inline onclick:
+// by the time a bubble-phase listener sees the click, the element's own handler
+// has already assigned to location.href and the document is already unloading.
+//
+// Capture on document also runs before menu.js's own capture listener on
+// #menu-container, so it deliberately ignores links entirely and leaves the
+// anchor path to onDocumentClick above. That ordering is what stops this from
+// stealing clicks on the current page's inert menu button.
+function onScriptedClick(event) {
+  if (event.defaultPrevented) return;
+  if (event.button !== 0) return;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+  var scripted = scriptedNavigationTarget(event.target);
+  if (!scripted) return;
+
+  var url = absolute(scripted);
+  if (!url || !isSameSite(url)) return;
+
+  // Claim it before the handler can run, then route it.
+  event.preventDefault();
+  event.stopPropagation();
+  handleRoute(url, event);
+}
+
 function onPopState(event) {
   var state = event.state || {};
   if (!state.ptg) {
@@ -395,6 +439,7 @@ window.PanategwaNavigate = function (href) {
 };
 
 document.addEventListener("click", onDocumentClick);
+document.addEventListener("click", onScriptedClick, true);
 window.addEventListener("popstate", onPopState);
 
 // A page reached by a real load leaves a history entry the router did not

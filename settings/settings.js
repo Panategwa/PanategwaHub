@@ -2,7 +2,7 @@
   if (window.__PANATEGWA_SETTINGS_BOOTSTRAPPED) return;
   window.__PANATEGWA_SETTINGS_BOOTSTRAPPED = true;
 
-  // Loaded as a module by js/page-init.js, last in the list, so the sidebar
+  // Loaded as a module by js/page-imports.js, last in the list, so the sidebar
   // exists and window.PanategwaRoot is published before siteRoot() is used.
   //
   // Use direct paths relative to the site root.

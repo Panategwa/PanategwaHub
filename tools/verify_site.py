@@ -104,18 +104,30 @@ for rel_path in PAGES:
     if "css/styles.css" in text:
         failures.append(f"{rel_path} -> still references the removed css/styles.css")
 
-    # One entry point pulls in the sidebar and all shared behaviour.
-    init = f'src="{expected_prefix}js/page-init.js"'
+    # One entry point pulls in the sidebar, the router and every shared module.
+    # A page's own modules live in the PAGE_MODULES registry inside that single
+    # file, so a page must not carry a second <script type="module"> tag -- that
+    # is what keeps page-imports.js the only file anyone has to edit.
+    init = f'src="{expected_prefix}js/page-imports.js"'
     if init not in text:
-        failures.append(f"{rel_path} -> page-init.js path is wrong for depth {depth}")
+        failures.append(f"{rel_path} -> page-imports.js path is wrong for depth {depth}")
     if text.count(init) > 1:
-        failures.append(f"{rel_path} -> loads js/page-init.js more than once")
-    for legacy in ("js/menu.js", "js/site.js", "auth/achievements.js",
-                   "auth/social.js", "music/system/music-system.js",
-                   "settings/settings.js"):
+        failures.append(f"{rel_path} -> loads js/page-imports.js more than once")
+
+    module_tags = re.findall(r'<script\s+type="module"', text)
+    if len(module_tags) != 1:
+        failures.append(
+            f"{rel_path} -> has {len(module_tags)} module script tags, expected exactly 1"
+        )
+
+    for legacy in ("js/menu.js", "js/site.js", "js/router.js",
+                   "auth/achievements.js", "auth/social.js",
+                   "music/system/music-system.js", "settings/settings.js",
+                   "auth/account.js", "auth/settings.js", "auth/streak.js",
+                   "settings/audio-settings.js"):
         if legacy in text:
             failures.append(
-                f"{rel_path} -> loads {legacy} directly instead of via js/page-init.js"
+                f"{rel_path} -> loads {legacy} directly instead of via js/page-imports.js"
             )
 
 if failures:

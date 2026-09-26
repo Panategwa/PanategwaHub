@@ -4,7 +4,7 @@
   // ========================================================
   // Sidebar menu — single source of truth
   // ========================================================
-  // Every page pulls this file in through js/page-init.js and holds nothing
+  // Every page pulls this file in through js/page-imports.js and holds nothing
   // more than an empty <div id="menu-container"></div>. The markup below is
   // rendered into that container, so adding or removing a page only ever means
   // editing PAGES here.

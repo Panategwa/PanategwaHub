@@ -79,6 +79,16 @@ Run all three before committing; they catch different classes of breakage:
   orphan pages that nothing links to
 - `python tools/check_http.py` — same, but over HTTP (needs `python -m http.server`)
 
+## Firestore Rules
+
+`firestore.rules` is the record of what the live rules should be. It is kept in the
+repo so the rules can be copied into the Firebase console, and the console copy is
+kept in sync with it by hand.
+
+Agents must not publish rules. If you edit `firestore.rules`, say so and spell out
+what needs to change in the console — the maintainer applies it manually. Deploying
+is never part of a code change here.
+
 ## Architecture
 
 ### Multi-Page Static Navigation

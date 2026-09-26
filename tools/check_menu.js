@@ -99,8 +99,8 @@ function run(pagePath) {
 
 const cases = [
   { path: "/main-pages/home/home-page.html", active: "home-page.html" },
-  { path: "/main-pages/panategwa-d/panategwa-d-page.html", active: "panategwa-d-page.html" },
-  { path: "/main-pages/panategwa-d/panategwa-d-map-page.html", active: null },
+  { path: "/main-pages/panategwa-d/panategwa-d-page/panategwa-d-page.html", active: "panategwa-d-page.html" },
+  { path: "/main-pages/panategwa-d/panategwa-d-map/panategwa-d-map-page.html", active: null },
   { path: "/main-pages/account/account-page.html", active: "account-page.html" },
   { path: "/main-pages/settings/settings-page.html", active: "settings-page.html" }
 ];

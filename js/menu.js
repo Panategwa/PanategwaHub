@@ -14,13 +14,13 @@
   // main-pages/<body>/ folders.
   var PAGES = [
     { name: "Home", url: "main-pages/home/home-page.html" },
-    { name: "Panategwa", url: "main-pages/panategwa/panategwa-page.html" },
-    { name: "Panategwa b", url: "main-pages/panategwa-b/panategwa-b-page.html" },
-    { name: "Panategwa c", url: "main-pages/panategwa-c/panategwa-c-page.html" },
-    { name: "Panategwa d", url: "main-pages/panategwa-d/panategwa-d-page.html" },
-    { name: "Panategwa e", url: "main-pages/panategwa-e/panategwa-e-page.html" },
-    { name: "Panategwa f", url: "main-pages/panategwa-f/panategwa-f-page.html" },
-    { name: "Panategwa g", url: "main-pages/panategwa-g/panategwa-g-page.html" }
+    { name: "Panategwa", url: "main-pages/panategwa/panategwa-page/panategwa-page.html" },
+    { name: "Panategwa b", url: "main-pages/panategwa-b/panategwa-b-page/panategwa-b-page.html" },
+    { name: "Panategwa c", url: "main-pages/panategwa-c/panategwa-c-page/panategwa-c-page.html" },
+    { name: "Panategwa d", url: "main-pages/panategwa-d/panategwa-d-page/panategwa-d-page.html" },
+    { name: "Panategwa e", url: "main-pages/panategwa-e/panategwa-e-page/panategwa-e-page.html" },
+    { name: "Panategwa f", url: "main-pages/panategwa-f/panategwa-f-page/panategwa-f-page.html" },
+    { name: "Panategwa g", url: "main-pages/panategwa-g/panategwa-g-page/panategwa-g-page.html" }
   ];
 
   var SETTINGS_ICON =

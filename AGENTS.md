@@ -18,32 +18,40 @@ main-pages/
   account/account-page.html
   settings/settings-page.html
   streak/streak-page.html
-  panategwa/panategwa-page.html
-  panategwa-b/panategwa-b-page.html
-  panategwa-c/panategwa-c-page.html
+  panategwa/panategwa-page/panategwa-page.html
+  panategwa-b/panategwa-b-page/panategwa-b-page.html
+  panategwa-c/panategwa-c-page/panategwa-c-page.html
   panategwa-d/
-    panategwa-d-page.html
-    panategwa-d-map-page.html
-    panategwa-d-life-page.html
-    panategwa-d-ideologies-page.html
-    pitons-page.html
-    empire-of-pitosia-page.html
-    thrinsachelom-history-page.html
-    bathythalassas-gigaperipatitis-page.html
-    tri-panategwaoi-anthropoi-civilis-page.html
+    panategwa-d-page/panategwa-d-page.html
+    panategwa-d-map/panategwa-d-map-page.html
+    panategwa-d-life/panategwa-d-life-page.html
+    panategwa-d-ideologies/panategwa-d-ideologies-page.html
+    pitons/pitons-page.html
+    empire-of-pitosia/empire-of-pitosia-page.html
+    thrinsachelom-history/thrinsachelom-history-page.html
+    bathythalassas-gigaperipatitis/bathythalassas-gigaperipatitis-page.html
+    tri-panategwaoi-anthropoi-civilis/tri-panategwaoi-anthropoi-civilis-page.html
   panategwa-e/
-    panategwa-e-page.html
-    dendrospheres-page.html
-  panategwa-f/panategwa-f-page.html
-  panategwa-g/panategwa-g-page.html
+    panategwa-e-page/panategwa-e-page.html
+    dendrospheres/dendrospheres-page.html
+  panategwa-f/panategwa-f-page/panategwa-f-page.html
+  panategwa-g/panategwa-g-page/panategwa-g-page.html
 ```
 
 ### Page Depth
 
-Every content page sits two levels deep (`main-pages/<body>/<page>.html`), so asset
-references in `<head>` are prefixed with `../../`. Those relative paths are fine on
-their own: the browser resolves them against the current page's URL, which already
-includes the mount point.
+Depth is **not** uniform, and the majority of pages are the deeper case. The four
+non-planet pages — `home`, `account`, `settings`, `streak` — sit directly at
+`main-pages/<body>/<page>.html`, two levels deep, so their asset references in
+`<head>` are prefixed with `../../`. Every planet page lives in its own folder,
+`main-pages/<body>/<page>/<page>.html`, three levels deep, so those use `../../../`,
+and a link to a sibling page goes through `../<page>/<page>.html`.
+`tools/verify_site.py` derives the expected prefix from `rel_path.count("/")`, so
+it enforces whichever depth a page actually sits at; moving a page between the two
+layouts needs no tool change, only the page's own relative paths updated.
+
+Those relative paths are fine on their own: the browser resolves them against the
+current page's URL, which already includes the mount point.
 
 What is *not* fine is rebuilding the site root by counting `../` segments, because
 the site is published under a subpath
@@ -304,8 +312,8 @@ Keep these storage keys in sync when changing the tracking code.
 
 ## How to Add a New Page
 
-1. **Create the file** at `main-pages/<body>/<page>.html` (or, for a page belonging
-   to an existing body, a new file beside its siblings), using this head:
+1. **Create the file** at `main-pages/<body>/<page>/<page>.html` (or, for one of the
+   four non-planet pages, directly at `main-pages/<body>/<page>.html`), using this head:
 ```html
 <!DOCTYPE html>
 <html lang="en">
@@ -326,8 +334,14 @@ Keep these storage keys in sync when changing the tracking code.
 </html>
 ```
 
+The `../../` prefixes assume a page at `main-pages/<body>/<page>.html`. A page in
+its own folder (`main-pages/panategwa-d/<page>/<page>.html`, as every planet page
+does) needs `../../../` instead.
+
 2. **Add to the sidebar menu** — Add an entry to the `PAGES` array in `js/menu.js`.
-   Every page picks it up automatically; no page needs editing.
+   Every page picks it up automatically; no page needs editing. The `url` is
+   site-root-relative and includes any per-page folder, e.g.
+   `main-pages/panategwa-d/panategwa-d-page/panategwa-d-page.html`.
    Afterwards run `python tools/verify_site.py` to confirm every page's links and
    menu markup are intact.
 
@@ -341,7 +355,7 @@ Keep these storage keys in sync when changing the tracking code.
 ```
 ├── index.html                 # Entry stub — forwards the site root to the home page
 ├── main-pages/                # All content pages, grouped by body
-│   └── <body>/<page>.html
+│   └── <body>/<page>/<page>.html   (or <body>/<page>.html for the 4 non-planet pages)
 ├── AGENTS.md                 # This guide
 ├── firestore.rules           # Firebase Firestore security rules
 ├── .gitignore                # Ignores firebase-debug.log, __pycache__, node_modules

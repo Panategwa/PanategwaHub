@@ -20,6 +20,12 @@ PAGES = sorted(html_files())
 LOCAL_REF = re.compile(r'(?:href|src)="([^"]+)"')
 MENU_URL = re.compile(r'url:\s*"([^"]+)"', re.MULTILINE)
 
+# The one stylesheet a page owns on top of the three shared files.
+PAGE_ONLY_SHEET = {
+    "account-page.html": "account.css",
+    "settings-page.html": "settings.css",
+}
+
 with open(os.path.join(ROOT, "js", "menu.js"), encoding="utf-8") as fh:
     menu_source = fh.read()
 
@@ -81,12 +87,36 @@ for rel_path in PAGES:
 
     depth = rel_path.count("/")
     expected_prefix = "../" * depth
-    if f'href="{expected_prefix}css/styles.css"' not in text:
-        failures.append(f"{rel_path} -> stylesheet path is wrong for depth {depth}")
-    if f'src="{expected_prefix}js/menu.js"' not in text:
-        failures.append(f"{rel_path} -> menu.js path is wrong for depth {depth}")
-    if text.count(f'src="{expected_prefix}js/menu.js"') > 1:
-        failures.append(f"{rel_path} -> loads js/menu.js more than once")
+
+    # Stylesheets: the three shared files, in cascade order, plus the one this
+    # page owns. Order is part of the contract, so the list is compared exactly.
+    expected_sheets = ["general.css", "menu.css", "secondary.css"]
+    extra = PAGE_ONLY_SHEET.get(os.path.basename(rel_path))
+    if extra:
+        expected_sheets.append(extra)
+    found_sheets = re.findall(
+        r'<link rel="stylesheet" href="(?:\.\./)+styles/([\w.-]+)"', text
+    )
+    if found_sheets != expected_sheets:
+        failures.append(
+            f"{rel_path} -> stylesheets are {found_sheets}, expected {expected_sheets}"
+        )
+    if "css/styles.css" in text:
+        failures.append(f"{rel_path} -> still references the removed css/styles.css")
+
+    # One entry point pulls in the sidebar and all shared behaviour.
+    init = f'src="{expected_prefix}js/page-init.js"'
+    if init not in text:
+        failures.append(f"{rel_path} -> page-init.js path is wrong for depth {depth}")
+    if text.count(init) > 1:
+        failures.append(f"{rel_path} -> loads js/page-init.js more than once")
+    for legacy in ("js/menu.js", "js/site.js", "auth/achievements.js",
+                   "auth/social.js", "music/system/music-system.js",
+                   "settings/settings.js"):
+        if legacy in text:
+            failures.append(
+                f"{rel_path} -> loads {legacy} directly instead of via js/page-init.js"
+            )
 
 if failures:
     for item in failures:

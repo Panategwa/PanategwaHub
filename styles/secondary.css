@@ -1,0 +1,148 @@
+/* =========================
+   SECONDARY.CSS
+   =========================
+Catch-all for components that are not the menu, the account page or
+the settings page: map and lore page furniture, the search bar, and
+the .streak-* rules kept for the streak page.
+
+NOTE: the .streak-* block currently matches nothing - the streak page
+carries its own inline <style> - and is retained verbatim so this
+split stays a pure move.
+   ========================= */
+
+.container {
+  position: relative;
+  width: 900px;
+  height: 675px;
+  margin: 80px auto;
+  margin-left: 0;
+  display: flex;
+  justify-content: center;
+}
+
+#map-image {
+  width: 900px;
+  height: 675px;
+  display: block;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(255,255,255,0.2);
+  user-select: none;
+  max-width: 100%; /* keeps it responsive */
+}
+
+.ethnotype {
+  position: absolute;
+  padding: 10px 16px;
+  background-color: rgba(255, 255, 255, 0.25);
+  color: rgb(0, 0, 0);
+  text-decoration: none;
+  font-weight: bolder;
+  border-radius: 6px;
+  font-family: 'Rubik', sans-serif;
+  cursor: pointer;
+}
+
+.ethnotype:hover {
+  background-color: rgba(225, 225, 255, 0.5);
+  color: rgb(0,0,0);
+}
+
+#search-bar {
+  width: 100%;
+  max-width: 420px;
+  padding: 12px 14px;
+  font-size: 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background-color: rgba(255, 255, 255, 0.94);
+  color: #0f172a;
+  outline: none;
+  margin: 15px 0;
+  font-family: 'Rubik', sans-serif;
+  font-weight: 500;
+  box-shadow: 0 14px 28px rgba(0,0,0,0.14);
+  transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+
+#search-bar:focus {
+  transform: translateY(-1px);
+  border-color: rgba(147, 197, 253, 0.4);
+  box-shadow: 0 18px 34px rgba(0,0,0,0.18);
+}
+
+#search-results button {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04)),
+    rgba(15, 23, 42, 0.72);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 0.6rem 1.2rem;
+  border-radius: 16px;
+  margin: 10px 0;
+  width: 100%;
+}
+
+.streak-panel {
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  box-shadow: var(--surface-shadow);
+}
+
+.streak-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: start;
+}
+
+.streak-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.streak-stat {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  display: grid;
+  gap: 4px;
+}
+
+.streak-stat span {
+  font-size: 0.88rem;
+  opacity: 0.78;
+}
+
+.streak-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.streak-day {
+  padding: 10px 8px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  text-align: center;
+  display: grid;
+  gap: 4px;
+}
+
+.streak-day.done {
+  background: rgba(59,130,246,0.16);
+  border-color: rgba(125,211,252,0.24);
+}
+
+.streak-day-label {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.streak-day-xp {
+  font-weight: 700;
+  font-size: 0.92rem;
+}

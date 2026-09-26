@@ -89,25 +89,44 @@ Run all three before committing; they catch different classes of breakage:
 2. **`js/site.js`** — Handles dynamic sidebar behavior: avatar rendering, site time
    display, and the sidebar resize handle. Also provides `window.PanategwaGoTo(href)`
    which simply sets `window.location.href`.
-3. **`css/styles.css`** — Contains all site styles, including the fixed sidebar layout
-   (`#menu-container` at 280px default width, `body` padding-left: 280px).
+3. **`styles/`** — Site styles, split into five files (see Stylesheet Layout).
+   `styles/menu.css` carries the fixed sidebar layout (`#menu-container` at 280px
+   default width, `body` padding-left: 280px).
 4. **Shared sidebar** — Rendered at runtime by `js/menu.js`; no page inlines menu markup.
 
 ### Script Includes
 
-Each page includes these scripts in `<head>`. Order matters: `js/menu.js` must come
-before `js/site.js` so the sidebar exists before the behavior code attaches to it.
+Every content page loads exactly one shared script:
 
-- **`js/menu.js`** (defer) — Renders the sidebar and highlights the active link
-- **`js/site.js`** (defer) — Sidebar behavior (avatar, site time, resize)
-- **`auth/achievements.js`** (type=module) — Achievement system (self-initializing on DOMContentLoaded)
-- **`auth/social.js`** (type=module) — Friends/messages system (self-initializing on import)
-- **`music/system/music-system.js`** (type=module) — Music player (self-initializing on DOMContentLoaded)
-- **`settings/settings.js`** (defer) — Settings bootstrap; loads translate.js, text-size.js, color-theme.js
+```html
+<script type="module" src="../../js/page-init.js"></script>
+```
+
+`js/page-init.js` statically imports the shared modules, in this order, and static
+imports evaluate depth-first in source order, so the order below is guaranteed
+rather than dependent on `<head>` layout:
+
+1. **`js/menu.js`** — Renders the sidebar, highlights the active link, publishes
+   `window.PanategwaRoot`
+2. **`js/site.js`** — Sidebar behavior (avatar, site time, resize handle). Must come
+   after `menu.js` so the markup exists before behavior attaches to it
+3. **`auth/achievements.js`** — Achievement system (self-initializing on DOMContentLoaded)
+4. **`auth/social.js`** — Friends/messages system (self-initializing on import)
+5. **`music/system/music-system.js`** — Music player (self-initializing on DOMContentLoaded)
+6. **`settings/settings.js`** — Settings bootstrap; loads translate.js, text-size.js,
+   color-theme.js as classic scripts, because those declare global init functions
+   (`initTranslate`, `initTextSize`, `initTheme`) that inline `onclick` handlers call
+
+`menu.js`, `site.js` and `settings/settings.js` are all ES modules. `menu.js` reads its
+own location from `import.meta.url`, not `document.currentScript` (which is `null` in a
+module). `settings.js` still resolves its dynamic script paths through
+`window.PanategwaRoot`, which is why it must come after `menu.js`.
 
 ### Page-Specific Modules
 
-Pages that need extra functionality include additional module scripts:
+Page-specific modules are deliberately *not* in `page-init.js`. The pages that need
+them keep their own `<script type="module">` tag after the `page-init.js` tag, so they
+still evaluate after everything it pulls in:
 
 - **`account-page.html`** → `auth/account.js`, `auth/settings.js`
 - **`settings-page.html`** → `settings/audio-settings.js`
@@ -133,6 +152,30 @@ to each link's `data-target-page` attribute. The button for the page you are alr
 gets `aria-current="page"` and `aria-disabled="true"`, which makes it inert: no clicks,
 no hover styling, but still keyboard-focusable.
 
+### Stylesheet Layout
+
+Site styles live in `styles/`, split so a page only downloads what it renders.
+They stay plain `<link>` elements rather than being injected by JavaScript, so
+the page is styled on first paint:
+
+| File | Contents | Loaded by |
+| --- | --- | --- |
+| `general.css` | the five theme tokens, body/typography/links/forms, and the few page-furniture classes used by more than one page (`.button-container`, `.map-button`, `.inline-link`, `.button-row`, `.section-hidden`) | every content page |
+| `menu.css` | the whole sidebar, plus the music player it hosts | every content page |
+| `secondary.css` | catch-all: map/lore furniture, search bar, the `.streak-*` rules | every content page |
+| `account.css` | the account page in full, including the ten account-only custom properties in its own `:root` | account page only |
+| `settings.css` | the standalone settings page: theme picker, text size, audio controls | settings page only |
+
+**Link order is the cascade order and is part of the contract** — `general.css`,
+`menu.css`, `secondary.css`, then the page's own file. `tools/verify_site.py`
+asserts the exact set and order per page.
+
+Two rules were deliberately moved out of `account.css` into `general.css`:
+`.section-hidden` and `.button-row` are also used by the settings page, so they
+had to stop being account-only. The reverse also holds: `account.css` keeps a
+second `:root` block, but nothing outside that file references those ten
+properties, so they no longer leak onto pages that never load it.
+
 ### Theme System
 
 A theme declares only **five** base colours in `settings/color-theme.js`:
@@ -145,8 +188,8 @@ A theme declares only **five** base colours in `settings/color-theme.js`:
 | `--c-line` | borders, dividers, scrollbars |
 | `--c-text` | body text |
 
-Everything else in `css/styles.css` is derived from those five with `color-mix()`,
-so adding or retuning a theme never requires editing the stylesheet. When styling new
+Everything else in `styles/` is derived from those five with `color-mix()`,
+so adding or retuning a theme never requires editing the stylesheets. When styling new
 components, use the derived tokens (`--surface-border`, `--menu-button-outline`,
 `--focus-ring`, `--scrollbar-thumb`, `--handle-grip-color`, …) rather than literal
 colours, or they will not respond to themes.
@@ -184,13 +227,10 @@ Keep these storage keys in sync when changing the tracking code.
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Your Page Title</title>
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../../css/styles.css" />
-  <script src="../../js/menu.js" defer></script>
-  <script src="../../js/site.js" defer></script>
-  <script type="module" src="../../auth/achievements.js"></script>
-  <script type="module" src="../../auth/social.js"></script>
-  <script type="module" src="../../music/system/music-system.js"></script>
-  <script src="../../settings/settings.js" defer></script>
+  <link rel="stylesheet" href="../../styles/general.css" />
+  <link rel="stylesheet" href="../../styles/menu.css" />
+  <link rel="stylesheet" href="../../styles/secondary.css" />
+  <script type="module" src="../../js/page-init.js"></script>
 </head>
 <body>
   <div id="menu-container"></div>
@@ -225,13 +265,19 @@ Keep these storage keys in sync when changing the tracking code.
 │   ├── streak.js             # Streak page module
 │   ├── achievements.js       # Achievement system
 │   └── toast.js              # Toast notifications + audio
-├── css/
-│   └── styles.css            # All site styles
+├── css/                        # (removed — styles now live in styles/)
+├── styles/                     # All site styles, split by role
+│   ├── general.css             # Theme tokens, base typography, shared page furniture
+│   ├── menu.css                # The shared sidebar and the music player it hosts
+│   ├── secondary.css           # Map/lore furniture, search bar, .streak-*
+│   ├── account.css             # The account page and its ten account-only tokens
+│   └── settings.css            # The standalone settings page
 ├── docs/
 │   ├── years.txt             # Lore note: world year length
 │   └── music-library.md      # How to add tracks to the music library
 ├── images/                   # Site images
 ├── js/
+│   ├── page-init.js             # The one shared entry point every page loads
 │   ├── menu.js                 # Sidebar markup, page list, active link highlighting
 │   └── site.js                 # Sidebar behavior (avatar, site time, resize)
 ├── settings/

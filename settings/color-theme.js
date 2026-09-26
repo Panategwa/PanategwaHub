@@ -4,9 +4,9 @@
 // A theme only declares FIVE base colours. Everything else
 // the UI needs — sidebar fill, button outlines, hover
 // states, borders, glows, shadows, scrollbars, focus rings —
-// is derived from those five in css/styles.css using
+// is derived from those five in styles/general.css using
 // color-mix(). Adding a theme is five lines, and nothing
-// else in the stylesheet has to be touched.
+// else in the stylesheets has to be touched.
 //
 //   --c-base    page background
 //   --c-panel   sidebar / card surface (usually base, darker or tinted)
@@ -118,7 +118,7 @@ const THEMES = [
 
 function applyTheme(theme) {
   // Only the five base colours are written; every derived token updates
-  // automatically because css/styles.css mixes them from these.
+  // automatically because styles/general.css mixes them from these.
   for (const [key, value] of Object.entries(theme.colors)) {
     document.documentElement.style.setProperty(key, value);
   }

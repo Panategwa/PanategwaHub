@@ -4,10 +4,10 @@
   // ========================================================
   // Sidebar menu — single source of truth
   // ========================================================
-  // Every page includes this file with <script src="js/menu.js" defer></script>
-  // and nothing more than an empty <div id="menu-container"></div>. The markup
-  // below is rendered into that container, so adding or removing a page only
-  // ever means editing PAGES here.
+  // Every page pulls this file in through js/page-init.js and holds nothing
+  // more than an empty <div id="menu-container"></div>. The markup below is
+  // rendered into that container, so adding or removing a page only ever means
+  // editing PAGES here.
   //
   // URLs are repo-relative. They are resolved against the current page's depth
   // at runtime, so the same menu works from the root and from the
@@ -48,13 +48,12 @@
   // (https://panategwa.github.io/PanategwaHub/), so walking up from the current
   // page's pathname would climb past the repo root and drop the
   // "/PanategwaHub/" segment, sending links to
-  // https://panategwa.github.io/main-pages/... This script's own URL always
+  // https://panategwa.github.io/main-pages/... This module's own URL always
   // ends in "/js/menu.js", so trimming those two segments off it yields the
   // real root regardless of the current page's depth or where the site is
   // mounted.
   function computeRoot() {
-    var script = document.currentScript;
-    var src = script && script.src;
+    var src = import.meta.url;
     if (src) {
       try {
         var url = new URL(src, window.location.href);
@@ -70,7 +69,7 @@
       }
     }
 
-    // Fallback for when the script URL is unavailable: "../../"-style prefix
+    // Fallback for when the module URL is unusable: "../../"-style prefix
     // relative to the current page. "" at the repo root, "../../" for
     // main-pages/<body>/file.html.
     var segments = window.location.pathname.split("/").filter(Boolean);
@@ -78,9 +77,7 @@
     return depth > 0 ? new Array(depth + 1).join("../") : "";
   }
 
-  // Resolved eagerly, while this classic script is still executing:
-  // document.currentScript is only set for the duration of a script's own run,
-  // and render() happens later on DOMContentLoaded.
+  // Resolved eagerly, while this module is still evaluating.
   var ROOT = computeRoot();
 
   function rootPrefix() {

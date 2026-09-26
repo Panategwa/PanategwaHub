@@ -2,6 +2,9 @@
   if (window.__PANATEGWA_SETTINGS_BOOTSTRAPPED) return;
   window.__PANATEGWA_SETTINGS_BOOTSTRAPPED = true;
 
+  // Loaded as a module by js/page-init.js, last in the list, so the sidebar
+  // exists and window.PanategwaRoot is published before siteRoot() is used.
+  //
   // Use direct paths relative to the site root.
   // These scripts are loaded as classic scripts (not modules) because
   // they declare global init functions (initTextSize, initTheme, initTranslate).
@@ -10,8 +13,6 @@
     "settings/text-size.js",
     "settings/color-theme.js"
   ];
-
-  const ACHIEVEMENTS_MODULE = "auth/achievements.js";
 
   function siteRoot() {
     return (typeof window !== "undefined" && window.PanategwaRoot) || "";
@@ -28,25 +29,6 @@
     });
   }
 
-  function ensureModule(src, marker) {
-    const root = siteRoot();
-    const existing = [...document.querySelectorAll("script[type='module']")].some((script) => {
-      const current = script.getAttribute("src") || "";
-      return current === src
-        || current === root + src
-        || current.endsWith("/auth/achievements.js")
-        || script.dataset[marker] === "true";
-    });
-
-    if (existing) return;
-
-    const script = document.createElement("script");
-    script.type = "module";
-    script.src = root + src;
-    script.dataset[marker] = "true";
-    document.head.appendChild(script);
-  }
-
   function whenReady(fn) {
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", fn, { once: true });
@@ -59,8 +41,6 @@
     for (const src of MODULES) {
       await loadScript(src);
     }
-
-    ensureModule(ACHIEVEMENTS_MODULE, "panategwaAchievements");
 
     whenReady(() => {
       if (typeof initTextSize === "function") initTextSize();

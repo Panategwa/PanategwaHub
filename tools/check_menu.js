@@ -4,7 +4,25 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
-const source = fs.readFileSync(path.join(__dirname, "..", "js", "menu.js"), "utf8");
+// The site is served from https://panategwa.github.io/PanategwaHub/, so the real
+// module tag resolves menu.js to an absolute URL. That is what the module reads
+// as import.meta.url, and what a browser would hand document.currentScript.src
+// back when this file was a classic script.
+const SCRIPT_URL = "https://panategwa.github.io/PanategwaHub/js/menu.js";
+const ROOT_URL = "https://panategwa.github.io/PanategwaHub/";
+
+// menu.js is an ES module, so it reads its own location from import.meta.url.
+// vm.runInContext parses as a classic script, where import.meta is a syntax
+// error, so substitute the URL literal before running. The assertion below keeps
+// that substitution honest: if menu.js ever stops using import.meta.url, the
+// substitution would silently stop matching and this test would pass for the
+// wrong reason.
+const raw = fs.readFileSync(path.join(__dirname, "..", "js", "menu.js"), "utf8");
+const source = raw.replace(/import\.meta\.url/g, JSON.stringify(SCRIPT_URL));
+if (!/import\.meta\.url/.test(raw)) {
+  console.error("FAIL js/menu.js no longer reads import.meta.url - update this harness");
+  process.exit(1);
+}
 
 function makeElement() {
   const el = {
@@ -33,8 +51,7 @@ function run(pagePath) {
 
   // The real script tag resolves menu.js to an absolute URL, which is what the
   // browser hands to document.currentScript.src.
-  const scriptUrl = "https://panategwa.github.io/PanategwaHub/js/menu.js";
-  const root = "https://panategwa.github.io/PanategwaHub/";
+  const root = ROOT_URL;
 
   let pageAnchors = null;
   let iconAnchors = null;
@@ -54,7 +71,6 @@ function run(pagePath) {
 
   const document = {
     readyState: "complete",
-    currentScript: { src: scriptUrl },
     documentElement: { style: { setProperty() {} } },
     getElementById: (id) => (id === "menu-container" ? container : null),
     querySelectorAll: (sel) => {

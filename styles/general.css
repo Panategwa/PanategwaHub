@@ -1,0 +1,293 @@
+/* =========================
+   GENERAL.CSS
+   =========================
+Foundation layer. Loaded first on every page.
+
+  - the five theme tokens (:root) and everything derived from them
+  - body / html / image / typography / link / form resets
+  - generic page furniture shared by more than one page
+    (.button-container, .map-button, .inline-link, .button-row,
+     .section-hidden)
+
+Anything that styles a single page belongs in that page's own file.
+   ========================= */
+
+:root {
+  /* Panategwa Preset (Default) */
+  --c-base: #121a2c;
+  --c-panel: #0b1424;
+  --c-accent: #60a5fa;
+  --c-line: #94a3b8;
+  --c-text: #e7edf7;
+
+  /* --- derived: core --- */
+  --bg-color: var(--c-base);
+  --text-color: var(--c-text);
+  --button-text: color-mix(in srgb, var(--c-text) 94%, var(--c-base));
+  --link-color: color-mix(in srgb, var(--c-accent) 82%, var(--c-text));
+  --link-hover: color-mix(in srgb, var(--c-accent) 45%, var(--c-text));
+
+  /* --- derived: sidebar --- */
+  --menu-bg: color-mix(in srgb, var(--c-panel) 84%, transparent);
+  --menu-text: var(--c-text);
+  --menu-muted: color-mix(in srgb, var(--c-text) 52%, var(--c-panel));
+  --menu-edge: color-mix(in srgb, var(--c-line) 22%, transparent);
+  --menu-shadow: 14px 0 32px color-mix(in srgb, var(--c-base) 60%, transparent);
+
+  /* --- derived: menu buttons (fill = accent, outline = line) --- */
+  --menu-button: color-mix(in srgb, var(--c-accent) 12%, transparent);
+  --menu-button-outline: color-mix(in srgb, var(--c-line) 38%, transparent);
+  --menu-button-fill-hover: color-mix(in srgb, var(--c-accent) 20%, transparent);
+  --menu-button-outline-hover: color-mix(in srgb, var(--c-line) 70%, var(--c-accent));
+  --menu-button-text: color-mix(in srgb, var(--c-accent) 55%, var(--c-text));
+  --menu-button-fill-active: color-mix(in srgb, var(--c-accent) 26%, transparent);
+  --menu-button-outline-active: color-mix(in srgb, var(--c-accent) 80%, transparent);
+  --menu-button-text-active: var(--c-text);
+
+  /* --- derived: icon buttons --- */
+  --icon-fill: color-mix(in srgb, var(--c-accent) 10%, transparent);
+  --icon-outline: color-mix(in srgb, var(--c-line) 30%, transparent);
+  --icon-text: color-mix(in srgb, var(--c-text) 80%, var(--c-accent));
+  --icon-fill-hover: color-mix(in srgb, var(--c-accent) 22%, transparent);
+  --icon-outline-hover: color-mix(in srgb, var(--c-accent) 60%, transparent);
+
+  /* --- derived: surfaces --- */
+  --surface-border: color-mix(in srgb, var(--c-line) 38%, transparent);
+  --surface-border-strong: color-mix(in srgb, var(--c-line) 62%, var(--c-accent));
+  --surface-soft: color-mix(in srgb, var(--c-text) 8%, transparent);
+  --surface-raised: color-mix(in srgb, var(--c-panel) 70%, transparent);
+  --surface-shadow: 0 20px 44px color-mix(in srgb, var(--c-base) 70%, black);
+  --surface-shadow-strong: 0 20px 40px color-mix(in srgb, var(--c-base) 80%, black);
+
+  /* --- derived: ambience --- */
+  --page-glow-a: color-mix(in srgb, var(--c-accent) 12%, transparent);
+  --page-glow-b: color-mix(in srgb, var(--c-line) 8%, transparent);
+  --page-glow-c: color-mix(in srgb, var(--c-accent) 7%, transparent);
+
+  /* --- derived: interaction --- */
+  --focus-ring: color-mix(in srgb, var(--c-accent) 65%, var(--c-text));
+  --scrollbar-thumb: color-mix(in srgb, var(--c-line) 55%, var(--c-base));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--c-line) 85%, var(--c-text));
+  --scrollbar-track: color-mix(in srgb, var(--c-base) 70%, black);
+  /* --- derived: resize handle ---
+     Geometry lives on #menu-container as --handle-*-width; these are the
+     colours. The two namespaces must stay separate — a single name used for
+     both makes `background: var(--handle-bar)` resolve to a length, which is
+     invalid at computed-value time and silently paints nothing. */
+  --handle-bar-color: color-mix(in srgb, var(--c-line) 22%, transparent);
+  --handle-bar-color-hover: color-mix(in srgb, var(--c-accent) 55%, var(--c-line));
+  --handle-grip-color: color-mix(in srgb, var(--c-text) 45%, var(--c-line));
+  --handle-grip-color-hover: var(--c-text);
+}
+
+body {
+  color: var(--text-color);
+  background:
+    radial-gradient(circle at 15% 20%, var(--page-glow-a), transparent 30%),
+    radial-gradient(circle at 80% 0%, var(--page-glow-b), transparent 30%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.26), rgba(2, 6, 23, 0.6)),
+    var(--bg-color);
+  padding: 0 2rem;
+  padding-top: 200px;
+  padding-left: 280px;
+  line-height: 1.6;
+  min-height: 100vh;
+  font-size: var(--global-font-size, 16px);
+  font-family: 'Rubik', 'Segoe UI', sans-serif;
+  background-attachment: fixed;
+  transition: padding-left 0.14s ease;
+}
+
+body.is-resizing {
+  transition: none;
+}
+
+html {
+  font-size: var(--global-font-size, 16px);
+  scroll-behavior: smooth;
+}
+
+img {
+  border-radius: 12px;
+  max-width: 100%;
+  height: auto;
+}
+
+h1, h2, h3 {
+  font-family: 'Rubik', 'Segoe UI', sans-serif;
+  color: var(--text-color);
+  letter-spacing: -0.02em;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 13px;
+  height: 13px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+h1 {
+  font-size: clamp(2.4rem, 4vw, 3.4rem);
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+h2 {
+  font-size: clamp(1.65rem, 2.8vw, 2.3rem);
+  border-bottom: 1px solid var(--surface-border);
+  padding-bottom: 0.3rem;
+  margin-top: 2.5rem;
+}
+
+h3 {
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+p, li {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  font-family: 'Rubik', sans-serif;
+}
+
+.pito-date
+  {
+    font-size: 0.8rem;
+    color: rgba(200,200,200,0.75);
+  }
+
+a, .nation-link {
+  color: var(--link-color);
+  cursor: pointer;
+  font-weight: bold;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+a:hover, .nation-link:hover,
+a:focus {
+  color: #dbeafe;
+}
+
+.nation-link:active {
+  color: #155aa8;
+}
+
+button {
+  font-size: var(--global-font-size, 16px);
+  padding: 0.74em 1.08em;
+  border-radius: 12px;
+  background: var(--menu-button);
+  color: var(--button-text);
+  border: 1px solid var(--surface-border);
+  cursor: pointer;
+  font-weight: 600;
+  font-family: 'Rubik', sans-serif;
+  margin: 0.75rem 0;
+  display: inline-block;
+  box-shadow: 0 12px 26px rgba(2, 6, 23, 0.16);
+  backdrop-filter: blur(14px);
+  transition: box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+button:hover {
+  filter: brightness(0.75);
+}
+
+button:disabled {
+  filter: brightness(0.5);
+  cursor: default;
+  box-shadow: none;
+  opacity: 0.62;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+  color: #0f172a;
+  background: rgba(255,255,255,0.74);
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 14px;
+  padding: 0.78em 0.92em;
+  box-sizing: border-box;
+  max-width: 100%;
+  backdrop-filter: blur(14px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.42);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid rgba(147, 197, 253, 0.34);
+  outline-offset: 1px;
+}
+
+.yt-icon {
+  height: 3em;
+  vertical-align: middle;
+}
+
+main {
+  margin-top: 100px;
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1rem 0;
+  padding-bottom: 3rem;
+}
+
+.button-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 280px;
+  margin: 2rem auto;
+}
+
+.map-button {
+  margin: 0;
+}
+
+.inline-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.inline-link:hover {
+  opacity: 0.8;
+}
+
+.section-hidden {
+  display: none;
+}

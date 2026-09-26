@@ -278,6 +278,20 @@ function emitNotificationChange(uid) {
   }));
 }
 
+// Every href the app builds is internal, but stored notifications are read
+// back out of localStorage, and assigning a "javascript:" URL to
+// location.href runs it. Restrict navigation to http(s) before following one.
+function navigateTo(target) {
+  let url;
+  try {
+    url = new URL(target, window.location.href);
+  } catch {
+    return;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return;
+  window.location.href = url.href;
+}
+
 function openToastHref(href) {
   const target = String(href || "").trim();
   if (!target) return;
@@ -294,9 +308,9 @@ function openToastHref(href) {
       return;
     }
 
-    window.location.href = url.toString();
+    navigateTo(url.toString());
   } catch {
-    window.location.href = target;
+    navigateTo(target);
   }
 }
 

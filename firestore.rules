@@ -1,6 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function signedIn() {
       return request.auth != null;
     }
@@ -13,18 +14,112 @@ service cloud.firestore {
       return signedIn() && request.auth.uid in participants;
     }
 
+    // ======================================================================
+    // users/{userId}
+    // ======================================================================
+    //
+    // Any signed-in user may read a profile. The friend-request flow has to
+    // read someone *before* they are a friend, so gating this on friendship
+    // would make it impossible to ever send the first request.
+    //
+    // That is only safe because the document no longer stores an email
+    // address. The canonical one lives in Firebase Auth (the owner reads it
+    // from there), and everything the UI is willing to show about someone else
+    // is already filtered through publicProfile() in auth/social.js.
+    //
+    // Writes are bounded by type and size rather than by a key allowlist. A
+    // strict allowlist was tried here first and it silently broke the entire
+    // social system: the moment the client added a field, every write was
+    // rejected outright, and because the client writes with `merge`, the
+    // offending key could not even be removed without a bespoke cleanup. Type
+    // and length bounds are what actually matter here, because they stop a
+    // client parking a megabyte of text, or a string where a number belongs,
+    // in its own document.
+    function boundedProfile(d, uid) {
+      return (!("uid" in d) || d.uid == uid)
+        && (!("username" in d) || (d.username is string && d.username.size() <= 32))
+        && (!("photoURL" in d) || (d.photoURL is string && d.photoURL.size() <= 300000))
+        && (!("avatarType" in d) || (d.avatarType is string && d.avatarType.size() <= 32))
+        && (!("avatarPreset" in d) || (d.avatarPreset is string && d.avatarPreset.size() <= 64))
+        && (!("avatarLetter" in d) || (d.avatarLetter is string && d.avatarLetter.size() <= 8))
+        && (!("xp" in d) || (d.xp is number && d.xp >= 0 && d.xp <= 1000000))
+        && (!("siteTimeMs" in d) || (d.siteTimeMs is number && d.siteTimeMs >= 0))
+        && (!("longestStreak" in d) || (d.longestStreak is number && d.longestStreak >= 0))
+        && (!("verified" in d) || d.verified is bool)
+        && (!("achievements" in d) || (d.achievements is list && d.achievements.size() <= 500))
+        && (!("achievementRewardSnapshot" in d) || d.achievementRewardSnapshot is map)
+        && (!("visitedPages" in d) || (d.visitedPages is list && d.visitedPages.size() <= 500))
+        && (!("streakHistory" in d) || (d.streakHistory is list && d.streakHistory.size() <= 4000))
+        && (!("friends" in d) || (d.friends is list && d.friends.size() <= 5000))
+        && (!("blocked" in d) || (d.blocked is list && d.blocked.size() <= 5000))
+        && (!("socialSettings" in d) || d.socialSettings is map)
+        && (!("socialBackup" in d) || d.socialBackup is map)
+        && (!("privacySettings" in d) || d.privacySettings is map)
+        && (!("progressBaseline" in d) || d.progressBaseline is map)
+        && (!("stats" in d) || d.stats is map)
+        && (!("streak" in d) || d.streak is map);
+    }
+
     match /users/{userId} {
-      allow read: if isUser(userId);
-      allow create, update, delete: if isUser(userId);
+      allow read: if signedIn();
+      allow create, update: if isUser(userId) && boundedProfile(request.resource.data, userId);
+      allow delete: if isUser(userId);
+    }
+
+    // ======================================================================
+    // messages/{messageId}
+    // ======================================================================
+    //
+    // Every field a create always writes is pinned against later updates.
+    // Without this, any participant could rewrite fromUid/toUid to impersonate
+    // the other party, flip `kind` to forge a notification type, or rewrite
+    // `body` in the recipient's own inbox.
+    //
+    // Only the per-recipient bookkeeping is meant to change: status, readBy,
+    // readAt, deletedFor and updatedAt.
+    function routingUnchanged(d, old) {
+      return d.participants == old.participants
+        && d.fromUid == old.fromUid
+        && d.toUid == old.toUid
+        && d.kind == old.kind
+        && d.title == old.title
+        && d.body == old.body
+        && d.requestId == old.requestId
+        && d.targetId == old.targetId
+        && d.targetSection == old.targetSection
+        && d.targetSubSection == old.targetSubSection
+        && d.createdAt == old.createdAt;
     }
 
     match /messages/{messageId} {
       allow read: if isParticipant(resource.data.participants);
+
       allow create: if isParticipant(request.resource.data.participants)
-        && request.resource.data.keys().hasOnly(["participants", "body", "senderId", "createdAt", "updatedAt"]);
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.fromUid is string
+        && request.resource.data.toUid is string
+        && request.resource.data.toUid.size() > 0
+        && request.resource.data.toUid.size() <= 128
+        && request.resource.data.kind is string
+        && request.resource.data.kind.size() <= 64
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 200
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 2000
+        && (!("fromName" in request.resource.data)
+            || (request.resource.data.fromName is string
+                && request.resource.data.fromName.size() <= 64))
+        && (!("toName" in request.resource.data)
+            || (request.resource.data.toName is string
+                && request.resource.data.toName.size() <= 64));
+
       allow update: if isParticipant(resource.data.participants)
-        && request.resource.data.participants == resource.data.participants;
-      allow delete: if isParticipant(resource.data.participants);
+        && routingUnchanged(request.resource.data, resource.data);
+
+      // The client soft-deletes with the deletedFor array, so a hard delete is
+      // never used - and allowing one would let either participant destroy the
+      // message for both of them.
+      allow delete: if false;
     }
   }
 }

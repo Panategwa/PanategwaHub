@@ -150,7 +150,7 @@ function buildSettingsUrl(urlString, overrides = {}) {
     url.searchParams.delete("lang");
   }
 
-  if (size && size !== "medium") {
+  if (size && size !== "medium" && size !== "custom") {
     url.searchParams.set("textsize", size);
   } else {
     url.searchParams.delete("textsize");
@@ -312,6 +312,10 @@ function patchOnclick(code) {
 }
 
 async function translatePage(lang) {
+  // Default to the stored/current language so a caller that forgets the
+  // argument degrades to the right behaviour instead of requesting
+  // "tl=undefined" and silently restoring the original English.
+  const target = lang || getCurrentLang();
   if (isTranslating) return;
   isTranslating = true;
 
@@ -326,7 +330,7 @@ async function translatePage(lang) {
     }
   }
 
-  if (lang === "en") {
+  if (target === "en") {
     syncNavigationForLanguage();
     isTranslating = false;
     return;
@@ -339,13 +343,13 @@ async function translatePage(lang) {
       const original = ORIGINAL_TEXT.get(node);
       if (!original || !original.trim()) return;
 
-      if (MANUAL_TRANSLATIONS[lang]?.[normalize(original)]) {
-        applyText(node, MANUAL_TRANSLATIONS[lang][normalize(original)]);
+      if (MANUAL_TRANSLATIONS[target]?.[normalize(original)]) {
+        applyText(node, MANUAL_TRANSLATIONS[target][normalize(original)]);
         return;
       }
 
-      const protectedInfo = protectPhrases(original, lang);
-      const translated = await googleTranslate(protectedInfo.output, lang);
+      const protectedInfo = protectPhrases(original, target);
+      const translated = await googleTranslate(protectedInfo.output, target);
       let restored = restorePhrases(translated, protectedInfo.replacements);
       restored = restored.replace(/:\s*/g, ": ").replace(/,\s*/g, ", ").replace(/;\s*/g, "; ");
       restored = restored.replace(/:([^\s])/g, ": $1");
@@ -369,7 +373,7 @@ function setLang(lang) {
   } else {
     url.searchParams.delete("lang");
   }
-  if (size && size !== "medium") {
+  if (size && size !== "medium" && size !== "custom") {
     url.searchParams.set("textsize", size);
   } else {
     url.searchParams.delete("textsize");
@@ -381,7 +385,11 @@ function setLang(lang) {
   }
   window.history.replaceState({}, "", url);
 
-  translatePage();
+  // translatePage() takes the language to translate into. Called with no
+  // argument it built its requests as "tl=undefined", every call to the
+  // translation service failed, and the catch below quietly restored the
+  // original English - so picking a language looked like it did nothing.
+  translatePage(lang);
 }
 
 function toggleLanguages() {
@@ -415,17 +423,32 @@ function buildLanguageButtons() {
   });
 }
 
+let navigationSyncFrame = 0;
+
 function startNavigationObserver() {
-  if (!document.body) return;
+  if (!document.body) return null;
 
   const observer = new MutationObserver(() => {
-    syncNavigationForLanguage();
+    // Dynamic content -- friend lists, notifications, the music player -- mutates
+    // the body in bursts, and each pass walks every a[href] and button[onclick]
+    // in the document. Coalesce a burst into one pass on the next frame instead
+    // of re-walking the whole document per mutation.
+    if (navigationSyncFrame) return;
+    navigationSyncFrame = requestAnimationFrame(() => {
+      navigationSyncFrame = 0;
+      syncNavigationForLanguage();
+    });
   });
 
+  // childList only, on purpose. syncNavigationForLanguage() writes href and
+  // onclick attributes, so adding attributes: true here would make the observer
+  // retrigger on its own output forever.
   observer.observe(document.body, {
     childList: true,
     subtree: true
   });
+
+  return observer;
 }
 
 function initTranslate() {
@@ -441,7 +464,7 @@ function initTranslate() {
   }
 
   const size = getCurrentTextSize();
-  if (size && size !== "medium") {
+  if (size && size !== "medium" && size !== "custom") {
     url.searchParams.set("textsize", size);
   } else {
     url.searchParams.delete("textsize");

@@ -297,7 +297,7 @@
               <div class="setting-card">
                 <div class="setting-title">Profile</div>
                 <div class="field-row">
-                  <input id="profile-username" type="text" maxlength="20" placeholder="Username (max 20 chars)" />
+                  <input id="profile-username" type="text" maxlength="20" placeholder="Username (max 20 chars)" aria-label="Username" />
                 </div>
                 <div class="button-row">
                   <button id="save-username-btn" type="button">Save name</button>
@@ -316,8 +316,8 @@
                 <div class="setting-title">Email</div>
                 <p id="settings-provider-note" class="setting-desc">Email and password changes work for email/password accounts.</p>
                 <div class="field-row">
-                  <input id="change-email-input" type="email" placeholder="New email" />
-                  <input id="change-email-password" type="password" placeholder="Current password" />
+                  <input id="change-email-input" type="email" placeholder="New email" aria-label="New email" />
+                  <input id="change-email-password" type="password" placeholder="Current password" aria-label="Current password" />
                 </div>
                 <div class="button-row">
                   <button id="change-email-btn" type="button">Change email</button>
@@ -328,9 +328,9 @@
               <div class="setting-card">
                 <div class="setting-title">Password</div>
                 <div class="field-row">
-                  <input id="current-password" type="password" placeholder="Current password" />
-                  <input id="new-password" type="password" placeholder="New password" />
-                  <input id="confirm-password" type="password" placeholder="Confirm new password" />
+                  <input id="current-password" type="password" placeholder="Current password" aria-label="Current password" />
+                  <input id="new-password" type="password" placeholder="New password" aria-label="New password" />
+                  <input id="confirm-password" type="password" placeholder="Confirm new password" aria-label="Confirm new password" />
                 </div>
                 <div class="button-row">
                   <button id="change-password-btn" type="button">Change password</button>
@@ -352,7 +352,7 @@
                 <div class="setting-title">Danger zone</div>
                 <p class="setting-desc">These resets are permanent. There is no going back after they are done.</p>
                 <div class="field-row field-row-inline">
-                  <select id="reset-data-select">
+                  <select id="reset-data-select" aria-label="Data to reset">
                     <option value="progress">Delete progress</option>
                     <option value="friends">Delete friends</option>
                     <option value="all">Delete all social + progress data</option>
@@ -360,7 +360,7 @@
                   <button id="reset-data-btn" class="danger" type="button">Reset selected data</button>
                 </div>
                 <div class="field-row">
-                  <input id="delete-password" type="password" placeholder="Current password for delete" autocomplete="current-password" />
+                  <input id="delete-password" type="password" placeholder="Current password for delete" autocomplete="current-password" aria-label="Current password" />
                 </div>
                 <div class="button-row">
                   <button id="delete-account-btn" class="danger" type="button">Delete account</button>
@@ -458,8 +458,8 @@
           </div>
 
           <div class="field-row">
-            <input id="friend-id-input" type="text" placeholder="Type a user ID" />
-            <input id="friend-note-input" type="text" placeholder="Optional note" />
+            <input id="friend-id-input" type="text" placeholder="Type a user ID" aria-label="User ID" />
+            <input id="friend-note-input" type="text" placeholder="Optional note" aria-label="Optional note" />
           </div>
 
           <div class="button-row">
@@ -482,7 +482,7 @@
               </div>
 
               <div class="field-row">
-                <input id="friend-search-input" type="text" placeholder="Search your friends" />
+                <input id="friend-search-input" type="text" placeholder="Search your friends" aria-label="Search your friends" />
               </div>
 
               <div id="friends-list" class="friend-list-stack"></div>

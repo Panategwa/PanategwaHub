@@ -510,11 +510,21 @@ async function playTrack(trackId, startAt = null) {
   if (!targetTrack) return;
 
   if (!trackIsEnabled(targetTrack.id)) {
-    currentPrefs = normalizePrefs({
-      ...currentPrefs,
-      disabledTrackIds: currentPrefs.disabledTrackIds.filter((id) => id !== targetTrack.id)
-    });
-    savePrefs();
+    // Do not quietly turn the track back on. Every row renders a play button,
+    // including the ones the user has switched off, and silently re-enabling a
+    // muted track on click meant a deliberate mute reversed itself with no
+    // explanation. Say why nothing happened instead; the toggle is right there.
+    if (typeof window.PanategwaToast === "function") {
+      window.PanategwaToast({
+        title: "Music",
+        body: `"${targetTrack.title || targetTrack.id}" is turned off. Use its toggle in the player to switch it back on.`,
+        duration: 5000,
+        persist: false,
+        kind: "music"
+      });
+    }
+    renderMenuMusic();
+    return;
   }
 
   brokenTrackIds.delete(targetTrack.id);

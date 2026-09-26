@@ -81,7 +81,7 @@
                 <button id="mute-master-volume-btn" type="button" class="audio-inline-button">Mute</button>
               </div>
             </div>
-            <input id="master-volume-slider" class="audio-volume-slider" type="range" min="0" max="100" step="1" value="100" />
+            <input id="master-volume-slider" class="audio-volume-slider" type="range" min="0" max="100" step="1" value="100" aria-label="Master volume" />
           </div>
 
           <div class="audio-control-card">
@@ -95,7 +95,7 @@
                 <button id="mute-music-volume-btn" type="button" class="audio-inline-button">Mute</button>
               </div>
             </div>
-            <input id="music-volume-slider" class="audio-volume-slider" type="range" min="0" max="100" step="1" value="70" />
+            <input id="music-volume-slider" class="audio-volume-slider" type="range" min="0" max="100" step="1" value="70" aria-label="Music volume" />
           </div>
 
           <div class="audio-control-card">
@@ -109,7 +109,7 @@
                 <button id="mute-popup-volume-btn" type="button" class="audio-inline-button">Mute</button>
               </div>
             </div>
-            <input id="popup-volume-slider" class="audio-volume-slider" type="range" min="0" max="100" step="1" value="70" />
+            <input id="popup-volume-slider" class="audio-volume-slider" type="range" min="0" max="100" step="1" value="70" aria-label="Pop-up volume" />
           </div>
 
           <p id="audio-status" class="settings-inline-status section-hidden" aria-live="polite"></p>
@@ -144,8 +144,8 @@
             <small>Send yourself a test popup that uses the same style and sound as the real ones.</small>
           </div>
           <div class="settings-inline-fields">
-            <input id="testing-toast-title" type="text" maxlength="60" placeholder="Message title" />
-            <input id="testing-toast-body" type="text" maxlength="140" placeholder="Message body" />
+            <input id="testing-toast-title" type="text" maxlength="60" placeholder="Message title" aria-label="Message title" />
+            <input id="testing-toast-body" type="text" maxlength="140" placeholder="Message body" aria-label="Message body" />
           </div>
           <div class="button-row">
             <button id="send-test-popup-btn" type="button">Send test popup</button>

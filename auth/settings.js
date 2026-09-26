@@ -72,10 +72,6 @@ function syncForm(profile, user) {
   const usernameInput = $("profile-username");
   const emailInput = $("change-email-input");
   const note = $("settings-provider-note");
-  const showRank = $("privacy-show-rank");
-  const showJoined = $("privacy-show-joined");
-  const showStreaks = $("privacy-show-streaks");
-  const showSiteAge = $("privacy-show-site-age");
 
   if (usernameInput && document.activeElement !== usernameInput) {
     usernameInput.value = profile?.username || user.displayName || "";
@@ -91,11 +87,6 @@ function syncForm(profile, user) {
       ? "Email and password changes work for email/password accounts."
       : "This account uses Google sign-in, so email/password changes are not available here.";
   }
-
-  if (showRank) showRank.checked = profile?.privacySettings?.showRank !== false;
-  if (showJoined) showJoined.checked = profile?.privacySettings?.showJoined !== false;
-  if (showStreaks) showStreaks.checked = profile?.privacySettings?.showStreaks !== false;
-  if (showSiteAge) showSiteAge.checked = profile?.privacySettings?.showSiteAge !== false;
 }
 
 function syncAvatarPresetLocks(profile) {
@@ -180,7 +171,7 @@ function renderAvatarChoices() {
     ${AVATAR_PICKER_ENTRIES.filter((entry) => !entry.isDefault).map((entry) => `
       <button id="avatar-preset-${escapeHtml(entry.id)}-btn" type="button" class="avatar-choice">
         <img alt="" src="" />
-        <span data-avatar-name">${escapeHtml(entry.name)}</span>
+        <span data-avatar-name>${escapeHtml(entry.name)}</span>
         <small class="avatar-requirements">
           <span class="avatar-requirements-label">Requirements:</span>
           <span class="avatar-requirements-text" data-avatar-rank-note>${escapeHtml(entry.requirementText)}</span>
@@ -353,22 +344,6 @@ function bindButtons() {
       console.error(error);
       setScopedStatus("danger", error.message || "Could not delete account.", "error");
     }
-  });
-
-  $("privacy-show-rank")?.addEventListener("change", (event) => {
-    applyPrivacySetting("showRank", event.target.checked);
-  });
-
-  $("privacy-show-joined")?.addEventListener("change", (event) => {
-    applyPrivacySetting("showJoined", event.target.checked);
-  });
-
-  $("privacy-show-streaks")?.addEventListener("change", (event) => {
-    applyPrivacySetting("showStreaks", event.target.checked);
-  });
-
-  $("privacy-show-site-age")?.addEventListener("change", (event) => {
-    applyPrivacySetting("showSiteAge", event.target.checked);
   });
 
   document.body.addEventListener("click", (event) => {

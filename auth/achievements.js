@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase-config.js";
-import { watchAuth, ensureUserProfile, normalizeSiteTimeMs, getLiveSiteTimeMs } from "./auth.js";
+import { watchAuth, ensureUserProfile, normalizeSiteTimeMs, getLiveSiteTimeMs, siteTimePendingStorageKey } from "./auth.js";
 import { ensurePanategwaToast } from "./toast.js";
 
 import {
@@ -121,12 +121,12 @@ export const ACHIEVEMENTS = Object.freeze([
   Object.freeze({
     id: "morning_person",
     name: "Morning Person",
-    description: "Visit between 3am and 10am.",
+    description: "Visit between 3am and 11am.",
     secret: true,
     reward: 2,
     requirement: achievementRequirement({
       type: "hour_bucket",
-      note: "Visit between 3am and 10am.",
+      note: "Visit between 3am and 11am.",
       baselineAware: true,
       page: "",
       pages: [],
@@ -571,9 +571,10 @@ function sameRewardSnapshot(a = {}, b = {}) {
   return true;
 }
 
-function siteTimePendingKey(uid) {
-  return `ptg_site_time_pending_${String(uid || "").trim()}`;
-}
+// The storage key itself comes from auth.js so the tracking code, the profile
+// resolver and the sidebar clock cannot drift apart. js/site.js keeps its own
+// copy of the same string on purpose - the sidebar deliberately has no imports.
+const siteTimePendingKey = siteTimePendingStorageKey;
 
 function loadPendingSiteTime(uid) {
   try {
@@ -861,7 +862,6 @@ export async function syncAchievementProgress(user, profile) {
     const mergedProfile = {
       ...data,
       uid: user.uid,
-      email: user.email || data.email || "",
       username: data.username || user.displayName || "",
       verified: !!user.emailVerified,
       achievements: currentAchievements,
@@ -875,16 +875,12 @@ export async function syncAchievementProgress(user, profile) {
     const nextRewardSnapshot = rewardSnapshotFor(mergedAchievements);
     const xp = Math.max(0, nonAchievementXp + totalSnapshotReward(nextRewardSnapshot));
     const nextUsername = data.username || user.displayName || "";
-    const nextEmail = user.email || data.email || "";
-    const nextEmailLower = String(nextEmail || "").toLowerCase();
     const nextVerified = !!user.emailVerified;
     const pagesVisited = nextVisited.length;
     const shouldWrite =
       !snap.exists() ||
       !data.createdAt ||
       data.uid !== user.uid ||
-      String(data.email || "") !== nextEmail ||
-      String(data.emailLower || "") !== nextEmailLower ||
       String(data.username || "") !== nextUsername ||
       !!data.verified !== nextVerified ||
       currentVisited.length !== nextVisited.length ||
@@ -895,8 +891,6 @@ export async function syncAchievementProgress(user, profile) {
 
     const nextDoc = {
       uid: user.uid,
-      email: nextEmail,
-      emailLower: nextEmailLower,
       username: nextUsername,
       verified: nextVerified,
       achievements: mergedAchievements,
@@ -1087,7 +1081,6 @@ function startLiveProfileListener() {
       const normalizedProfile = {
         ...freshProfile,
         uid: trackedUser.uid,
-        email: trackedUser.email || freshProfile.email || "",
         username: freshProfile.username || trackedUser.displayName || "",
         verified: !!trackedUser.emailVerified,
         achievements: uniqueKnown(freshProfile.achievements || []),

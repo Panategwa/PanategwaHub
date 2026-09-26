@@ -53,7 +53,6 @@ let unsubProfile = null;
 let unsubMessages = null;
 const listenerErrors = new Map();
 const TOAST_STORAGE_LIMIT = 160;
-let unreadSummaryToastUserId = "";
 let hydratedMessagesUserId = "";
 
 function cloneState() {
@@ -213,7 +212,7 @@ function userRef(uid) {
 }
 
 function usernameOf(profile) {
-  return profile?.username || profile?.displayName || profile?.email?.split("@")?.[0] || "Player";
+  return profile?.username || profile?.displayName || "Player";
 }
 
 function rankFromXp(xp) {
@@ -260,7 +259,6 @@ function publicProfile(profile, viewerUid) {
       uid: profile.uid,
       username: profile.username || "Player",
       photoURL: getDefaultAvatarDataUrl(),
-      email: "",
       xp: null,
       verified: null,
       createdAt: null,
@@ -287,7 +285,6 @@ function publicProfile(profile, viewerUid) {
     uid: profile.uid,
     username: profile.username || "Player",
     photoURL: profile.photoURL || getDefaultAvatarDataUrl(),
-    email: self ? (profile.email || "") : "",
     xp: canShowRank ? Number(profile.xp || 0) : null,
     verified: !!profile.verified,
     createdAt: canShowJoined ? (profile.createdAt || null) : null,
@@ -572,7 +569,6 @@ function maybeToastUnreadSummary(messages, uid) {
 
   if (loadUnreadSummarySignature(currentUid) === signature) return;
 
-  unreadSummaryToastUserId = currentUid;
   saveUnreadSummarySignature(currentUid, signature);
   const label = unreadCount > 10 ? "10+" : String(unreadCount);
   const suffix = unreadCount === 1 ? "message" : "messages";
@@ -956,12 +952,10 @@ async function setMessageDeletedForCurrentUser(messageId, deleted = true) {
 
 function resetSocialState() {
   listenerErrors.clear();
-  unreadSummaryToastUserId = "";
   hydratedMessagesUserId = "";
   socialState.ready = true;
   socialState.user = null;
   socialState.profile = null;
-  socialState.settings = { ...DEFAULT_SETTINGS };
   socialState.socialError = null;
   socialState.friends = [];
   socialState.blocked = [];
@@ -1006,7 +1000,6 @@ function startRealtime() {
     }
 
     listenerErrors.clear();
-    unreadSummaryToastUserId = "";
     hydratedMessagesUserId = "";
     socialState.ready = false;
     socialState.user = user;
@@ -1015,7 +1008,6 @@ function startRealtime() {
 
     try {
       socialState.profile = withResolvedOwnSiteTime(await ensureUserProfile(user), user.uid);
-      socialState.settings = { ...DEFAULT_SETTINGS, ...(socialState.profile?.socialSettings || {}) };
       socialState.friends = unique(socialState.profile?.friends);
       socialState.blocked = unique(socialState.profile?.blocked);
       await loadFriendProfiles([...socialState.friends, ...socialState.blocked]);
@@ -1024,14 +1016,22 @@ function startRealtime() {
 
       unsubProfile = onSnapshot(userRef(user.uid), async (snap) => {
         clearListenerError("profile");
-        const fresh = snap.exists() ? withResolvedOwnSiteTime(snap.data(), user.uid) : null;
-        socialState.profile = fresh;
-        socialState.settings = { ...DEFAULT_SETTINGS, ...(fresh?.socialSettings || {}) };
-        socialState.friends = unique(fresh?.friends);
-        socialState.blocked = unique(fresh?.blocked);
-        await loadFriendProfiles([...socialState.friends, ...socialState.blocked]);
-        socialState.ready = true;
-        emit();
+        // Firestore does not await the callback we hand onSnapshot, so anything
+        // thrown here escapes as an unhandled rejection. Letting one through
+        // would also skip the ready flag below and leave the account page
+        // spinning forever with nothing on screen explaining why.
+        try {
+          const fresh = snap.exists() ? withResolvedOwnSiteTime(snap.data(), user.uid) : null;
+          socialState.profile = fresh;
+          socialState.friends = unique(fresh?.friends);
+          socialState.blocked = unique(fresh?.blocked);
+          await loadFriendProfiles([...socialState.friends, ...socialState.blocked]);
+        } catch (error) {
+          console.error("Profile snapshot error:", error);
+        } finally {
+          socialState.ready = true;
+          emit();
+        }
       }, (error) => {
         socialState.ready = true;
         setListenerError("profile", "profile", error);
@@ -1041,32 +1041,39 @@ function startRealtime() {
         query(collection(db, "messages"), where("participants", "array-contains", user.uid)),
         async (snap) => {
           clearListenerError("messages");
-          const all = [];
-          snap.forEach((docSnap) => all.push({ id: docSnap.id, ...docSnap.data() }));
+          try {
+            const all = [];
+            snap.forEach((docSnap) => all.push({ id: docSnap.id, ...docSnap.data() }));
 
-          const sorted = sortNewestFirst(all);
-          const visible = sorted.filter((message) => !unique(message.deletedFor).includes(user.uid));
-          const unreadIncoming = visible.filter((message) => cleanUid(message.toUid) === user.uid && isUnreadForUser(message, user.uid));
-          const initialSnapshot = hydratedMessagesUserId !== user.uid;
-          if (initialSnapshot) {
-            markIncomingMessagesAsSeen(unreadIncoming, user.uid);
-            maybeToastUnreadSummary(unreadIncoming, user.uid);
-            hydratedMessagesUserId = user.uid;
-          } else {
-            maybeToastNewMessages(sorted);
+            const sorted = sortNewestFirst(all);
+            const visible = sorted.filter((message) => !unique(message.deletedFor).includes(user.uid));
+            const unreadIncoming = visible.filter((message) => cleanUid(message.toUid) === user.uid && isUnreadForUser(message, user.uid));
+            const initialSnapshot = hydratedMessagesUserId !== user.uid;
+            if (initialSnapshot) {
+              markIncomingMessagesAsSeen(unreadIncoming, user.uid);
+              maybeToastUnreadSummary(unreadIncoming, user.uid);
+              hydratedMessagesUserId = user.uid;
+            } else {
+              maybeToastNewMessages(sorted);
+            }
+
+            socialState.messages = visible;
+            socialState.incomingRequests = sortNewestFirst(
+              visible.filter((message) => message.kind === "friend-request" && cleanUid(message.toUid) === user.uid && (message.status || "pending") === "pending")
+            );
+            socialState.outgoingRequests = sortNewestFirst(
+              visible.filter((message) => message.kind === "friend-request" && cleanUid(message.fromUid) === user.uid && (message.status || "pending") === "pending")
+            );
+            syncUnreadCount();
+            await syncRelationshipSignals(sorted);
+          } catch (error) {
+            // See the note on the profile listener: an escaping error here
+            // would skip the ready flag and strand the UI on its spinner.
+            console.error("Messages snapshot error:", error);
+          } finally {
+            socialState.ready = true;
+            emit();
           }
-
-          socialState.messages = visible;
-          socialState.incomingRequests = sortNewestFirst(
-            visible.filter((message) => message.kind === "friend-request" && cleanUid(message.toUid) === user.uid && (message.status || "pending") === "pending")
-          );
-          socialState.outgoingRequests = sortNewestFirst(
-            visible.filter((message) => message.kind === "friend-request" && cleanUid(message.fromUid) === user.uid && (message.status || "pending") === "pending")
-          );
-          syncUnreadCount();
-          await syncRelationshipSignals(sorted);
-          socialState.ready = true;
-          emit();
         },
         (error) => {
           socialState.ready = true;

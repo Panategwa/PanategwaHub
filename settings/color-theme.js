@@ -152,13 +152,27 @@ function syncThemeUrl(name) {
     ? getTextSize()
     : (new URLSearchParams(window.location.search).get("textsize") || localStorage.getItem("textsize") || "medium");
 
-  if (size && size !== "medium") {
+  if (size && size !== "medium" && size !== "custom") {
     url.searchParams.set("textsize", size);
   } else {
     url.searchParams.delete("textsize");
   }
 
   window.history.replaceState({}, "", url);
+}
+
+// Mirror the active class onto the theme picker. Without this the picker never
+// shows which theme is selected, and setTheme used to throw here - which also
+// skipped syncThemeUrl below, and (because initTheme is called in the same
+// callback as initTranslate) left translation uninitialised on every page.
+function setActiveThemeButton(name) {
+  const container = document.getElementById("theme-buttons");
+  if (!container) return;
+
+  container.querySelectorAll(".theme-button").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.theme === name);
+    btn.setAttribute("aria-pressed", btn.dataset.theme === name ? "true" : "false");
+  });
 }
 
 function setTheme(name) {

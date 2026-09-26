@@ -30,7 +30,8 @@ import {
   query,
   where,
   serverTimestamp,
-  arrayUnion
+  arrayUnion,
+  deleteField
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 function userRef(uid) {
@@ -68,8 +69,31 @@ export function siteTimeLiveStorageKey(uid) {
   return `ptg_site_time_live_${cleanText(uid)}`;
 }
 
+export function siteTimePendingStorageKey(uid) {
+  return `ptg_site_time_pending_${cleanText(uid)}`;
+}
+
+// The same three sources the sidebar clock reads in js/site.js: the value the
+// page is tracking in memory (mirrored to localStorage), the last value that
+// was flushed, and this tab's unspent time. The largest wins so the number can
+// never appear to move backwards. Previously this ignored its uid and returned
+// only the fallback, so the Firestore snapshot was used unchanged.
 export function getLiveSiteTimeMs(uid, fallback = 0) {
-  return normalizeSiteTimeMs(fallback);
+  const cleanUid = cleanText(uid || "");
+  const base = normalizeSiteTimeMs(fallback);
+  if (!cleanUid) return base;
+
+  let live = 0;
+  try {
+    live = normalizeSiteTimeMs(localStorage.getItem(siteTimeLiveStorageKey(cleanUid)));
+  } catch (e) {}
+
+  let pending = 0;
+  try {
+    pending = normalizeSiteTimeMs(sessionStorage.getItem(siteTimePendingStorageKey(cleanUid)));
+  } catch (e) {}
+
+  return Math.max(base, live, pending);
 }
 export function getResolvedProfileSiteTime(profile, uid = auth.currentUser?.uid) {
   const cleanUid = cleanText(uid || profile?.uid || "");
@@ -558,8 +582,10 @@ function syncSidebarAvatar(photoURL) {
 function baseProfile(user) {
   return {
     uid: user.uid,
-    email: user.email || "",
-    emailLower: cleanEmail(user.email),
+    // No email is stored here. Any signed-in user can read a profile document
+    // (the friend-request flow has to read someone before they are a friend),
+    // so an address in here would be an address disclosure. Firebase Auth owns
+    // the canonical address; read it from `user.email` where it is needed.
     username: user.displayName || defaultUsername(user),
     photoURL: getDefaultAvatarDataUrl(),
     avatarType: "default",
@@ -690,8 +716,6 @@ export async function ensureUserProfile(user) {
 
   const merged = {
     uid: user.uid,
-    email: user.email || data.email || "",
-    emailLower: cleanEmail(user.email || data.email || ""),
     username: data.username || user.displayName || defaultUsername(user),
     photoURL: normalizedAvatar.photoURL,
     avatarType: normalizedAvatar.avatarType,
@@ -725,6 +749,19 @@ export async function ensureUserProfile(user) {
   };
 
   await setDoc(ref, merged, { merge: true });
+
+  // Documents written before the profile stopped storing an email still carry
+  // one, and a merge will not remove it. Strip it once, on load, so the address
+  // is not left sitting in a document every signed-in user can now read.
+  // deleteField() is a no-op for a key that is already absent.
+  if (data.email !== undefined || data.emailLower !== undefined) {
+    try {
+      await updateDoc(ref, { email: deleteField(), emailLower: deleteField() });
+    } catch (error) {
+      console.warn("Could not remove the legacy email fields from the profile:", error);
+    }
+  }
+
   if ((user.photoURL || "") !== merged.photoURL) {
     try {
       await updateProfile(user, { photoURL: merged.photoURL });
@@ -928,11 +965,8 @@ export async function changeEmail(newEmail, currentPassword) {
     const credential = EmailAuthProvider.credential(user.email, currentPassword);
     await reauthenticateWithCredential(user, credential);
     await updateEmail(user, cleanMail);
-    await setDoc(userRef(user.uid), {
-      email: cleanMail,
-      emailLower: cleanMail,
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+    // updateEmail above is the only place the address is stored now; the profile
+    // document deliberately does not mirror it.
     return cleanMail;
   } catch (error) {
     throw new Error(friendlyAuthError(error));
@@ -998,7 +1032,7 @@ export async function requestPasswordReset(email) {
 
 async function sendRelationshipResetMessage(user, targetUid, targetProfile, kind, body, targetId = null) {
   const fromName = user.displayName || user.email?.split("@")?.[0] || "Player";
-  const toName = targetProfile?.username || targetProfile?.email?.split("@")?.[0] || "Player";
+  const toName = targetProfile?.username || "Player";
 
   await addDoc(collection(db, "messages"), {
     fromUid: user.uid,

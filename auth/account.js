@@ -375,6 +375,20 @@ function localNotificationHref(entry) {
   return String(entry?.href || "").trim();
 }
 
+// Only follow http(s). Notification hrefs are built here, but the records
+// behind them round-trip through localStorage, and assigning a "javascript:"
+// URL to location.href would execute it.
+function navigateTo(target) {
+  let url;
+  try {
+    url = new URL(target, window.location.href);
+  } catch {
+    return;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return;
+  window.location.href = url.href;
+}
+
 function openNotificationHref(href) {
   const target = String(href || "").trim();
   if (!target) return;
@@ -391,9 +405,9 @@ function openNotificationHref(href) {
       return;
     }
 
-    window.location.href = url.toString();
+    navigateTo(url.toString());
   } catch {
-    window.location.href = target;
+    navigateTo(target);
   }
 }
 
@@ -764,7 +778,7 @@ function renderAuth(state) {
   }
 
   const username = ownProfile.username || user.displayName || "Player";
-  const email = user.email || ownProfile.email || "--";
+  const email = user.email || "--";
   const verified = user.emailVerified ? "Yes" : "No";
   const xp = typeof ownProfile.xp === "number" ? ownProfile.xp : 0;
   const streak = ownProfile?.streak?.current || 0;
@@ -1373,7 +1387,7 @@ function renderAll(state) {
     uid: user?.uid || "",
     targetId: currentInfoTargetId(),
     username: profile?.username || "",
-    email: user?.email || profile?.email || "",
+    email: user?.email || "",
     verified: isVerifiedState(user, profile),
     photoURL: profile?.photoURL || "",
     xp: profile?.xp || 0,

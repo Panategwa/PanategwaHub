@@ -4,8 +4,7 @@ import { ensurePanategwaToast } from "./toast.js";
 
 import {
   doc,
-  getDoc,
-  setDoc,
+  runTransaction,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
@@ -21,6 +20,10 @@ let countdownTimer = null;
 let streakBound = false;
 let streakUnsubs = [];
 let streakTimers = [];
+// Set while a claim is in flight. The button is not disabled between renders,
+// and currentProfile only refreshes after the write lands, so two clicks in
+// that window both passed the "already claimed" check and both awarded.
+let claimingStreak = false;
 
 function userRef(uid) {
   return doc(db, "users", uid);
@@ -141,7 +144,11 @@ function daysBetween(fromKey, toKey) {
   if (!fromKey || !toKey) return Infinity;
   const from = dateFromKey(fromKey);
   const to = dateFromKey(toKey);
-  return Math.floor((to.getTime() - from.getTime()) / DAY_MS);
+  // Round, do not floor. dateFromKey builds local midnights, and on a
+  // spring-forward day two local midnights one calendar day apart are only 23h
+  // apart, so floor() reported 0 and isMissed() missed the missed day. Two days
+  // apart is 47h, which floors to 1 - the same bug one day further out.
+  return Math.round((to.getTime() - from.getTime()) / DAY_MS);
 }
 
 function isMissed(state, todayKey = localDateKey()) {
@@ -301,7 +308,7 @@ function renderMonthGrid(profile, state) {
 }
 
 async function claimStreak() {
-  if (!currentUser) return;
+  if (!currentUser || claimingStreak) return;
   ensurePanategwaToast();
 
   const today = localDateKey();
@@ -331,46 +338,99 @@ async function claimStreak() {
     }
   };
 
-  const profileSnap = await getDoc(userRef(currentUser.uid));
-  const liveProfile = profileSnap.exists() ? profileSnap.data() : (currentProfile || {});
-  const currentXp = Number(liveProfile?.xp || 0);
-  const longest = Math.max(Number(liveProfile?.longestStreak || 0), Number(state.longest || 0), nextDay);
+  claimingStreak = true;
+  setClaimButtonDisabled(true);
 
-  await setDoc(userRef(currentUser.uid), {
-    xp: currentXp + reward,
-    longestStreak: longest,
-    streak: {
-      current: nextDay,
-      longest,
-      lastClaimAt: Date.now(),
-      lastClaimDay: today
-    },
-    streakHistory: nextHistory,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
+  try {
+    // A transaction, so the read and the write cannot be interleaved with a
+    // second claim from another tab or device. The claim is re-checked against
+    // the freshly read document rather than the possibly stale currentProfile.
+    // The reward is also recorded in streakHistory, which is what
+    // syncAchievementProgress later derives xp from, so a duplicated award
+    // would be permanent rather than self-correcting.
+    const outcome = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(userRef(currentUser.uid));
+      const liveProfile = snap.exists() ? snap.data() : (currentProfile || {});
 
-  saveBackup(currentUser.uid, {
-    streak: nextDay,
-    longestStreak: longest,
-    lastClaimAt: Date.now(),
-    lastClaimDay: today,
-    history: nextHistory
-  });
+      if (String(liveProfile?.streak?.lastClaimDay || "") === today) {
+        return { alreadyClaimed: true };
+      }
 
-  currentProfile = await getProfile(currentUser.uid);
-  renderPage();
+      const currentXp = Number(liveProfile?.xp || 0);
+      const longest = Math.max(Number(liveProfile?.longestStreak || 0), Number(state.longest || 0), nextDay);
 
-  if (typeof window.PanategwaToast === "function") {
-    window.PanategwaToast({
-      title: "Streak claimed",
-      body: `You claimed ${reward} XP from your day ${nextDay} streak.`,
-      href: `${window.PanategwaRoot || ""}main-pages/streak/streak-page.html`,
-      duration: 5000,
-      persist: true,
-      kind: "streak",
-      notificationId: `streak:${today}`
+      tx.set(userRef(currentUser.uid), {
+        xp: currentXp + reward,
+        longestStreak: longest,
+        streak: {
+          current: nextDay,
+          longest,
+          lastClaimAt: Date.now(),
+          lastClaimDay: today
+        },
+        streakHistory: nextHistory,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      return { alreadyClaimed: false, longest };
     });
+
+    if (outcome.alreadyClaimed) {
+      if (typeof window.PanategwaToast === "function") {
+        window.PanategwaToast({
+          title: "Streak",
+          body: "You already claimed today.",
+          href: `${window.PanategwaRoot || ""}main-pages/streak/streak-page.html`,
+          duration: 5000,
+          persist: false,
+          kind: "streak"
+        });
+      }
+      return;
+    }
+
+    saveBackup(currentUser.uid, {
+      streak: nextDay,
+      longestStreak: outcome.longest,
+      lastClaimAt: Date.now(),
+      lastClaimDay: today,
+      history: nextHistory
+    });
+
+    currentProfile = await getProfile(currentUser.uid);
+    renderPage();
+
+    if (typeof window.PanategwaToast === "function") {
+      window.PanategwaToast({
+        title: "Streak claimed",
+        body: `You claimed ${reward} XP from your day ${nextDay} streak.`,
+        href: `${window.PanategwaRoot || ""}main-pages/streak/streak-page.html`,
+        duration: 5000,
+        persist: true,
+        kind: "streak",
+        notificationId: `streak:${today}`
+      });
+    }
+  } catch (error) {
+    console.error("Could not claim the streak:", error);
+    if (typeof window.PanategwaToast === "function") {
+      window.PanategwaToast({
+        title: "Streak",
+        body: "Could not claim today's streak. Please try again.",
+        duration: 6000,
+        persist: false,
+        kind: "streak"
+      });
+    }
+  } finally {
+    claimingStreak = false;
+    setClaimButtonDisabled(false);
   }
+}
+
+function setClaimButtonDisabled(disabled) {
+  const button = $("claim-streak-btn");
+  if (button) button.disabled = !!disabled;
 }
 
 function scheduleMidnightRefresh() {
@@ -428,7 +488,7 @@ function renderPage() {
           <h1>Streak</h1>
           <p>Each local midnight starts a new streak day. Miss a day and your next claim resets to 1 XP.</p>
         </div>
-        <button id="claim-streak-btn" type="button" ${alreadyClaimed ? "disabled" : ""}>${alreadyClaimed ? "Claimed today" : `Claim ${reward} XP`}</button>
+        <button id="claim-streak-btn" type="button" ${alreadyClaimed || claimingStreak ? "disabled" : ""}>${alreadyClaimed ? "Claimed today" : `Claim ${reward} XP`}</button>
       </div>
 
       <div class="streak-summary">
@@ -449,7 +509,7 @@ function renderPage() {
 
         <div class="setting-card">
           <div class="setting-title">On the site for</div>
-          <div class="setting-desc">${formatSiteTimeDuration(resolvedOwnSiteTimeMs(profile), { includeSeconds: true })}</div>
+          <div class="setting-desc" id="streak-site-time-value">${formatSiteTimeDuration(resolvedOwnSiteTimeMs(profile), { includeSeconds: true })}</div>
         </div>
 
         <div class="setting-card">
@@ -534,7 +594,15 @@ function start() {
       ...currentProfile,
       siteTimeMs: Number(detail.siteTimeMs || 0)
     };
-    renderPage();
+
+    // This event fires once a second. Re-rendering the whole page rebuilt the
+    // month grid and destroyed and recreated #claim-streak-btn and the month
+    // arrows, so a click whose mousedown and mouseup straddled a rebuild was
+    // swallowed. Update just the one line that actually changed.
+    const value = $("streak-site-time-value");
+    if (value) {
+      value.textContent = formatSiteTimeDuration(currentProfile.siteTimeMs, { includeSeconds: true });
+    }
   }
   window.addEventListener("panategwa:sitetimechange", __streakSiteTimeListener);
   streakUnsubs.push(() => window.removeEventListener("panategwa:sitetimechange", __streakSiteTimeListener));

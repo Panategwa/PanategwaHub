@@ -44,6 +44,15 @@ function getTextSizePresetKey(size) {
   return Object.entries(PRESET_FONT_SIZES).find(([, value]) => value === px)?.[0] || "custom";
 }
 
+// The current size as a preset key, or "custom" once the user has dragged the
+// slider off the presets. color-theme.js and translate.js both call this to
+// mirror the size into the URL, and neither defined it, so both fell through
+// their typeof guard to localStorage and wrote a "?textsize=custom" parameter
+// that readUrlTextSize then discarded on the next load.
+function getTextSize() {
+  return getTextSizePresetKey(getTextSizeValue());
+}
+
 function syncTextSizeUrl(size) {
   const px = clampFontSize(size);
   const url = new URL(window.location.href);

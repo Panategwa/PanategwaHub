@@ -71,6 +71,10 @@
   // ========================================================
   // Site time rendering
   // ========================================================
+  // These two key names are duplicated in auth.js (siteTimeLiveStorageKey /
+  // siteTimePendingStorageKey), which is what auth/achievements.js reads and
+  // writes. The copy here is deliberate: the sidebar is loaded on every page
+  // and must stay free of imports, so if you change a key, change it there too.
   function siteTimeStorageKey(uid) {
     return "ptg_site_time_live_" + String(uid || "").trim();
   }
@@ -119,6 +123,7 @@
   }
 
   var liveSiteTimeMs = 0;
+  var liveSiteTimeUid = "";
 
   function setLiveSiteTime(value) {
     var next = normalizeSiteTimeMs(value);
@@ -146,8 +151,19 @@
 
     var uid = currentUid();
     if (!uid) {
+      liveSiteTimeUid = "";
+      liveSiteTimeMs = 0;
       el.textContent = "On the site for: --";
       return;
+    }
+
+    // The cached value only ever climbs, so it has to be dropped when the
+    // signed-in account changes. Otherwise signing out of one account and into
+    // another without a reload keeps showing the first account's total until
+    // the new one happens to exceed it.
+    if (uid !== liveSiteTimeUid) {
+      liveSiteTimeUid = uid;
+      liveSiteTimeMs = 0;
     }
 
     var siteTimeMs = setLiveSiteTime(readStoredSiteTimeMs(uid));
@@ -196,7 +212,14 @@
       } catch (e) {}
     }
 
-    var savedWidth = localStorage.getItem("menuWidth");
+    // Guarded like every other storage access in this file. When site data is
+    // blocked, a SecurityError here used to propagate out of init() before the
+    // four listeners below were attached, leaving the sidebar with no resize
+    // handle, no site-time clock and no avatar updates at all.
+    var savedWidth = null;
+    try {
+      savedWidth = localStorage.getItem("menuWidth");
+    } catch (e) {}
     var initialWidth = DEFAULT_WIDTH;
     if (savedWidth) {
       savedWidth = parseInt(savedWidth, 10);

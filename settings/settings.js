@@ -37,15 +37,27 @@
     }
   }
 
+  function runInit(name, fn) {
+    try {
+      fn();
+    } catch (error) {
+      // Each settings script is independent. Isolating them means a fault in
+      // one - a theme lookup that throws, say - cannot stop the others from
+      // applying, which is exactly what happened when setActiveThemeButton
+      // went missing and silently disabled translation on every page.
+      console.warn(`[Panategwa settings] ${name} failed to initialise:`, error);
+    }
+  }
+
   async function boot() {
     for (const src of MODULES) {
       await loadScript(src);
     }
 
     whenReady(() => {
-      if (typeof initTextSize === "function") initTextSize();
-      if (typeof initTheme === "function") initTheme();
-      if (typeof initTranslate === "function") initTranslate();
+      if (typeof initTextSize === "function") runInit("text size", initTextSize);
+      if (typeof initTheme === "function") runInit("color theme", initTheme);
+      if (typeof initTranslate === "function") runInit("translation", initTranslate);
     });
   }
 

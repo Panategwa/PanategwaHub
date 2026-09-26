@@ -1502,7 +1502,11 @@ async function copyText(value) {
 }
 
 function bindNavigation() {
-  document.addEventListener("click", (event) => {
+  // Both of these are delegated to document rather than to an element inside
+  // the page, so the client-side router swapping the content out does not take
+  // them with it. Named and unsubscribed, or every return to the account page
+  // would add another copy and a single click would fire all of them.
+  const onSectionClick = (event) => {
     const sectionButton = event.target.closest("[data-target], [data-open-section], [data-auth-mode], [data-settings-subtab]");
     if (!sectionButton) return;
 
@@ -1524,13 +1528,18 @@ function bindNavigation() {
     if (sectionButton.dataset.settingsSubtab) {
       window.openAccountArea("settings", sectionButton.dataset.settingsSubtab);
     }
-  });
+  };
 
-  document.addEventListener("click", (event) => {
+  const onDocumentClick = (event) => {
     if (!event.target.closest(".friend-entry-menu")) {
       document.querySelectorAll(".friend-entry-menu[open]").forEach((menu) => menu.removeAttribute("open"));
     }
-  });
+  };
+
+  document.addEventListener("click", onSectionClick);
+  document.addEventListener("click", onDocumentClick);
+  accountUnsubs.push(() => document.removeEventListener("click", onSectionClick));
+  accountUnsubs.push(() => document.removeEventListener("click", onDocumentClick));
 }
 
 function bindAuthForms() {
@@ -1846,6 +1855,13 @@ function disposeAccountModule() {
   accountUnsubs = [];
   accountBound = false;
 }
+
+// The client-side router navigates without a document load, so nothing else
+// would ever call the dispose above. Handing it over keeps this module's
+// Firestore subscriptions and document listeners from stacking up when you
+// leave the account page and come back.
+window.PanategwaRouteDispose = window.PanategwaRouteDispose || {};
+window.PanategwaRouteDispose.account = disposeAccountModule;
 
 function start() {
   if (accountBound) disposeAccountModule();

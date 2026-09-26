@@ -227,8 +227,20 @@
         initialWidth = savedWidth;
       }
     }
+    // menu.css declares #menu-container at width: 280px with a
+    // `transition: width`, so applying the saved width here used to animate
+    // 280px -> saved width on every single page load. The transition is muted
+    // for this one write and restored on the next frame, so the sidebar simply
+    // appears at the right size. Dragging still animates as before, because
+    // that is a real width change rather than a first paint.
+    menuContainer.style.transition = "none";
     menuContainer.style.width = initialWidth + "px";
     document.body.style.paddingLeft = initialWidth + "px";
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(function () {
+        menuContainer.style.transition = "";
+      });
+    });
     handle.setAttribute("aria-valuemin", String(MIN_WIDTH));
     handle.setAttribute("aria-valuemax", String(MAX_WIDTH));
     handle.setAttribute("aria-valuenow", String(initialWidth));

@@ -158,13 +158,22 @@ function bindAudioControls() {
 
   $("send-test-popup-btn")?.addEventListener("click", sendTestPopup);
 
-  window.addEventListener("panategwa:audio-settings-change", (event) => {
+  // Named and unsubscribed. These two live on window, so unlike the element
+  // listeners above they are not taken down by the content being replaced --
+  // and disposeAudioModule used to clear an empty audioUnsubs list, meaning
+  // nothing was ever actually removed.
+  const onAudioSettingsChange = (event) => {
     syncAudioControls(event?.detail?.settings || getToastAudioSettings());
-  });
+  };
 
-  window.addEventListener("storage", () => {
+  const onStorageChange = () => {
     syncAudioControls(getToastAudioSettings());
-  });
+  };
+
+  window.addEventListener("panategwa:audio-settings-change", onAudioSettingsChange);
+  window.addEventListener("storage", onStorageChange);
+  audioUnsubs.push(() => window.removeEventListener("panategwa:audio-settings-change", onAudioSettingsChange));
+  audioUnsubs.push(() => window.removeEventListener("storage", onStorageChange));
 
   // Track all interactive elements for disposal
   ["mute-master-volume-btn", "mute-music-volume-btn", "mute-popup-volume-btn",
@@ -177,10 +186,19 @@ function bindAudioControls() {
 
 function disposeAudioModule() {
   wipeAudioElementListeners();
+  for (var i = 0; i < audioUnsubs.length; i++) {
+    try { audioUnsubs[i](); } catch (e) { console.error("Audio settings disposal error:", e); }
+  }
   audioUnsubs = [];
   audioListeners = [];
   audioBound = false;
 }
+
+// The client-side router navigates without a document load, so nothing else
+// would ever call the dispose above. Without it the slider listeners would be
+// re-attached to detached inputs on every visit to the settings page.
+window.PanategwaRouteDispose = window.PanategwaRouteDispose || {};
+window.PanategwaRouteDispose.audioSettings = disposeAudioModule;
 
 function start() {
   if (audioBound) {

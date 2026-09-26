@@ -346,7 +346,11 @@ function bindButtons() {
     }
   });
 
-  document.body.addEventListener("click", (event) => {
+  // Named and registered for removal. This one is delegated to document.body
+  // rather than to an element inside the page, so removing the content on
+  // navigation does not take it with it -- without the unsub below it would
+  // still be attached on the next visit to the account page, and the next.
+  const onPrivacyToggleClick = (event) => {
     const button = event.target.closest("[data-privacy-toggle-key]");
     if (!button) return;
 
@@ -355,7 +359,10 @@ function bindButtons() {
     if (!key) return;
 
     applyPrivacySetting(key, nextValue);
-  });
+  };
+
+  document.body.addEventListener("click", onPrivacyToggleClick);
+  settingsUnsubs.push(() => document.body.removeEventListener("click", onPrivacyToggleClick));
 }
 
 function disposeSettingsModule() {
@@ -365,6 +372,13 @@ function disposeSettingsModule() {
   settingsUnsubs = [];
   settingsBound = false;
 }
+
+// The client-side router navigates without a document load, so nothing else
+// would ever call the dispose above. This module also binds a delegated click
+// listener to document.body, which would otherwise survive every navigation
+// and fire once per visit.
+window.PanategwaRouteDispose = window.PanategwaRouteDispose || {};
+window.PanategwaRouteDispose.accountSettings = disposeSettingsModule;
 
 function start() {
   if (settingsBound) disposeSettingsModule();

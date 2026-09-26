@@ -91,6 +91,58 @@ is never part of a code change here.
 
 ## Architecture
 
+### Client-Side Routing
+
+`js/router.js` turns an internal link click into a `fetch` plus a content swap, so
+the document is never reloaded and the sidebar is never rebuilt. It is imported
+last by `js/page-init.js`, and it is the only reason music survives navigation: the
+`<audio>` element in `music-system.js` is a JS variable rather than part of the
+markup, so a real page load used to throw it away mid-track.
+
+The swap keeps the three nodes that belong to the shell and replaces everything
+else in `<body>`:
+
+| Node | Owner | Why it must survive |
+| --- | --- | --- |
+| `#menu-container` | `js/menu.js` | the sidebar itself |
+| `#ptg-site-music` | `music/system/music-system.js` | the audio element, appended to `<body>` |
+| `#achievement-toast-stack` | `auth/toast.js` | the toast host, also appended to `<body>` |
+
+They are listed in `SHELL_NODE_IDS` in `js/router.js`. **If a new module appends a
+node straight to `document.body` and expects it to outlive navigation, add its id
+there**, or it will be destroyed on the first navigation.
+
+Per-route `<head>` contents are applied from the fetched page rather than from a
+registry, so **a new page needs no router wiring** — the existing workflow still
+holds: write the HTML, add it to the `PAGES` list in `menu.js`. Stylesheets are
+added and removed to match, and inline scripts are re-executed.
+
+Page-specific modules are imported with a cache-busting query, because a plain
+`import()` of an already-evaluated URL is a no-op and the destination page would
+come up dead. The one exception is `js/page-init.js` itself, which must never run
+twice: re-running it would attach a second music player, a second site-time
+tracker and a second set of Firestore listeners. Because those fresh instances
+re-attach `document`- and `window`-level listeners and Firestore subscriptions,
+each page-specific module registers its existing dispose function:
+
+```js
+window.PanategwaRouteDispose = window.PanategwaRouteDispose || {};
+window.PanategwaRouteDispose.account = disposeAccountModule;
+```
+
+which the router calls on route leave. **A new page-specific module must do the
+same**, and any listener it adds to `document` or `window` must be pushed onto its
+own unsub list — a listener on an element inside the page is removed with the
+content, but one on `document.body` is not.
+
+The router falls back to a real `location.href` navigation if the fetch fails,
+so a broken or redirected response lands the user on a working page rather than a
+half-swapped document.
+
+Pages remain complete standalone documents. Direct links, no-JS, GitHub Pages and
+`tools/audit_links.py` all behave exactly as before, because each page still works
+when loaded directly — the router is an enhancement layered on top.
+
 ### Multi-Page Static Navigation
 
 1. **`js/menu.js`** — Owns the entire sidebar: the `PAGES` list, the icons, the
@@ -127,7 +179,13 @@ rather than dependent on `<head>` layout:
    color-theme.js as classic scripts, because those declare global init functions
    (`initTranslate`, `initTextSize`, `initTheme`) that inline `onclick` handlers call
 
-`menu.js`, `site.js` and `settings/settings.js` are all ES modules. `menu.js` reads its
+7. **`js/router.js`** — Client-side routing (see Client-Side Routing). Last, because
+   it only acts on clicks and `popstate`, both of which happen after everything
+   above has booted.
+
+`menu.js`, `site.js`, `router.js` and `settings/settings.js` are all ES modules.
+`menu.js` and `router.js` have no imports at all, so both keep working even if the
+Firebase CDN is unreachable. `menu.js` reads its
 own location from `import.meta.url`, not `document.currentScript` (which is `null` in a
 module). `settings.js` still resolves its dynamic script paths through
 `window.PanategwaRoot`, which is why it must come after `menu.js`.

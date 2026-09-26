@@ -21,6 +21,8 @@
 //                   slot), so they come after both of the above
 //   4. settings.js  applies the stored text size / theme / language, which is
 //                   why it goes last
+//   5. router.js    last of all: it only acts on clicks and popstate, both of
+//                   which happen after everything above has finished booting.
 //
 // Page-specific modules are deliberately NOT imported here. A page that needs
 // one (account, settings, streak) keeps its own <script type="module"> tag after
@@ -31,3 +33,4 @@ import "../auth/achievements.js";
 import "../auth/social.js";
 import "../music/system/music-system.js";
 import "../settings/settings.js";
+import "./router.js";

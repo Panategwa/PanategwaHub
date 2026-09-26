@@ -201,6 +201,11 @@
   window.PanategwaRoot = rootPrefix();
   window.PanategwaMenuPages = PAGES;
   window.PanategwaPageUrl = pageUrl;
+  // The sidebar is rendered once and then left alone -- that is what keeps the
+  // music player and the saved width alive across navigation. So the active
+  // link cannot be re-evaluated by re-rendering; the router calls this instead
+  // when the location changes.
+  window.PanategwaHighlightActive = highlightActiveLink;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", render);

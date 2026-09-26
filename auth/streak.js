@@ -560,6 +560,12 @@ function disposeStreakModule() {
   streakBound = false;
 }
 
+// The client-side router navigates without a document load, so nothing else
+// would ever call the dispose above. The countdown interval in particular has
+// to be cleared, or a second one starts every time you return to this page.
+window.PanategwaRouteDispose = window.PanategwaRouteDispose || {};
+window.PanategwaRouteDispose.streak = disposeStreakModule;
+
 function start() {
   const root = $("streak-root");
   if (!root) return;

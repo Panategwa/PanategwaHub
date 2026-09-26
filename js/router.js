@@ -49,6 +49,11 @@ var managedStyles = [];
 var navigations = 0;
 var restoreFocus = true;
 
+// The pathname this document is currently showing. Tracked separately because
+// by the time popstate fires, window.location already holds the *new* URL, so
+// comparing against it would tell us nothing about where we came from.
+var lastPathname = window.location.pathname;
+
 function isShellNode(node) {
   return !!node && !!node.id && SHELL_NODE_IDS.indexOf(node.id) !== -1;
 }
@@ -202,7 +207,20 @@ function runInlineScripts(doc, pageUrl) {
     if (!text || !text.trim()) continue;
 
     var el = document.createElement("script");
-    el.textContent = text;
+    // A classic script's top-level `const`/`let`/`class` are declared in the
+    // shared global lexical environment, which cannot be emptied between
+    // navigations. Re-inserting a page's own script therefore threw
+    // "Identifier 'x' has already been declared" the second time the page was
+    // reached, which killed the taxonomy explorer outright: its tree never
+    // rendered and its search listener was never attached.
+    //
+    // Wrapping the source in a block gives those declarations block scope, so
+    // every re-run gets fresh bindings and nothing can collide. The cost is
+    // that top-level function declarations stop being globals as well, so a
+    // page whose markup calls one from an inline onclick now has to publish it
+    // on `window` itself. The pages that do are the D map page (`showMap`),
+    // the taxonomy page (`goToEthnotype`) and the ideologies page (`goBack`).
+    el.textContent = "{\n" + text + "\n}\n";
     // Marks it as ours so a later swap removes it with the content instead of
     // leaving a stale copy in the document.
     el.setAttribute("data-router-inline", "");
@@ -322,21 +340,28 @@ function navigate(url, options) {
       var doc = new DOMParser().parseFromString(html, "text/html");
 
       clearContent();
+
+      // The URL has to move *before* the incoming page's own script runs,
+      // because those scripts read their deep-link parameters out of the
+      // address bar as they start: the ideologies page's ?ideology=, the
+      // taxonomy page's ?ethnotype= and ?path=, the account page's ?tab=. Run
+      // first, they saw the *previous* page's query string, so every deep link
+      // silently did nothing whenever it was reached without a full load.
+      if (!opts.silent && opts.history === "push") {
+        window.history.pushState({ ptg: true, y: 0 }, "", url.href);
+      }
+
       applyStyles(doc, url.href);
       insertContent(doc);
       applyDocumentMeta(doc);
       runInlineScripts(doc, url.href);
+      lastPathname = url.pathname;
 
       restoreFocus = opts.restoreFocus !== false;
       if (!opts.silent) {
-        if (opts.history === "push") {
-          window.history.pushState({ ptg: true, y: 0 }, "", url.href);
-        }
         window.scrollTo(0, 0);
       }
 
-      // After the URL has moved, so relative paths in the new page resolve
-      // against the new location.
       applyModules();
       onRouteReady(false);
     })
@@ -426,7 +451,15 @@ function onPopState(event) {
     return;
   }
   var url = absolute(window.location.href);
-  if (url) navigate(url, { history: "none" });
+  if (!url) return;
+
+  // A Back that only changes the query string is a page restoring its own
+  // state, not a navigation: the content, the styles and the modules are all
+  // still correct. Refetching would throw them away just to rebuild the same
+  // page, so leave it to the page's own popstate listener.
+  if (url.pathname === lastPathname) return;
+
+  navigate(url, { history: "none" });
 }
 
 window.PanategwaNavigate = function (href) {

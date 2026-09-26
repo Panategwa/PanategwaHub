@@ -82,6 +82,257 @@ split stays a pure move.
   width: 100%;
 }
 
+/* =========================
+   TAXONOMY EXPLORER
+   =========================
+   The D life page. Its controls are plain buttons with no shared class, so
+   each element is styled by id here. Colours are all derived from the five
+   base theme tokens, so the explorer follows the active theme.
+   ========================= */
+
+#current-title,
+#current-rank,
+#breadcrumbs,
+#info-box,
+#taxonomy-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+#current-rank {
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--menu-muted);
+  margin-top: 0.5rem;
+}
+
+#breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.4rem;
+  padding: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.crumb {
+  background: var(--surface-soft);
+  color: var(--link-color);
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.crumb:hover {
+  background: var(--menu-button-fill-hover);
+  border-color: var(--surface-border-strong);
+}
+
+.crumb:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The rank you are already on: shown for context, not a link. */
+.crumb-current,
+.crumb-current:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--menu-muted);
+  cursor: default;
+}
+
+.crumb-separator {
+  color: var(--menu-muted);
+  opacity: 0.6;
+}
+
+#control-buttons {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+  flex-wrap: wrap;
+}
+
+#control-buttons button,
+#advanced-toggle {
+  font: inherit;
+  font-weight: 500;
+  color: var(--link-color);
+  background: var(--menu-button);
+  border: 1px solid var(--menu-button-outline);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+#control-buttons button:hover:not(:disabled),
+#advanced-toggle:hover {
+  background: var(--menu-button-fill-hover);
+  border-color: var(--menu-button-outline-hover);
+}
+
+#control-buttons button:focus-visible,
+#advanced-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Back is inert at the top of the tree, so it reads as unavailable rather
+   than as a button that happens to do nothing. */
+#back-button:disabled {
+  background: transparent;
+  border-color: var(--surface-border);
+  color: var(--menu-muted);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+#advanced-toggle {
+  margin-bottom: 0.5rem;
+}
+
+#advanced-panel {
+  max-width: 900px;
+  margin: 0 auto 1rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 14px;
+  background: var(--surface-raised);
+}
+
+#advanced-panel h2 {
+  margin-top: 0;
+  font-size: 1rem;
+}
+
+#advanced-panel label {
+  cursor: pointer;
+  margin-bottom: 0.3rem;
+}
+
+#current-title {
+  margin-top: 1.2rem;
+}
+
+.taxonomy-type {
+  color: var(--menu-muted);
+  font-size: 0.8em;
+  font-weight: 500;
+}
+
+#info-box {
+  margin: 0.6rem 0 1.2rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--surface-border);
+  border-left: 3px solid var(--c-accent);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+#info-box h2 {
+  margin-top: 0;
+}
+
+.taxonomy-label {
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--menu-muted);
+  margin-bottom: 0.5rem;
+}
+
+#taxonomy-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding-bottom: 2rem;
+}
+
+#taxonomy-container button {
+  font: inherit;
+  font-weight: 500;
+  color: var(--button-text);
+  background: var(--menu-button);
+  border: 1px solid var(--menu-button-outline);
+  border-radius: 12px;
+  padding: 0.55rem 1.1rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+#taxonomy-container button:hover {
+  background: var(--menu-button-fill-hover);
+  border-color: var(--menu-button-outline-hover);
+}
+
+#taxonomy-container button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.taxonomy-empty {
+  width: 100%;
+  margin: 0;
+  color: var(--menu-muted);
+  font-style: italic;
+}
+
+#search-results {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#search-results .search-button {
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04)),
+    rgba(15, 23, 42, 0.72);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  padding: 0.6rem 1.2rem;
+  width: 100%;
+  margin: 0;
+}
+
+#search-results .search-button:hover {
+  border-color: var(--surface-border-strong);
+}
+
+#search-results .search-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.search-main {
+  font-weight: 700;
+}
+
+.search-path {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+#search-results .more-less-button {
+  text-align: center;
+  font-weight: 500;
+}
+
 .streak-panel {
   border-radius: 18px;
   border: 1px solid rgba(255,255,255,0.12);

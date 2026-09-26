@@ -125,6 +125,38 @@ are re-executed, both read from the fetched page's own `<head>`. **A new page
 needs no router wiring** — the existing workflow still holds: write the HTML, add
 it to the `PAGES` list in `menu.js`.
 
+#### Inline scripts and re-execution
+
+A re-executed classic script runs in the *same* document, and a top-level
+`const`/`let`/`class` is declared in the shared global lexical environment,
+which cannot be emptied. Re-inserting a page's own script therefore threw
+`SyntaxError: Identifier 'x' has already been declared` the second time the page
+was reached, and the whole script died before it attached anything. That is what
+made the taxonomy explorer's search bar appear dead: the page rendered once, then
+went blank on the next visit.
+
+So the router wraps every re-inserted script's source in a block, which gives
+those declarations block scope and makes each run independent. Two consequences
+for anyone writing a page with an inline script:
+
+- **A function the markup calls from an inline `onclick` is no longer a global.**
+  Publish it: `window.showMap = showMap;`. The three pages that need this are the
+  D map page (`showMap`), the D life page (`goToEthnotype`) and the ideologies
+  page (`goBack`).
+- **Wrapping the page's own script in an IIFE is still worth doing**, so the page
+  does not depend on the router being there. The account page and the taxonomy
+  page both do this.
+
+`var` and function declarations are unaffected by the collision, but prefer the
+IIFE for consistency.
+
+A `popstate` that only changes the query string is treated as the page restoring
+its own state, not as a navigation: the router leaves it alone instead of
+refetching and re-swapping the same page. That is what lets a page keep its own
+history entries — see the taxonomy page's `?path=` — without every Back press
+rebuilding the document. A page listening for `popstate` must therefore not write
+the URL back out, or it will trap the user in entries they cannot leave.
+
 Page-specific modules come from the `PAGE_MODULES` registry inside
 `js/page-imports.js`, keyed by page filename, so no page carries a second
 `<script type="module">` tag and `page-imports.js` is the only file anyone has
@@ -257,7 +289,7 @@ the page is styled on first paint:
 | --- | --- | --- |
 | `general.css` | the five theme tokens, body/typography/links/forms, and the few page-furniture classes used by more than one page (`.button-container`, `.map-button`, `.inline-link`, `.button-row`, `.section-hidden`) | every content page |
 | `menu.css` | the whole sidebar, plus the music player it hosts | every content page |
-| `secondary.css` | catch-all: map/lore furniture, search bar, the `.streak-*` rules | every content page |
+| `secondary.css` | catch-all: map/lore furniture, the search bar, the taxonomy explorer, the `.streak-*` rules | every content page |
 | `account.css` | the account page in full, including the ten account-only custom properties in its own `:root` | account page only |
 | `settings.css` | the standalone settings page: theme picker, text size, audio controls | settings page only |
 
@@ -372,7 +404,7 @@ does) needs `../../../` instead.
 ├── styles/                     # All site styles, split by role
 │   ├── general.css             # Theme tokens, base typography, shared page furniture
 │   ├── menu.css                # The shared sidebar and the music player it hosts
-│   ├── secondary.css           # Map/lore furniture, search bar, .streak-*
+│   ├── secondary.css           # Map/lore furniture, search bar, taxonomy explorer, .streak-*
 │   ├── account.css             # The account page and its ten account-only tokens
 │   └── settings.css            # The standalone settings page
 ├── docs/

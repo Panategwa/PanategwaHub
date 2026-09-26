@@ -19,7 +19,8 @@
   <div id="breadcrumbs"></div>
 
   <div id="control-buttons">
-    <button id="reset-button">Reset All</button>
+    <button id="back-button" type="button" disabled>&larr; Back</button>
+    <button id="reset-button" type="button">Reset All</button>
   </div>
 
   <input type="text" id="search-bar" placeholder="Search any rank..." aria-label="Search any rank">
@@ -43,6 +44,12 @@
   <div id="taxonomy-container"></div>
 
   <script>
+  // Everything below lives in this IIFE. The router re-runs a page's inline
+  // script whenever the page is reached again without a document load, and a
+  // top-level `const` would collide with the previous run's binding and take
+  // the whole explorer down with it. Only goToEthnotype is deliberately left
+  // outside, because the ethnotype buttons in the markup call it.
+  (function () {
   // ================= TAXONOMY DATA =================
   const taxonomy = {
     Eukarya: { // Domain
@@ -1217,6 +1224,113 @@ info:`<section><h2>Neevalis Clade</h2></section>`,
   let expanded = true;
   const defaultShowCount = 4;
 
+  // ================= URL STATE =================
+  // Where you are in the taxonomy is kept in ?path=, so a rank can be linked to,
+  // reloaded, and reached with the browser's own Back and Forward. The theme
+  // and text size that color-theme.js also keeps in the query string are left
+  // alone: every write rebuilds the URL from the current one and only touches
+  // its own parameters.
+  const PATH_PARAM = "path";
+
+  function pathToParam(path) {
+    return path.map(encodeURIComponent).join("/");
+  }
+
+  // Resolves a list of names to the node and the canonical (correctly cased)
+  // path they name, or null if any step is not in the taxonomy.
+  function resolvePath(segments) {
+    // Callers pass whatever a URL parameter held, which is null when the
+    // parameter is absent, so an empty or missing path resolves to nothing
+    // rather than throwing.
+    if (!Array.isArray(segments) || !segments.length) return null;
+
+    let node = taxonomy;
+    const path = [];
+
+    for (const segment of segments) {
+      if (!node || typeof node !== "object") return null;
+
+      let match = null;
+      for (const key of Object.keys(node)) {
+        if (key === "info") continue;
+        if (key.toLowerCase() === String(segment).toLowerCase()) {
+          match = key;
+          break;
+        }
+      }
+
+      if (!match) return null;
+      path.push(match);
+      node = node[match];
+    }
+
+    return { path, node };
+  }
+
+  // Finds a rank by name anywhere in the tree, which is how the map page's
+  // ?ethnotype= deep links and the ethnotype buttons in the markup work.
+  function findPathByName(name, node, path) {
+    node = node || taxonomy;
+    path = path || [];
+    if (typeof node !== "object" || node === null) return null;
+
+    for (const key of Object.keys(node)) {
+      if (key === "info") continue;
+      const newPath = path.concat(key);
+
+      if (key.toLowerCase() === String(name).toLowerCase()) return newPath;
+
+      const deeper = findPathByName(name, node[key], newPath);
+      if (deeper) return deeper;
+    }
+
+    return null;
+  }
+
+  function writeUrl(options) {
+    if (options && options.silentUrl) return;
+
+    const url = new URL(window.location.href);
+    if (currentPath.length) {
+      url.searchParams.set(PATH_PARAM, pathToParam(currentPath));
+    } else {
+      url.searchParams.delete(PATH_PARAM);
+    }
+    // ?ethnotype= is only how this page gets *reached*; once resolved, the
+    // path is the better description of where we are.
+    url.searchParams.delete("ethnotype");
+
+    // ptg marks the entry as router-owned. Without it the router's popstate
+    // handler would treat a Back through these entries as a pre-router entry
+    // and reload the whole document.
+    const method = options && options.replace ? "replaceState" : "pushState";
+    window.history[method]({ ptg: true, y: window.scrollY || 0 }, "", url.href);
+  }
+
+  // The one way to move. Everything that changes where we are -- the tree, the
+  // breadcrumbs, Back, Reset, a search hit, a deep link -- goes through here,
+  // so the tree, the crumbs, the Back button and the URL can never disagree.
+  function navigateTo(path, node, options) {
+    currentPath = path.slice();
+    currentNode = node;
+    renderLevel(currentNode);
+    updateUI();
+    writeUrl(options);
+  }
+
+  // Resolves a list of names and moves there. An empty list means the root,
+  // which resolvePath reports as null because there is nothing to resolve --
+  // so Back off the first rank has to go through here rather than through
+  // resolvePath directly.
+  function navigateToSegments(segments, options) {
+    if (!segments.length) {
+      navigateTo([], taxonomy, options);
+      return;
+    }
+    const target = resolvePath(segments);
+    if (target) navigateTo(target.path, target.node, options);
+  }
+
   // ================= ADVANCED SEARCH SETUP =================
   function setupExcludeOptions() {
     const container = document.getElementById("exclude-options");
@@ -1304,17 +1418,26 @@ info:`<section><h2>Neevalis Clade</h2></section>`,
       container.appendChild(label);
     }
 
-    Object.keys(node).forEach(key => {
-      if (key === "info") return;
+    const childKeys = Object.keys(node).filter((key) => key !== "info");
 
+    // A leaf used to render as an empty list under its rank heading, which read
+    // as a broken page rather than as the end of a branch.
+    if (!childKeys.length) {
+      const empty = document.createElement("p");
+      empty.className = "taxonomy-empty";
+      empty.textContent = "Nothing is filed below this rank.";
+      container.appendChild(empty);
+      return;
+    }
+
+    childKeys.forEach((key) => {
       const btn = document.createElement("button");
+      btn.type = "button";
       btn.textContent = key;
 
       btn.onclick = () => {
-        currentPath.push(key);
-        currentNode = node[key];
-        renderLevel(currentNode);
-        updateUI();
+        const target = resolvePath(currentPath.concat(key));
+        if (target) navigateTo(target.path, target.node);
       };
 
       container.appendChild(btn);
@@ -1323,37 +1446,20 @@ info:`<section><h2>Neevalis Clade</h2></section>`,
 
 // ================= ETHNOTYPE NAVIGATION =================
 function goToEthnotype(ethnotypeName) {
-  function search(node, path = []) {
-    if (typeof node !== "object" || node === null) return null;
+  const path = findPathByName(ethnotypeName);
+  const target = path ? resolvePath(path) : null;
 
-    for (const key in node) {
-      if (key === "info") continue; // ignore info fields
-
-      const newPath = [...path, key];
-
-      if (key.toLowerCase() === ethnotypeName.toLowerCase()) {
-        return { node: node[key], path: newPath };
-      }
-
-      const result = search(node[key], newPath);
-      if (result) return result;
-    }
-
-    return null;
-  }
-
-  const result = search(taxonomy);
-
-  if (!result) {
-    alert(`Ethnotype "${ethnotypeName}" not found in taxonomy!`);
+  if (!target) {
+    alert(`"${ethnotypeName}" is not in the taxonomy.`);
     return;
   }
 
-  currentNode = result.node;
-  currentPath = result.path;
-  renderLevel(currentNode);
-  updateUI();
+  navigateTo(target.path, target.node);
 }
+
+// The ethnotype buttons in the markup below call this from an onclick
+// attribute, which can only see globals.
+window.goToEthnotype = goToEthnotype;
 
 // ---------------------- Ideologies ----------------------
 
@@ -1367,16 +1473,75 @@ document.querySelectorAll(".ideology-button").forEach(el => {
   });
 });
 
-// ================= AUTO-NAVIGATE FROM URL =================
-(function() {
+// ================= BROWSER BACK / FORWARD =================
+// The router sees a query-only history change on the page it is already showing
+// and deliberately leaves it alone, so the state is rebuilt here instead of
+// refetching the page. silentUrl stops this from pushing a new entry, which
+// would trap the user in a loop they could never back out of.
+window.addEventListener("popstate", function () {
   const params = new URLSearchParams(window.location.search);
-  const ethnotype = params.get("ethnotype"); // e.g. "pitosians"
-  if (ethnotype) {
-    goToEthnotype(ethnotype);
+  const fromUrl = resolvePath(decodePathParam(params.get(PATH_PARAM)));
+
+  if (fromUrl) {
+    navigateTo(fromUrl.path, fromUrl.node, { silentUrl: true });
+  } else {
+    navigateTo([], taxonomy, { silentUrl: true });
   }
-})();
+});
+
+function decodePathParam(value) {
+  if (!value) return null;
+  const segments = value.split("/").filter(Boolean);
+  if (!segments.length) return null;
+  return segments.map(decodeURIComponent);
+}
 
   // ================= UI =================
+  // Each crumb is a button that jumps to that ancestor, so from Anthropoi
+  // civilis you can click Spondylota to go straight there. The last crumb is
+  // the rank you are already on, so it is inert and marked aria-current.
+  function renderBreadcrumbs(container) {
+    container.textContent = "";
+
+    currentPath.forEach((name, index) => {
+      if (index > 0) {
+        const separator = document.createElement("span");
+        separator.className = "crumb-separator";
+        separator.textContent = ">";
+        container.appendChild(separator);
+      }
+
+      const crumb = document.createElement("button");
+      crumb.type = "button";
+      crumb.className = "crumb";
+      crumb.textContent = name;
+
+      if (index === currentPath.length - 1) {
+        crumb.classList.add("crumb-current");
+        crumb.setAttribute("aria-current", "true");
+        crumb.title = name + " (you are here)";
+      } else {
+        crumb.title = "Go to " + name;
+        crumb.onclick = () => {
+          navigateToSegments(currentPath.slice(0, index + 1));
+        };
+      }
+
+      container.appendChild(crumb);
+    });
+  }
+
+  // Back moves up one rank, so it is greyed out at the top of the tree.
+  function renderBackButton() {
+    const back = document.getElementById("back-button");
+    if (!back) return;
+
+    back.disabled = currentPath.length === 0;
+    back.title = currentPath.length
+      ? "Back to " + currentPath[currentPath.length - 2]
+      : "Already at the top of the taxonomy";
+  }
+
   function updateUI() {
     const title = document.getElementById("current-title");
     const info = document.getElementById("info-box");
@@ -1385,7 +1550,8 @@ document.querySelectorAll(".ideology-button").forEach(el => {
 
     if (!title || !info || !breadcrumbs || !currentRank) return;
 
-    breadcrumbs.textContent = currentPath.join(" > ");
+    renderBreadcrumbs(breadcrumbs);
+    renderBackButton();
 
     if (currentPath.length === 0) {
       title.innerHTML = `<h2>Domains</h2>`;
@@ -1400,7 +1566,7 @@ document.querySelectorAll(".ideology-button").forEach(el => {
 
     currentRank.textContent = rankNames.slice(0, level + 1).join(" > ");
     title.innerHTML = `<h2>${name} <span class="taxonomy-type">(${rank})</span></h2>`;
-    info.innerHTML = currentNode.info || "No info available.";
+    info.innerHTML = (currentNode && currentNode.info) || "No info available.";
 
 document.querySelectorAll(".ethnotype").forEach(el => {
   el.onclick = (e) => {
@@ -1449,6 +1615,7 @@ document.querySelectorAll(".ethnotype").forEach(el => {
       const rank = rankSingle[level] || "Unknown Rank";
 
       const btn = document.createElement("button");
+      btn.type = "button";
       btn.className = "search-button";
       btn.innerHTML = `
         <span class="search-main">${name} (${rank})</span>
@@ -1456,12 +1623,10 @@ document.querySelectorAll(".ethnotype").forEach(el => {
       `;
 
       btn.onclick = () => {
-        currentPath = item.path;
-        currentNode = item.node;
-        renderLevel(currentNode);
-        updateUI();
         container.innerHTML = "";
         document.getElementById("search-bar").value = "";
+        expanded = true;
+        navigateTo(item.path, item.node);
       };
 
       container.appendChild(btn);
@@ -1469,8 +1634,9 @@ document.querySelectorAll(".ethnotype").forEach(el => {
 
     if (searchResults.length > defaultShowCount) {
       const toggle = document.createElement("button");
+      toggle.type = "button";
       toggle.className = "search-button more-less-button";
-      toggle.textContent = expanded ? "Show Less" : "Show More";
+      toggle.textContent = expanded ? "Show Less" : `Show all ${searchResults.length}`;
       toggle.onclick = () => {
         expanded = !expanded;
         renderSearchResults();
@@ -1486,19 +1652,51 @@ document.querySelectorAll(".ethnotype").forEach(el => {
     renderSearchResults();
   });
 
+  document.getElementById("back-button").addEventListener("click", () => {
+    if (!currentPath.length) return;
+    navigateToSegments(currentPath.slice(0, -1));
+  });
+
   document.getElementById("reset-button").addEventListener("click", () => {
-    currentPath = [];
-    currentNode = taxonomy;
-    renderLevel(currentNode);
-    updateUI();
     document.getElementById("search-results").innerHTML = "";
     document.getElementById("search-bar").value = "";
+    searchResults = [];
+    navigateTo([], taxonomy);
   });
 
   // ================= INIT =================
-  setupExcludeOptions();
-  renderLevel(currentNode);
-  updateUI();
+  // A ?path= wins, so a shared link is restored exactly. Failing that, the
+  // ?ethnotype= the map page links with is resolved and the URL rewritten to
+  // the path, using replaceState so Back from there still returns to the map
+  // rather than to the same page twice.
+  (function init() {
+    setupExcludeOptions();
+
+    const params = new URLSearchParams(window.location.search);
+    const fromPath = resolvePath(decodePathParam(params.get(PATH_PARAM)));
+
+    if (fromPath) {
+      navigateTo(fromPath.path, fromPath.node, { silentUrl: true });
+      return;
+    }
+
+    const ethnotype = params.get("ethnotype");
+    if (ethnotype) {
+      const path = findPathByName(ethnotype);
+      const target = path ? resolvePath(path) : null;
+
+      if (target) {
+        navigateTo(target.path, target.node, { replace: true });
+      } else {
+        navigateTo([], taxonomy, { silentUrl: true });
+      }
+      return;
+    }
+
+    navigateTo([], taxonomy, { silentUrl: true });
+  })();
+
+  })();
   </script>
   </body>
   </html>

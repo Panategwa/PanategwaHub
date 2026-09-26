@@ -192,6 +192,11 @@ function showMap(filename){
   document.getElementById("map-image").src = filename;
 }
 
+// The router re-runs this page's inline script inside a block, so a top-level
+// function is no longer a global and the onclick attributes above could not
+// find it. Publishing it here is what keeps those buttons working.
+window.showMap = showMap;
+
     // Optional: intercept clicks and send to JS function if you want dynamic behavior
     document.querySelectorAll(".ethnotype").forEach(el => {
       el.addEventListener("click", e => {

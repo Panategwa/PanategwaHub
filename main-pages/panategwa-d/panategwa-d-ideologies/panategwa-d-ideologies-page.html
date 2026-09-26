@@ -65,6 +65,11 @@ function goBack() {
   window.location.href = "panategwa-d-ideologies-page.html";
 }
 
+// The router re-runs this page's inline script inside a block, so a top-level
+// function is no longer a global and the markup's onclick="goBack()" could not
+// find it. Publishing it here is what keeps that button working.
+window.goBack = goBack;
+
 // --- Show ideology ---
 const ideologyParam = getParam("ideology");
 

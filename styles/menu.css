@@ -25,7 +25,14 @@ immediately after general.css.
   backdrop-filter: blur(18px);
   box-shadow: var(--menu-shadow);
   transition: width 0.14s ease;
-  will-change: width;
+  /* No will-change here. `width` is a layout property, so the hint never
+     accelerated the resize; all it did was pin this panel to its own
+     compositor layer for the whole page. Combined with the backdrop-filter
+     above, that layer caches a blurred tile and re-blurs stale content when a
+     descendant repaints — which is what drew a straight seam across the
+     sidebar the moment a control was hovered. `body.is-resizing` already
+     cancels the transition for the duration of a drag, so the 0.14s ease is
+     cheap enough without the promotion. */
 }
 
 #menu-container.is-resizing,
@@ -225,7 +232,27 @@ immediately after general.css.
   padding: 8px 11px;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.018)),
-    rgba(255,255,255,0.025);
+    rgba(255, 255, 255, 0.025);
+}
+
+/* This button paints its own vertical gradient, so it has to restate it for
+   hover and press. Inheriting the shared hover would drop the gradient and
+   swap in a flat fill, which is what made the button's background look like it
+   split in two the moment the pointer arrived. */
+.menu-music-quick-mute:hover,
+.menu-music-quick-mute:focus-visible {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.04)),
+    var(--btn-bg-hover);
+  color: var(--btn-text-hover);
+}
+
+.menu-music-quick-mute:active {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.05)),
+    var(--btn-bg-active);
+  transform: translateY(1px);
+  transition-duration: 0.04s;
 }
 
 .menu-music-toggle-copy {

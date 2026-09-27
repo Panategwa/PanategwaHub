@@ -256,8 +256,11 @@ button {
     transform 0.09s ease;
 }
 
+/* background-color, never the `background` shorthand: the shorthand resets
+   background-image to none, so a button carrying its own gradient lost it the
+   instant the pointer arrived. */
 button:hover {
-  background: var(--btn-bg-hover);
+  background-color: var(--btn-bg-hover);
   border-color: var(--btn-border-hover);
   color: var(--btn-text-hover);
 }
@@ -269,7 +272,7 @@ button:hover {
    their own `filter: none`. Recolouring the surface keeps every component's
    own hover state working. */
 button:active {
-  background: var(--btn-bg-active);
+  background-color: var(--btn-bg-active);
   border-color: var(--btn-border-active);
   color: var(--btn-text-hover);
   /* A 1px settle, not a scale: several buttons are width:100%, and scaling
@@ -298,7 +301,7 @@ button:disabled:hover,
 button:disabled:active,
 button[aria-disabled="true"]:hover,
 button[aria-disabled="true"]:active {
-  background: var(--btn-bg);
+  background-color: var(--btn-bg);
   border-color: var(--btn-border);
   color: var(--button-text);
   box-shadow: none;

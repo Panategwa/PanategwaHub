@@ -691,13 +691,23 @@ function renderMenuMusic() {
 
   menuSlot.innerHTML = `
     <div class="menu-music-card">
-      <div class="menu-music-head">
-        <button type="button" class="menu-music-toggle" id="menu-music-toggle">
+      <div class="menu-music-head ${currentUi.expanded ? "" : "is-collapsed"}">
+        <button
+          type="button"
+          class="menu-music-toggle"
+          id="menu-music-toggle"
+          aria-expanded="${currentUi.expanded ? "true" : "false"}"
+          aria-controls="menu-music-panel"
+          title="${currentUi.expanded ? "Collapse the music player" : "Expand the music player"}"
+        >
           <span class="menu-music-toggle-copy">
             <strong>Music</strong>
-            <small>${trackName}</small>
+            <span class="menu-music-toggle-meta">
+              <small class="menu-music-toggle-track">${trackName}</small>
+              <small class="menu-music-toggle-state">${currentState.isPlaying ? "Playing" : "Paused"}</small>
+            </span>
           </span>
-          <span class="menu-music-toggle-state">${currentState.isPlaying ? "Playing" : "Paused"}</span>
+          <span class="menu-music-chevron" aria-hidden="true"></span>
         </button>
         <button type="button" class="menu-music-quick-mute" id="menu-music-quick-mute">Mute</button>
       </div>

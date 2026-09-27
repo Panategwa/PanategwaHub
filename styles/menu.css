@@ -194,6 +194,10 @@ immediately after general.css.
 
 .menu-music-card {
   display: grid;
+  /* Without an explicit track the single implicit column is sized to its content
+     and the header was measured 157px wide inside a 142px content box, pushing
+     the Mute button out past the card's border at the narrowest sidebar width. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   margin: 1px 0 4px;
   padding: 8px 8px 9px;
@@ -207,32 +211,93 @@ immediately after general.css.
 }
 
 .menu-music-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: stretch;
 }
 
+/* The Music header is the player's only collapse control, so it has to read as
+   a control rather than as a caption. It used to be `background: transparent;
+   border: none` with its hover forced transparent too, which left a full-width
+   click target looking exactly like two lines of static text. It now wears the
+   same surface as every other sidebar button, and the chevron on the right is
+   the standard disclosure cue: pointing down while collapsed, up once open.
+
+   flex-basis 100px is what decides whether Mute shares the row or drops below
+   it: 100 + 8 + 68 fits the header at the default sidebar width, and not at the
+   220px minimum, so the mute button wraps to its own line instead of squeezing
+   this control off the end of the card. min-width:0 on the button and on the
+   copy is what keeps the chevron inside it -- flex items refuse to shrink below
+   their content by default, and a narrow toggle used to push the chevron out
+   past its own right edge and over the Mute button. */
 .menu-music-toggle {
-  width: 100%;
+  flex: 1 1 100px;
+  min-width: 0;
+  width: auto;
   margin: 0;
-  padding: 2px 8px;
+  padding: 8px 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  background: transparent;
-  border: none;
+  gap: 8px;
+  border-radius: 11px;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
   box-shadow: none;
 }
 
+.menu-music-toggle:hover,
+.menu-music-toggle:focus-visible {
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-border-hover);
+  color: var(--btn-text-hover);
+}
+
+.menu-music-toggle:active {
+  background: var(--btn-bg-active);
+  border-color: var(--btn-border-active);
+}
+
+/* Two borders on a rotated square draw the chevron without an SVG, so it
+   inherits currentColor and needs no second icon set per theme. The offsets
+   pull the corner back over its box after the rotation. */
+.menu-music-chevron {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  margin-right: 2px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  opacity: 0.7;
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform 0.16s ease, opacity 0.14s ease;
+}
+
+.menu-music-toggle[aria-expanded="true"] .menu-music-chevron {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+.menu-music-toggle:hover .menu-music-chevron,
+.menu-music-toggle:focus-visible .menu-music-chevron {
+  opacity: 1;
+}
+
 .menu-music-quick-mute {
-  min-width: 84px;
+  min-width: 68px;
+  flex-shrink: 0;
   margin: 0;
   padding: 8px 11px;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.018)),
     rgba(255, 255, 255, 0.025);
+}
+
+/* Collapsed, the header is the only thing on screen, so the Mute button stands
+   aside and gives the whole row to the disclosure control. Muting is still a
+   slider inside the panel whenever the player is open. */
+.menu-music-head.is-collapsed .menu-music-quick-mute {
+  display: none;
 }
 
 /* This button paints its own vertical gradient, so it has to restate it for
@@ -255,10 +320,33 @@ immediately after general.css.
   transition-duration: 0.04s;
 }
 
+/* The pill used to sit opposite the title as its own flex item, which made the
+   header need about 140px of horizontal room before anything could shrink. The
+   sidebar resizes down to 220px, and the row that Mute shares is narrower than
+   that, so the controls were pushed out past the button's own edge. Putting the
+   pill on the track-name line instead leaves the title, the track and the
+   chevron to share one line that the track name can always ellipsize out of,
+   which is why no width-based query is needed here. */
 .menu-music-toggle-copy {
   display: grid;
-  gap: 3px;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
   text-align: left;
+}
+
+.menu-music-toggle-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.menu-music-toggle-track {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .menu-music-toggle-copy small,
@@ -275,13 +363,14 @@ immediately after general.css.
 
 .menu-music-toggle-state {
   flex-shrink: 0;
-  padding: 4px 8px;
+  padding: 2px 7px;
   border-radius: 5px;
   border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.08);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.02em;
+  line-height: 1.5;
 }
 
 .menu-music-panel {
@@ -490,9 +579,9 @@ immediately after general.css.
 
 /* Buttons that deliberately sit on a transparent surface. Without these they
    would pick up the shared hover fill and turn into filled boxes on hover,
-   which is not what the player is going for — they brighten instead. */
-.menu-music-toggle:hover,
-.menu-music-toggle:focus-visible,
+   which is not what the player is going for — they brighten instead.
+   .menu-music-toggle is no longer in either group: it is a real control now, and
+   is styled with the shared button tokens further up. */
 .menu-music-track-main:hover,
 .menu-music-track-main:focus-visible {
   background: transparent;
@@ -501,7 +590,6 @@ immediately after general.css.
   color: var(--btn-text-hover);
 }
 
-.menu-music-toggle:active,
 .menu-music-track-main:active {
   background: transparent;
   border-color: transparent;

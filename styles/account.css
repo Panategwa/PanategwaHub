@@ -729,6 +729,30 @@ they no longer leak into pages that do not load it.
       background: rgba(255, 255, 255, 0.09);
     }
 
+    /* Spotlight: opening a notification for an achievement lands on that card,
+       lifts it 25% brighter, and pushes every other card back to half opacity
+       for two seconds before the whole list eases back to normal over three.
+
+       The timing is entirely in the cascade. The resting card carries the 3s
+       transition, and the spotlight state sets `transition: none`, so adding the
+       class lands instantly and *removing* it is what performs the fade back.
+       One class therefore drives both halves, and no script has to animate
+       anything -- the timers in account.js only decide when to drop it. */
+    .achievement-card {
+      transition: opacity 3s ease, filter 3s ease, box-shadow 3s ease;
+    }
+
+    .achievement-list.is-spotlighting .achievement-card {
+      opacity: 0.5;
+      transition: none;
+    }
+
+    .achievement-list.is-spotlighting .achievement-card.is-spotlight {
+      opacity: 1;
+      filter: brightness(1.25);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-accent) 70%, transparent);
+    }
+
     .achievement-status {
       justify-self: start;
       padding: 7px 11px;

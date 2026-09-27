@@ -170,9 +170,10 @@ settings-page.html links it.
     grid-template-columns: 1fr;
   }
 
-  .menu-music-head {
-    grid-template-columns: 1fr;
-  }
+  /* The music header no longer needs a narrow-screen override: it is a
+     wrapping flex row in menu.css, so the Mute button drops to its own line
+     whenever the sidebar is too narrow for it, on every page rather than just
+     this one. */
 
   .menu-music-controls {
     flex-wrap: wrap;

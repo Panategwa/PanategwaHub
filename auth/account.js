@@ -645,6 +645,9 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
     }
 
     if (nextSection === "progress" && targetId) {
+      // The notification path and a pasted ?tab=progress&target=... link both
+      // land here, so the spotlight needs no separate wiring per entry point.
+      startAchievementSpotlight(targetId);
       setTimeout(() => {
         document.getElementById(`achievement-card-${targetId}`)?.scrollIntoView({
           behavior: "smooth",
@@ -846,6 +849,84 @@ function renderAuth(state) {
   updateSidebarAvatar(ownProfile, user);
 }
 
+// ========================================================
+// Achievement spotlight
+// ========================================================
+
+// Opening a notification for an achievement should not just scroll to it. The
+// card is lifted out of the list for two seconds with everything else pushed
+// back, then the list eases back over three. The easing is CSS's job (see the
+// .is-spotlighting rules in account.css); these timers only decide when to let
+// go of the classes.
+const ACHIEVEMENT_SPOTLIGHT_HOLD_MS = 2000;
+const ACHIEVEMENT_SPOTLIGHT_SETTLE_MS = 3000;
+
+let achievementSpotlightId = "";
+let achievementSpotlightTimers = [];
+
+// Toggling the classes off is the half that animates, so it must be its own
+// step: removing them in the same tick as adding them would mean the spotlight
+// state was never committed and the browser would have nothing to transition
+// from. Hence clear, then wait, then re-apply on the next frame.
+function applyAchievementSpotlightClasses() {
+  const list = $("achievements-list");
+  if (!list) return;
+
+  const active = String(achievementSpotlightId || "").trim();
+  list.classList.toggle("is-spotlighting", Boolean(active));
+
+  list.querySelectorAll(".achievement-card").forEach((card) => {
+    const isTarget = Boolean(active) && card.dataset.achievementId === active;
+    card.classList.toggle("is-spotlight", isTarget);
+  });
+}
+
+function clearAchievementSpotlightClasses() {
+  const list = $("achievements-list");
+  if (!list) return;
+  list.classList.remove("is-spotlighting");
+  list.querySelectorAll(".achievement-card.is-spotlight").forEach((card) => {
+    card.classList.remove("is-spotlight");
+  });
+}
+
+function startAchievementSpotlight(achievementId) {
+  const id = String(achievementId || "").trim();
+  if (!id) return;
+
+  stopAchievementSpotlight();
+  achievementSpotlightId = id;
+
+  // Deferred by a turn, not to give the browser a frame: openAccountArea calls
+  // this before its synchronous renderAll, and opening a second notification
+  // while the progress tab is already up re-renders nothing at all (the list is
+  // rebuilt only when the achievement signature changes). Applying on the next
+  // turn is what covers both cases -- by then the cards exist either way.
+  // renderAchievements also re-applies, which is what makes a fresh render land
+  // in the spotlight state without waiting.
+  achievementSpotlightTimers.push(setTimeout(() => {
+    applyAchievementSpotlightClasses();
+
+    // Two steps, deliberately. Dropping the classes is what animates, so the
+    // removal has to be its own task; clearing and re-adding in the same tick
+    // would mean the browser never saw the spotlight state to begin with.
+    achievementSpotlightTimers.push(setTimeout(() => {
+      clearAchievementSpotlightClasses();
+    }, ACHIEVEMENT_SPOTLIGHT_HOLD_MS));
+
+    achievementSpotlightTimers.push(setTimeout(() => {
+      achievementSpotlightId = "";
+    }, ACHIEVEMENT_SPOTLIGHT_HOLD_MS + ACHIEVEMENT_SPOTLIGHT_SETTLE_MS));
+  }, 0));
+}
+
+function stopAchievementSpotlight() {
+  achievementSpotlightTimers.forEach((timer) => clearTimeout(timer));
+  achievementSpotlightTimers = [];
+  achievementSpotlightId = "";
+  clearAchievementSpotlightClasses();
+}
+
 function renderProgress(state) {
   const profile = resolvedProfile(state) || {};
   const xp = typeof profile.xp === "number" ? profile.xp : 0;
@@ -905,6 +986,11 @@ function renderAchievements(state) {
       </div>
     `;
   }).join("");
+
+  // The list is rebuilt from scratch, which drops any class the spotlight put
+  // on it. Re-apply, otherwise a progress update arriving mid-spotlight would
+  // silently cancel the effect the user is meant to be looking at.
+  if (achievementSpotlightId) applyAchievementSpotlightClasses();
 }
 
 function renderPrivacyProfilePreview(state) {
@@ -1849,6 +1935,7 @@ function bindNotifications() {
 }
 
 function disposeAccountModule() {
+  stopAchievementSpotlight();
   for (let i = 0; i < accountUnsubs.length; i++) {
     try { accountUnsubs[i](); } catch (e) { console.error("Account disposal error:", e); }
   }

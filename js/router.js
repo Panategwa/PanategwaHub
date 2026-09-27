@@ -46,6 +46,7 @@
 var SHELL_NODE_IDS = ["menu-container", "ptg-site-music", "achievement-toast-stack"];
 
 var managedStyles = [];
+var managedInlineStyles = [];
 var navigations = 0;
 var restoreFocus = true;
 
@@ -194,6 +195,66 @@ function applyStyles(doc, pageUrl) {
     document.head.appendChild(add);
     managedStyles.push(wanted[k]);
   }
+
+  swapInlineStyles(doc);
+}
+
+// The same job for a page's own inline <style> blocks, which is where the D map
+// page keeps one rule per ethnotype (`.pitosians { top: 20.5%; left: 37% }` and
+// so on). A <style> lives in <head>, and the content swap only replaces <body>,
+// so these rules are neither carried into the incoming page nor cleared out of
+// the outgoing one. The map page's anchors are `position: absolute`, so losing
+// those offsets left every one of them with `top: auto; left: auto` -- which
+// parks them all at the same static position, piled in one corner of the map.
+// The links above could not stand in for this: `position: absolute` is a
+// structural property of the component, not a themed one.
+function swapInlineStyles(doc) {
+  var incoming = doc.querySelectorAll("style");
+  var texts = [];
+
+  for (var i = 0; i < incoming.length; i++) {
+    var text = incoming[i].textContent;
+    if (!text || !text.trim()) continue;
+    texts.push(text);
+
+    // Already resident, either from a previous visit or because this document
+    // loaded the page directly. Re-adding it would just stack duplicates.
+    if (hasStyleText(text)) continue;
+
+    var el = document.createElement("style");
+    el.textContent = text;
+    var media = incoming[i].getAttribute("media");
+    if (media) el.setAttribute("media", media);
+    el.setAttribute("data-router-managed", "");
+    document.head.appendChild(el);
+    managedInlineStyles.push(text);
+  }
+
+  // Drop the outgoing page's rules, but only the ones this file put there. A
+  // <style> the document itself wrote is left alone, the same way the <link>
+  // cleanup above spares anything not marked as ours.
+  for (var j = managedInlineStyles.length - 1; j >= 0; j--) {
+    var stale = managedInlineStyles[j];
+    if (texts.indexOf(stale) !== -1) continue;
+
+    var nodes = document.querySelectorAll("style[data-router-managed]");
+    for (var k = 0; k < nodes.length; k++) {
+      if (nodes[k].textContent === stale && nodes[k].parentNode) {
+        nodes[k].parentNode.removeChild(nodes[k]);
+      }
+    }
+    managedInlineStyles.splice(j, 1);
+  }
+}
+
+// True when a <style> with this exact source is already in the document,
+// whether it is one of ours or one the page shipped with.
+function hasStyleText(text) {
+  var nodes = document.querySelectorAll("style");
+  for (var i = 0; i < nodes.length; i++) {
+    if (nodes[i].textContent === text) return true;
+  }
+  return false;
 }
 
 // Inline scripts are not modules, so they re-run every time the element is

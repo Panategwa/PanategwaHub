@@ -717,6 +717,12 @@ they no longer leak into pages that do not load it.
       border-radius: 16px;
       border: 1px solid rgba(255, 255, 255, 0.12);
       background: rgba(255, 255, 255, 0.05);
+      /* Carries the spotlight's fade back. The resting card is the one that
+         transitions, so removing the spotlight class is what animates -- see
+         .is-spotlighting below. background-color has to be in this list or the
+         lifted fill snaps off the instant the class is dropped, while the
+         opacity keeps easing for its full three seconds. */
+      transition: opacity 3s ease, background-color 3s ease, filter 3s ease;
     }
 
     .achievement-card.locked {
@@ -729,19 +735,22 @@ they no longer leak into pages that do not load it.
       background: rgba(255, 255, 255, 0.09);
     }
 
-    /* Spotlight: opening a notification for an achievement lands on that card,
-       lifts it 25% brighter, and pushes every other card back to half opacity
-       for two seconds before the whole list eases back to normal over three.
+    /* Spotlight: opening a notification for an achievement lands on that card
+       and lifts it out of the list with everything else pushed back to half
+       opacity, for two seconds, before the whole thing eases back over three.
 
-       The timing is entirely in the cascade. The resting card carries the 3s
-       transition, and the spotlight state sets `transition: none`, so adding the
-       class lands instantly and *removing* it is what performs the fade back.
-       One class therefore drives both halves, and no script has to animate
-       anything -- the timers in account.js only decide when to drop it. */
-    .achievement-card {
-      transition: opacity 3s ease, filter 3s ease, box-shadow 3s ease;
-    }
+       The lift is a background-color rather than filter: brightness() washed
+       over the text and the status pill as well and needed an accent ring to
+       read at all, which came out as a blue outline around the card. A plain
+       brighter fill says the same thing and, unlike a gradient overlay, is a
+       value the transition can actually interpolate on the way back.
 
+       The timing is entirely in the cascade, and the 3s transition on the
+       resting card above is half of it: the spotlight state sets
+       `transition: none`, so adding the class lands instantly and *removing* it
+       is what performs the fade back. One class therefore drives both halves,
+       and no script has to animate anything -- the timers in account.js only
+       decide when to drop it. */
     .achievement-list.is-spotlighting .achievement-card {
       opacity: 0.5;
       transition: none;
@@ -749,8 +758,7 @@ they no longer leak into pages that do not load it.
 
     .achievement-list.is-spotlighting .achievement-card.is-spotlight {
       opacity: 1;
-      filter: brightness(1.25);
-      box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-accent) 70%, transparent);
+      background-color: rgba(255, 255, 255, 0.25);
     }
 
     .achievement-status {

@@ -315,12 +315,13 @@ immediately after general.css.
     rgba(255, 255, 255, 0.025);
 }
 
-/* Collapsed, the header is the only thing on screen, so the Mute button stands
-   aside and gives the whole row to the disclosure control. Muting is still a
-   slider inside the panel whenever the player is open. */
-.menu-music-head.is-collapsed .menu-music-quick-mute {
-  display: none;
-}
+/* Mute stays on the header in both states. It used to be hidden while the
+   player was collapsed, which was a layout fix: with the status pill competing
+   for the same row, the disclosure control had about 108px for contents needing
+   nearer 140, and its chevron was pushed outside the button. That is no longer
+   the case -- the pill sits on the track-name line now, the track name is the
+   part that ellipsizes, and the row wraps when the sidebar is too narrow. So
+   muting is reachable without opening the player first. */
 
 /* This button paints its own vertical gradient, so it has to restate it for
    hover and press. Inheriting the shared hover would drop the gradient and

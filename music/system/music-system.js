@@ -691,7 +691,7 @@ function renderMenuMusic() {
 
   menuSlot.innerHTML = `
     <div class="menu-music-card">
-      <div class="menu-music-head ${currentUi.expanded ? "" : "is-collapsed"}">
+      <div class="menu-music-head">
         <button
           type="button"
           class="menu-music-toggle"
@@ -783,9 +783,20 @@ function bindMenuSlot() {
     if (!target) return;
 
     if (target.id === "menu-music-toggle") {
+      // Only reclaim focus if the keyboard had it. Clicking with a mouse should
+      // not leave a focus ring behind, and :focus-visible means restoring it
+      // costs a mouse user nothing anyway.
+      const hadFocus = document.activeElement === target;
       currentUi = normalizeUi({ ...currentUi, expanded: !currentUi.expanded });
       saveUi();
       renderMenuMusic();
+      // renderMenuMusic rewrites the card's innerHTML, which throws away the very
+      // button that was just pressed and drops focus to <body>. This control is
+      // pressed over and over, so without this a keyboard user would have to tab
+      // back from the top of the sidebar every single time they collapsed it.
+      if (hadFocus) {
+        document.getElementById("menu-music-toggle")?.focus({ preventScroll: true });
+      }
       return;
     }
 

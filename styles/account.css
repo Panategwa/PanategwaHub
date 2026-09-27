@@ -186,6 +186,33 @@ they no longer leak into pages that do not load it.
       font-weight: 700;
       cursor: pointer;
       font-size: 0.96rem;
+      transition:
+        background 120ms ease,
+        border-color 120ms ease,
+        box-shadow 120ms ease,
+        transform 0.09s ease;
+    }
+
+    .tab-button:hover,
+    .tab-chip:hover {
+      border-color: var(--button-hover-border);
+    }
+
+    .tab-button:active,
+    .tab-chip:active {
+      transform: translateY(1px);
+      transition-duration: 0.04s;
+    }
+
+    /* The open tab keeps its own fill when hovered, so the shared hover state
+       cannot quietly repaint it as if it were merely under the pointer. */
+    .tab-button.active:hover,
+    .tab-button.active:active,
+    .tab-chip.active:hover,
+    .tab-chip.active:active {
+      background: var(--accent);
+      border-color: var(--accent-border);
+      transform: none;
     }
 
     .tab-button.active,
@@ -280,7 +307,11 @@ they no longer leak into pages that do not load it.
     }
 
     .account-wrap button:not(.link-button) {
-      transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+      transition:
+        background 120ms ease,
+        border-color 120ms ease,
+        box-shadow 120ms ease,
+        transform 0.09s ease;
       border: 1px solid var(--button-border);
       background: var(--button-bg);
       color: #f8fafc;
@@ -290,6 +321,12 @@ they no longer leak into pages that do not load it.
     .account-wrap button:not(.link-button):hover {
       border-color: var(--button-hover-border);
       box-shadow: 0 10px 22px rgba(2, 6, 23, 0.14);
+    }
+
+    .account-wrap button:not(.link-button):active {
+      box-shadow: 0 3px 8px rgba(2, 6, 23, 0.2);
+      transform: translateY(1px);
+      transition-duration: 0.04s;
     }
 
     .account-wrap button:not(.link-button):disabled {
@@ -319,6 +356,30 @@ they no longer leak into pages that do not load it.
       font-weight: 700;
       text-decoration: underline;
       text-underline-offset: 0.18em;
+    }
+
+    /* These sit on a transparent surface by design, so they opt out of the
+       shared `button` hover fill rather than turning into a filled box. */
+    .button-ghost:hover,
+    .button-ghost:active,
+    .link-button:hover,
+    .link-button:active {
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+      color: inherit;
+      transform: none;
+    }
+
+    .button-ghost:hover,
+    .link-button:hover {
+      opacity: 0.78;
+    }
+
+    .button-ghost:active,
+    .link-button:active {
+      opacity: 0.58;
+      transition-duration: 0.04s;
     }
 
     .danger {
@@ -998,8 +1059,13 @@ they no longer leak into pages that do not load it.
     }
 
     .privacy-inline-toggle:hover {
-      filter: none;
       background: rgba(153, 27, 27, 0.5);
+    }
+
+    .privacy-inline-toggle:active {
+      background: rgba(127, 29, 29, 0.6);
+      transform: translateY(1px);
+      transition-duration: 0.04s;
     }
 
     .messages-wrap {
@@ -1087,12 +1153,38 @@ they no longer leak into pages that do not load it.
       cursor: pointer;
       display: grid;
       gap: 3px;
+      transition:
+        background 120ms ease,
+        border-color 120ms ease,
+        transform 0.09s ease;
+    }
+
+    .friend-pill:hover,
+    .group-pill:hover {
+      background: rgba(255,255,255,0.11);
+    }
+
+    .friend-pill:active,
+    .group-pill:active {
+      background: rgba(255,255,255,0.03);
+      transform: translateY(1px);
+      transition-duration: 0.04s;
     }
 
     .friend-pill.active,
     .group-pill.active {
       background: rgba(59,130,246,0.22);
       border: 1px solid rgba(125,211,252,0.28);
+    }
+
+    /* The selected pill keeps its own tint under the pointer, otherwise the
+       shared hover fill makes an unselected pill look selected. */
+    .friend-pill.active:hover,
+    .friend-pill.active:active,
+    .group-pill.active:hover,
+    .group-pill.active:active {
+      background: rgba(59,130,246,0.22);
+      transform: none;
     }
 
     .friend-pill small,

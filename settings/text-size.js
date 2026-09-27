@@ -157,7 +157,7 @@ function buildTextSizeButtons() {
         </div>
         <input
           id="textsize-custom-slider"
-          class="audio-volume-slider"
+          class="range-slider"
           type="range"
           min="12"
           max="20"

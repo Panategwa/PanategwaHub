@@ -51,6 +51,30 @@ Anything that styles a single page belongs in that page's own file.
   --icon-fill-hover: color-mix(in srgb, var(--c-accent) 22%, transparent);
   --icon-outline-hover: color-mix(in srgb, var(--c-accent) 60%, transparent);
 
+  /* --- derived: buttons ---
+     Prefixed --btn-* rather than --button-* on purpose: account.css declares
+     its own --button-bg / --button-border / --button-shadow in a second :root
+     for the account page alone. Reusing those names here would let the shared
+     `button` rule silently pick up the account-only values on that one page. */
+  --btn-bg: color-mix(in srgb, var(--c-accent) 12%, transparent);
+  --btn-border: var(--surface-border);
+  --btn-bg-hover: color-mix(in srgb, var(--c-accent) 20%, transparent);
+  --btn-border-hover: color-mix(in srgb, var(--c-line) 70%, var(--c-accent));
+  --btn-bg-active: color-mix(in srgb, var(--c-accent) 30%, transparent);
+  --btn-border-active: color-mix(in srgb, var(--c-accent) 85%, transparent);
+  --btn-text-hover: var(--c-text);
+  --btn-shadow: 0 12px 26px color-mix(in srgb, var(--c-base) 45%, transparent);
+  --btn-shadow-pressed: 0 5px 12px color-mix(in srgb, var(--c-base) 60%, transparent);
+
+  /* --- derived: range sliders --- */
+  --slider-track: color-mix(in srgb, var(--c-text) 15%, transparent);
+  --slider-fill: color-mix(in srgb, var(--c-accent) 88%, var(--c-text));
+  --slider-thumb: color-mix(in srgb, var(--c-text) 96%, var(--c-base));
+  --slider-thumb-border: color-mix(in srgb, var(--c-text) 42%, var(--c-line));
+  --slider-thumb-border-hover: var(--c-accent);
+  --slider-shadow: 0 3px 8px color-mix(in srgb, var(--c-base) 55%, transparent);
+  --slider-grip-halo: color-mix(in srgb, var(--c-accent) 22%, transparent);
+
   /* --- derived: surfaces --- */
   --surface-border: color-mix(in srgb, var(--c-line) 38%, transparent);
   --surface-border-strong: color-mix(in srgb, var(--c-line) 62%, var(--c-accent));
@@ -201,31 +225,200 @@ button {
   font-size: var(--global-font-size, 16px);
   padding: 0.74em 1.08em;
   border-radius: 12px;
-  background: var(--menu-button);
+  background: var(--btn-bg);
   color: var(--button-text);
-  border: 1px solid var(--surface-border);
+  border: 1px solid var(--btn-border);
   cursor: pointer;
   font-weight: 600;
   font-family: 'Rubik', sans-serif;
   margin: 0.75rem 0;
   display: inline-block;
-  box-shadow: 0 12px 26px rgba(2, 6, 23, 0.16);
+  box-shadow: var(--btn-shadow);
   backdrop-filter: blur(14px);
-  transition: box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+  /* transform is in the list so the press state can settle the button
+     instead of only recolouring it, and so it eases rather than snaps. */
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease,
+    box-shadow 0.14s ease,
+    transform 0.09s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:hover {
-  filter: brightness(0.75);
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-border-hover);
+  color: var(--btn-text-hover);
 }
 
-button:disabled {
-  filter: brightness(0.5);
+/* The press. This used to be `filter: brightness(0.75)`, which was the reason
+   clicks felt wrong: a filter has no transition, so it snapped on; it dimmed
+   the label along with the surface; and being applied over the whole element
+   it outranked the per-component hover fills that then had to cancel it with
+   their own `filter: none`. Recolouring the surface keeps every component's
+   own hover state working. */
+button:active {
+  background: var(--btn-bg-active);
+  border-color: var(--btn-border-active);
+  color: var(--btn-text-hover);
+  /* A 1px settle, not a scale: several buttons are width:100%, and scaling
+     those makes them visibly narrower while held down. */
+  transform: translateY(1px);
+  box-shadow: var(--btn-shadow-pressed);
+  transition-duration: 0.04s;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+button:disabled,
+button[aria-disabled="true"] {
   cursor: default;
   box-shadow: none;
   opacity: 0.62;
+  transform: none;
 }
 
-input,
+/* Above the plain :hover / :active, so a disabled button does not light up
+   when the pointer passes over it. */
+button:disabled:hover,
+button:disabled:active,
+button[aria-disabled="true"]:hover,
+button[aria-disabled="true"]:active {
+  background: var(--btn-bg);
+  border-color: var(--btn-border);
+  color: var(--button-text);
+  box-shadow: none;
+  transform: none;
+}
+
+/* =========================
+   RANGE SLIDER
+   =========================
+   One primitive for every range input on the site: the three volume sliders on
+   the settings page and the music player's seek and volume sliders.
+
+   It used to live in settings.css under .audio-volume-slider, so the music
+   player's two sliders in the sidebar were unstyled on every page except the
+   settings page, and fell back to the generic `input` box below — a white pill,
+   complete with text padding, around a default-blue native range.
+   ========================= */
+
+.range-slider {
+  /* Maintained from JS as the filled percentage. */
+  --range-fill: 70%;
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  /* The bar drawn below is 6px, but the input box is 22px tall. The extra
+     space is the hit target, and a range input is dragged by its box rather
+     than by the drawn track — at 5px these were almost impossible to grab. */
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.range-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      var(--slider-fill) 0 var(--range-fill),
+      var(--slider-track) var(--range-fill) 100%
+    );
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  /* Centres the thumb on the 6px track: (6 - 16) / 2 = -5px. */
+  margin-top: -5px;
+  border-radius: 50%;
+  border: 1px solid var(--slider-thumb-border);
+  background: var(--slider-thumb);
+  box-shadow: var(--slider-shadow);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.range-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+  border-color: var(--slider-thumb-border-hover);
+}
+
+.range-slider:active::-webkit-slider-thumb {
+  transform: scale(1.22);
+  box-shadow: 0 0 0 6px var(--slider-grip-halo);
+}
+
+.range-slider:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
+.range-slider:focus-visible::-webkit-slider-thumb {
+  border-color: var(--slider-thumb-border-hover);
+  box-shadow: 0 0 0 4px var(--slider-grip-halo);
+}
+
+.range-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--slider-track);
+}
+
+.range-slider::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--slider-fill);
+}
+
+.range-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--slider-thumb-border);
+  border-radius: 50%;
+  background: var(--slider-thumb);
+  box-shadow: var(--slider-shadow);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.range-slider:hover::-moz-range-thumb {
+  transform: scale(1.12);
+  border-color: var(--slider-thumb-border-hover);
+}
+
+.range-slider:active::-moz-range-thumb {
+  transform: scale(1.22);
+  box-shadow: 0 0 0 6px var(--slider-grip-halo);
+}
+
+.range-slider:focus-visible::-moz-range-thumb {
+  border-color: var(--slider-thumb-border-hover);
+  box-shadow: 0 0 0 4px var(--slider-grip-halo);
+}
+
+input:not([type="range"]),
 textarea,
 select {
   font: inherit;
@@ -240,7 +433,7 @@ select {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.42);
 }
 
-input:focus,
+input:not([type="range"]):focus,
 textarea:focus,
 select:focus {
   outline: 2px solid rgba(147, 197, 253, 0.34);
@@ -285,7 +478,21 @@ main {
 }
 
 .inline-link:hover {
-  opacity: 0.8;
+  background: none;
+  border-color: transparent;
+  color: var(--link-hover);
+  box-shadow: none;
+  transform: none;
+  opacity: 1;
+}
+
+.inline-link:active {
+  background: none;
+  border-color: transparent;
+  color: var(--link-hover);
+  box-shadow: none;
+  transform: none;
+  opacity: 0.72;
 }
 
 .section-hidden {

@@ -1503,6 +1503,20 @@ function decodePathParam(value) {
   function renderBreadcrumbs(container) {
     container.textContent = "";
 
+    // At the top of the tree there are no ancestors, so the bar would come out
+    // as a blank strip. Show the root as a single inert crumb instead, reusing
+    // the same label the title uses, rather than leaving reserved space empty.
+    if (currentPath.length === 0) {
+      const rootCrumb = document.createElement("button");
+      rootCrumb.type = "button";
+      rootCrumb.className = "crumb crumb-current";
+      rootCrumb.textContent = "Domains";
+      rootCrumb.setAttribute("aria-current", "true");
+      rootCrumb.title = "Domains (you are here)";
+      container.appendChild(rootCrumb);
+      return;
+    }
+
     currentPath.forEach((name, index) => {
       if (index > 0) {
         const separator = document.createElement("span");

@@ -720,7 +720,7 @@ function renderMenuMusic() {
           </div>
           <input
             id="menu-music-progress-slider"
-            class="audio-volume-slider menu-music-progress-slider"
+            class="range-slider menu-music-progress-slider"
             type="range"
             min="0"
             max="1"
@@ -744,7 +744,7 @@ function renderMenuMusic() {
           </div>
           <input
             id="menu-music-volume-slider"
-            class="audio-volume-slider menu-music-volume-slider"
+            class="range-slider menu-music-volume-slider"
             type="range"
             min="0"
             max="100"

@@ -62,6 +62,13 @@ immediately after general.css.
   cursor: col-resize;
   touch-action: none;
   z-index: 4;
+  /* The handle is a <div>, so the shared `button` states cannot reach it.
+     Resetting them anyway keeps a stray press or shadow from appearing here
+     if it is ever changed to a real <button> — it is dragged, so it must not
+     move under the pointer. */
+  transform: none;
+  box-shadow: none;
+  transition: none;
 }
 
 #resize-handle::before {
@@ -110,6 +117,8 @@ immediately after general.css.
   height: 116px;
 }
 
+/* The page links are anchors, not buttons, so the shared `button` states in
+   general.css never reach them — they need their own hover/press here. */
 .menu-button {
   display: block;
   box-sizing: border-box;
@@ -122,13 +131,25 @@ immediately after general.css.
   text-decoration: none;
   background: var(--menu-button);
   border: 1px solid var(--menu-button-outline);
-  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+  transition:
+    color 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    transform 0.09s ease;
 }
 
 .menu-button:hover {
   background: var(--menu-button-fill-hover);
   color: var(--c-text);
   border-color: var(--menu-button-outline-hover);
+}
+
+.menu-button:active {
+  background: var(--menu-button-fill-active);
+  color: var(--menu-button-text-active);
+  border-color: var(--menu-button-outline-active);
+  transform: translateY(1px);
+  transition-duration: 0.04s;
 }
 
 .menu-button:focus-visible,
@@ -138,11 +159,13 @@ immediately after general.css.
 }
 
 .menu-button[aria-disabled="true"],
-.menu-button[aria-disabled="true"]:hover {
+.menu-button[aria-disabled="true"]:hover,
+.menu-button[aria-disabled="true"]:active {
   pointer-events: none;
   background: var(--menu-button-fill-active);
   color: var(--menu-button-text-active);
   border-color: var(--menu-button-outline-active);
+  transform: none;
 }
 
 .menu-button.active {
@@ -271,7 +294,6 @@ immediately after general.css.
   border: none;
   box-shadow: none;
   backdrop-filter: none;
-  filter: none;
   opacity: 0.86;
 }
 
@@ -285,9 +307,20 @@ immediately after general.css.
   background: transparent;
   border: none;
   box-shadow: none;
-  filter: none;
   opacity: 1;
   transform: translateY(-1px);
+}
+
+/* An icon button reads as pressed by shrinking, not by sinking — and it has
+   to override the shared 1px translate, which would otherwise win by being
+   declared against a class selector. */
+.menu-music-control-button:active {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  opacity: 0.78;
+  transform: scale(0.9);
+  transition-duration: 0.04s;
 }
 
 .menu-music-control-icon {
@@ -428,18 +461,37 @@ immediately after general.css.
   user-select: none;
 }
 
-.menu-button.active {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.06)),
-    rgba(59, 130, 246, 0.28);
-  border-color: rgba(191, 219, 254, 0.36);
-  box-shadow: 0 18px 34px rgba(37, 99, 235, 0.24);
+/* Buttons that deliberately sit on a transparent surface. Without these they
+   would pick up the shared hover fill and turn into filled boxes on hover,
+   which is not what the player is going for — they brighten instead. */
+.menu-music-toggle:hover,
+.menu-music-toggle:focus-visible,
+.menu-music-track-main:hover,
+.menu-music-track-main:focus-visible {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--btn-text-hover);
 }
 
-.menu-button.active:disabled {
-  opacity: 1;
-  box-shadow: 0 18px 34px rgba(37, 99, 235, 0.24);
+.menu-music-toggle:active,
+.menu-music-track-main:active {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--btn-text-hover);
+  transform: none;
 }
+
+/* The second .menu-button.active that used to sit here has been removed. It
+   repeated the rule above with hardcoded rgba() values, so being later in the
+   file it won — which pinned the current page's highlight to one blue and kept
+   it from following the active theme. The token-based rule above is the one
+   that applies now.
+
+   Its `.menu-button.active:disabled` companion went with it: menu.js marks the
+   current page with aria-disabled, never the disabled attribute, so that rule
+   matched nothing. */
 
 .line {
   padding: 10px 0 11px;
@@ -490,7 +542,11 @@ immediately after general.css.
   align-items: center;
   justify-content: center;
   color: var(--icon-text);
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.09s ease;
 }
 
 .menu-icon-button:hover {
@@ -498,11 +554,19 @@ immediately after general.css.
   border-color: var(--icon-outline-hover);
 }
 
+.menu-icon-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--c-base) 55%, transparent);
+  transition-duration: 0.04s;
+}
+
 .menu-icon-button[aria-disabled="true"],
-.menu-icon-button[aria-disabled="true"]:hover {
+.menu-icon-button[aria-disabled="true"]:hover,
+.menu-icon-button[aria-disabled="true"]:active {
   pointer-events: none;
   background: var(--icon-fill-hover);
   border-color: var(--icon-outline-hover);
+  transform: none;
 }
 
 .menu-icon-button.active-icon {

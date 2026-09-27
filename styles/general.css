@@ -513,6 +513,15 @@ main {
   opacity: 0.72;
 }
 
+/* The one place `!important` is deliberate. This is a state utility whose whole
+   job is to win, and it cannot do that on specificity alone: a single-class
+   component rule that also sets `display` is a specificity tie, and the cascade
+   then hands the win to whichever file loads later. general.css loads first, so
+   `.menu-music-panel { display: grid }` in menu.css beat this outright and the
+   Music toggle looked dead -- the class came and went on the element while the
+   panel stayed 416px tall, because a "hidden" section was still laid out.
+   Without the important flag every such component needs a matching
+   `.foo.section-hidden` override, and the next one added is the next bug. */
 .section-hidden {
-  display: none;
+  display: none !important;
 }

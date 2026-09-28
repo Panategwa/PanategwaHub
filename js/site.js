@@ -188,6 +188,13 @@
     var dragStartWidth = 0;
     var frameId = 0;
     var pendingWidth = 0;
+    // The width this code has actually applied, kept separately from the
+    // measured element. #menu-container has a 1px border, so its offsetWidth
+    // and getBoundingClientRect().width are both one more than the width set
+    // on it -- reading the element back to answer "how wide is it" made the
+    // settings label read 281px for a 280px sidebar, and the slider would
+    // creep up by a pixel every time it was touched.
+    var appliedWidth = DEFAULT_WIDTH;
 
     function clampWidth(value) {
       return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(value)));
@@ -198,6 +205,7 @@
       if (frameId) return;
       frameId = window.requestAnimationFrame(function () {
         frameId = 0;
+        appliedWidth = pendingWidth;
         menuContainer.style.width = pendingWidth + "px";
         document.body.style.paddingLeft = pendingWidth + "px";
         handle.setAttribute("aria-valuenow", String(pendingWidth));
@@ -207,7 +215,7 @@
     function saveWidth(value) {
       try {
         localStorage.setItem("menuWidth", String(clampWidth(
-          Number.isFinite(value) ? value : menuContainer.offsetWidth
+          Number.isFinite(value) ? value : appliedWidth
         )));
       } catch (e) {}
     }
@@ -227,6 +235,7 @@
         initialWidth = savedWidth;
       }
     }
+    appliedWidth = initialWidth;
     // menu.css declares #menu-container at width: 280px with a
     // `transition: width`, so applying the saved width here used to animate
     // 280px -> saved width on every single page load. The transition is muted
@@ -296,6 +305,32 @@
     handle.addEventListener("dblclick", function () {
       paintWidth(DEFAULT_WIDTH);
       saveWidth(pendingWidth);
+    });
+
+    // The settings page's sidebar-width slider and this handle are two
+    // controls for one value, so they have to agree. Exposing the pair here
+    // keeps the storage key, the clamp and the first-paint transition mute in
+    // one place: a slider that wrote localStorage and set the width itself
+    // would drift from the handle's idea of it the first time either side
+    // read a stale value.
+    window.PanategwaGetMenuWidth = function () {
+      return clampWidth(appliedWidth);
+    };
+
+    window.PanategwaSetMenuWidth = function (value) {
+      var next = clampWidth(value);
+      menuContainer.style.transition = "";
+      menuContainer.classList.remove("is-resizing");
+      document.body.classList.remove("is-resizing");
+      paintWidth(next);
+      saveWidth(next);
+      return next;
+    };
+
+    window.PanategwaMenuWidthRange = Object.freeze({
+      min: MIN_WIDTH,
+      max: MAX_WIDTH,
+      default: DEFAULT_WIDTH
     });
   }
 

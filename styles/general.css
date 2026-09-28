@@ -102,6 +102,75 @@ Anything that styles a single page belongs in that page's own file.
   --handle-bar-color-hover: color-mix(in srgb, var(--c-accent) 55%, var(--c-line));
   --handle-grip-color: color-mix(in srgb, var(--c-text) 45%, var(--c-line));
   --handle-grip-color-hover: var(--c-text);
+
+  /* --- animation scale (see the ANIMATION TIERS block below) ---
+     1 = normal, 0.25 = reduced, 0 = none. Every animated rule multiplies its
+     own duration by this, so changing the value here retimes everything that
+     opts in. A component that wants a named duration of its own -- the music
+     player's -- declares one locally, e.g. --anim-unravel. */
+  --anim-scale: 1;
+}
+
+/* =========================
+   ANIMATION TIERS
+   =========================
+   The Animation setting (Accessibility -> Animations) writes one attribute
+   on <html>: data-anim="normal" | "reduced" | "none". Everything else is CSS,
+   so nothing in the site has to ask what the preference is.
+
+   HOW TO PUT AN ELEMENT IN A TIER
+   Add data-anim to the element that owns the animated property. The tier is
+   about *the effect*, not the element, so put the attribute on the animated
+   element itself rather than on a wrapper.
+
+     data-anim="always"     Feedback that would be wrong to remove. Hover
+                            tints, the focus ring, button presses. Untouched
+                            by the setting in every tier.
+     data-anim="optional"   Decorative movement -- panels opening, the music
+                            player rolling up, the page glow. Normal or off.
+     data-anim="full"       Movement that is the point of the feature.
+                            A slowed-down version still communicates, so
+                            these get Normal, Reduced or None.
+
+   HOW TO WRITE A DURATION THAT RESPECTS "reduced"
+   Multiply it by the scale:
+
+     transition: background-color calc(0.16s * var(--anim-scale, 1)) ease;
+     animation: spin calc(1.1s * var(--anim-scale, 1)) linear infinite;
+
+   --anim-scale is 1 by default and only 0.25 on a data-anim="full" element
+   while <html> is data-anim="reduced", so an "optional" or "always" element
+   is unaffected by Reduced and only ever changes under None.
+
+   "None" is the belt-and-braces rule at the bottom: it force-zeroes any
+   transition on the tier's elements, so a duration written without the
+   scale still gets switched off rather than silently surviving.        */
+
+/* Reduced runs full-tier elements 4x quicker: 75% less time, not 75% less
+   movement. Nothing is removed, so nothing is lost. */
+html[data-anim="reduced"] [data-anim="full"] {
+  --anim-scale: 0.25;
+}
+
+/* None removes the movement outright for the two tiers that may lose it.
+   `animation: none` matters as much as the duration: a looping keyframe
+   animation with a 0s duration is still running, just invisibly burning
+   frames. */
+html[data-anim="none"] [data-anim="optional"],
+html[data-anim="none"] [data-anim="full"] {
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  animation: none !important;
+}
+
+/* The OS preference is honoured on a visitor's first visit only. Once the
+   Animation setting is chosen the attribute wins, so a deliberate pick is
+   never overridden by a system-wide toggle. */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-anim-choice]) [data-anim="optional"],
+  html:not([data-anim-choice]) [data-anim="full"] {
+    --anim-scale: 0.25;
+  }
 }
 
 body {

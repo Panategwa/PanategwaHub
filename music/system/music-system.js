@@ -679,17 +679,61 @@ function renderTrackRows() {
   }).join("");
 }
 
+// The player is two boxes that have to persist across re-renders: the header
+// (rewritten every render) and the unravel wrapper (which must NOT be).
+//
+// The wrapper has to survive, because a transition needs the same element on
+// both sides of the change -- a brand new one has no previous computed value
+// to interpolate from, so the roll-up snaps instead of animating. That is why
+// the slot's own innerHTML is written exactly once, here, and every later
+// render writes into the two children instead.
+//
+// It is also why `menuSlot.innerHTML = ...` must not reappear in
+// renderMenuMusic: doing so destroys the wrapper, and ensureMusicShell then
+// quietly builds a new one on the next line, which looks correct in a
+// screenshot and animates not at all.
+function ensureMusicShell() {
+  let head = document.getElementById("menu-music-head-host");
+  let host = document.getElementById("menu-music-unravel");
+
+  if (head && host) return { head, host };
+
+  menuSlot.innerHTML = '<div class="menu-music-head-host" id="menu-music-head-host"></div>';
+
+  head = document.getElementById("menu-music-head-host");
+
+  host = document.createElement("div");
+  host.id = "menu-music-unravel";
+  host.className = "menu-music-unravel";
+  // A freshly inserted element cannot transition, so the initial state is
+  // applied before it reaches the document. That is what keeps the player
+  // from rolling open by itself on every page load.
+  host.classList.toggle("is-open", currentUi.expanded);
+  // "full", not "optional": a second of large-area movement is exactly what
+  // someone who has asked for reduced motion wants less of, and a faster
+  // unravel still reads as an unravel.
+  host.setAttribute("data-anim", "full");
+
+  const inner = document.createElement("div");
+  inner.className = "menu-music-unravel-inner";
+  host.appendChild(inner);
+  menuSlot.appendChild(host);
+
+  return { head, host };
+}
+
 function renderMenuMusic() {
   if (!menuSlot) return;
 
   const track = activeTrack();
   const settings = getToastAudioSettings();
   const musicVolume = clampPercent(settings?.musicVolume, 70);
-  const panelClass = currentUi.expanded ? "" : "section-hidden";
   const trackName = track ? escapeHtml(track.name) : "No music added yet.";
   const trackArtist = track ? escapeHtml(track.artist) : "";
 
-  menuSlot.innerHTML = `
+  const { head, host } = ensureMusicShell();
+
+  head.innerHTML = `
     <div class="menu-music-card">
       <div class="menu-music-head">
         <button
@@ -711,8 +755,16 @@ function renderMenuMusic() {
         </button>
         <button type="button" class="menu-music-quick-mute" id="menu-music-quick-mute">Mute</button>
       </div>
+    </div>
+  `;
 
-      <div id="menu-music-panel" class="menu-music-panel ${panelClass}">
+  // The panel is rendered into the persistent unravel wrapper rather than
+  // alongside the card, so the roll-up has a stable element to animate. The
+  // class is applied after the content is in place, so the browser has a
+  // starting height to interpolate from.
+  host.classList.toggle("is-open", currentUi.expanded);
+  host.querySelector(".menu-music-unravel-inner").innerHTML = `
+      <div id="menu-music-panel" class="menu-music-panel">
         <div class="menu-music-now">
           <strong>${track ? trackName : "No track selected"}</strong>
           <small>${trackArtist ? `By ${trackArtist}` : "No artist listed."}</small>
@@ -767,7 +819,6 @@ function renderMenuMusic() {
           ${renderTrackRows()}
         </div>
       </div>
-    </div>
   `;
 
   syncMenuVolumeUi(settings);

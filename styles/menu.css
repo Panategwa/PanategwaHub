@@ -192,15 +192,15 @@ immediately after general.css.
   padding: 0 6px;
 }
 
-.menu-music-card {
-  display: grid;
-  /* Without an explicit track the single implicit column is sized to its content
-     and the header was measured 157px wide inside a 142px content box, pushing
-     the Mute button out past the card's border at the narrowest sidebar width. */
-  grid-template-columns: minmax(0, 1fr);
-  gap: 6px;
-  margin: 1px 0 4px;
-  padding: 8px 8px 9px;
+/* The header and the panel are two boxes that read as one player. They have
+   to be siblings rather than nested, because the panel has to sit outside the
+   element that gets re-rendered for the unravel to have something stable to
+   animate -- so the shared surface lives here instead of on .menu-music-card
+   alone. Anything that would still take up space when the panel is rolled up
+   (padding, border, margin) belongs on .menu-music-panel, not on the
+   .menu-music-unravel wrapper, or it would survive the collapse as a sliver. */
+.menu-music-card,
+.menu-music-panel {
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,0.08);
   background:
@@ -208,6 +208,17 @@ immediately after general.css.
     rgba(15, 23, 42, 0.26);
   box-shadow: 0 8px 18px rgba(2, 6, 23, 0.12);
   backdrop-filter: blur(16px);
+}
+
+.menu-music-card {
+  display: grid;
+  /* Without an explicit track the single implicit column is sized to its content
+     and the header was measured 157px wide inside a 142px content box, pushing
+     the Mute button out past the card's border at the narrowest sidebar width. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  margin: 1px 0 0;
+  padding: 8px 8px 9px;
 }
 
 .menu-music-head {
@@ -396,9 +407,66 @@ immediately after general.css.
   line-height: 1.5;
 }
 
+/* --- the unravel -------------------------------------------------------
+   Collapsing with display:none has no in-between: the player is simply
+   there or not there. This rolls the panel away over --anim-unravel
+   instead, and reverses cleanly on the way back.
+
+   The technique is grid-template-rows 0fr -> 1fr. A grid row sized in
+   fractions animates, and overflow:hidden on the single child clips the
+   content as the row shrinks, so the panel appears to be wound back into
+   the card. Animating height directly would not work: it is a layout
+   property with no transition, and the old auto-height trick needed a
+   hard-coded pixel value that broke the moment the panel's contents
+   changed height.
+
+   Durations are named rather than inline so they can be retimed in one
+   place. See the ANIMATION TIERS block in general.css for the data-anim
+   contract; the wrapper itself is data-anim="optional", so the Animations
+   setting can switch the whole effect off. */
+.menu-music-unravel {
+  --anim-unravel: calc(1s * var(--anim-scale, 1));
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--anim-unravel) cubic-bezier(0.33, 0, 0.2, 1);
+}
+
+.menu-music-unravel.is-open {
+  grid-template-rows: 1fr;
+}
+
+.menu-music-unravel-inner {
+  /* min-height:0 is required, not cosmetic: a grid item defaults to
+     min-height:auto, which refuses to shrink below its content and pins
+     the row open, which is the classic way this trick silently fails. */
+  min-height: 0;
+  overflow: hidden;
+  /* visibility rather than display, so the collapse can be animated. The
+     delay is what keeps it usable in both directions: opening reveals the
+     content immediately, closing hides it only once it has finished winding
+     away. It also takes the collapsed player out of the tab order and out
+     of the accessibility tree, which display:none used to do. */
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity calc(var(--anim-unravel) * 0.45) ease,
+    transform var(--anim-unravel) cubic-bezier(0.33, 0, 0.2, 1),
+    visibility 0s linear var(--anim-unravel);
+}
+
+.menu-music-unravel.is-open > .menu-music-unravel-inner {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  transition-delay: 0s;
+}
+
 .menu-music-panel {
   display: grid;
   gap: 8px;
+  margin: 5px 0 4px;
+  padding: 9px 8px 10px;
 }
 
 .menu-music-now {

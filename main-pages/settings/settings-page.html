@@ -15,148 +15,270 @@
 <body>
   <div id="menu-container"></div>
 
-<h1> Settings </h1>
+  <h1 class="settings-page-title">Settings</h1>
 
-<section class="settings-box">
+  <p class="settings-page-lede">
+    Five categories. Pick one to see what is in it.
+  </p>
 
-  <div class="settings-main-container">
+  <!--
+    The five categories. Each tab button names a panel below it, and only one
+    panel is shown at a time.
 
-    <div class="settings-group">
-      <button class="settings-main" onclick="toggleLanguages()">
-        Language
-      </button>
-
-      <div id="lang-message" style="display:none;">
-        Select your preferred language.<br>
-        (Changes take effect after a few seconds)
-      </div>
-
-      <div id="lang-buttons" class="settings-options" style="display:none;"></div>
-    </div>
-
-    <div class="settings-group">
-      <button class="settings-main" onclick="toggleTextSizes()">
-        Text Size
-      </button>
-
-      <div id="textsize-message" style="display:none;">
-        Choose a preset, or set your own text size from 12px to 20px.
-      </div>
-
-      <div id="textsize-buttons" class="settings-options settings-options-rich" style="display:none;"></div>
-    </div>
-
-    <div class="settings-group">
-      <button class="settings-main" onclick="toggleThemes()">
-        Color Theme
-      </button>
-
-      <div id="theme-message" style="display:none;">
-        Choose a visual preset for the site.
-      </div>
-
-      <div id="theme-buttons" class="settings-options" style="display:none;"></div>
-    </div>
-
-    <div class="settings-group">
-      <button class="settings-main" onclick="toggleAudioSettings()">
-        Audio
-      </button>
-
-      <div id="audio-message" style="display:none;">
-        Adjust the site sound levels here.
-      </div>
-
-      <div id="audio-options" class="settings-options settings-options-rich" style="display:none;">
-        <div class="settings-option-card audio-slider-list">
-          <div class="audio-control-card">
-            <div class="audio-slider-row">
-              <span class="audio-slider-copy">
-                <strong>Master Volume</strong>
-                <small>Controls every site sound at once, including popups and future music.</small>
-              </span>
-              <div class="audio-slider-actions">
-                <span id="master-volume-value" class="audio-slider-value">100%</span>
-                <button id="mute-master-volume-btn" type="button" class="audio-inline-button">Mute</button>
-              </div>
-            </div>
-            <input id="master-volume-slider" class="range-slider" type="range" min="0" max="100" step="1" value="100" aria-label="Master volume" />
-          </div>
-
-          <div class="audio-control-card">
-            <div class="audio-slider-row">
-              <span class="audio-slider-copy">
-                <strong>Music Volume</strong>
-                <small>Controls the site music player from the menu, and stays in sync everywhere.</small>
-              </span>
-              <div class="audio-slider-actions">
-                <span id="music-volume-value" class="audio-slider-value">70%</span>
-                <button id="mute-music-volume-btn" type="button" class="audio-inline-button">Mute</button>
-              </div>
-            </div>
-            <input id="music-volume-slider" class="range-slider" type="range" min="0" max="100" step="1" value="70" aria-label="Music volume" />
-          </div>
-
-          <div class="audio-control-card">
-            <div class="audio-slider-row">
-              <span class="audio-slider-copy">
-                <strong>Pop-Up Volume</strong>
-                <small>Controls the popup sound for notifications, achievements, and streak rewards.</small>
-              </span>
-              <div class="audio-slider-actions">
-                <span id="popup-volume-value" class="audio-slider-value">70%</span>
-                <button id="mute-popup-volume-btn" type="button" class="audio-inline-button">Mute</button>
-              </div>
-            </div>
-            <input id="popup-volume-slider" class="range-slider" type="range" min="0" max="100" step="1" value="70" aria-label="Pop-up volume" />
-          </div>
-
-          <p id="audio-status" class="settings-inline-status section-hidden" aria-live="polite"></p>
-        </div>
-      </div>
-    </div>
-
-    <div class="settings-group">
-      <button class="settings-main" onclick="toggleOtherSettings()">
-        Other settings
-      </button>
-
-      <div id="other-message" style="display:none;">
-        Popup tools and testing live here.
-      </div>
-
-      <div id="other-options" class="settings-options settings-options-rich" style="display:none;">
-        <div class="settings-option-card">
-          <div class="settings-card-heading">
-            <strong>Pop-up settings</strong>
-            <small>Instantly remove any visible or queued popups if you want a clean screen.</small>
-          </div>
-          <div class="button-row audio-button-row">
-            <button id="clear-all-popups-btn" type="button">Remove all popups</button>
-          </div>
-          <p id="other-status" class="settings-inline-status section-hidden" aria-live="polite"></p>
-        </div>
-
-        <div class="settings-option-card">
-          <div class="settings-card-heading">
-            <strong>Testing</strong>
-            <small>Send yourself a test popup that uses the same style and sound as the real ones.</small>
-          </div>
-          <div class="settings-inline-fields">
-            <input id="testing-toast-title" type="text" maxlength="60" placeholder="Message title" aria-label="Message title" />
-            <input id="testing-toast-body" type="text" maxlength="140" placeholder="Message body" aria-label="Message body" />
-          </div>
-          <div class="button-row">
-            <button id="send-test-popup-btn" type="button">Send test popup</button>
-          </div>
-          <p id="testing-status" class="settings-inline-status section-hidden" aria-live="polite"></p>
-        </div>
-      </div>
-    </div>
-
+    The Language panel is the one left visible in the markup, and the other
+    four ship with `hidden`. That is deliberate: settings-page.js owns the
+    hidden state from the moment it boots, so a visible-then-hidden flash
+    would be the alternative. Every control on this page is built by script
+    anyway, so a visitor without JS gets the headings rather than a working
+    page either way.
+  -->
+  <div class="settings-tabs" role="tablist" aria-label="Settings categories">
+    <button type="button" class="settings-tab" role="tab" id="settings-tab-language"
+            data-settings-tab="language" aria-controls="settings-panel-language"
+            aria-selected="true">Language</button>
+    <button type="button" class="settings-tab" role="tab" id="settings-tab-accessibility"
+            data-settings-tab="accessibility" aria-controls="settings-panel-accessibility"
+            aria-selected="false" tabindex="-1">Accessibility</button>
+    <button type="button" class="settings-tab" role="tab" id="settings-tab-theme"
+            data-settings-tab="theme" aria-controls="settings-panel-theme"
+            aria-selected="false" tabindex="-1">Theme</button>
+    <button type="button" class="settings-tab" role="tab" id="settings-tab-audio"
+            data-settings-tab="audio" aria-controls="settings-panel-audio"
+            aria-selected="false" tabindex="-1">Audio</button>
+    <button type="button" class="settings-tab" role="tab" id="settings-tab-developer"
+            data-settings-tab="developer" aria-controls="settings-panel-developer"
+            aria-selected="false" tabindex="-1">Developer</button>
   </div>
 
-</section>
+  <section class="settings-box">
+
+  <!-- ============================ LANGUAGE ============================ -->
+  <div class="settings-panel" id="settings-panel-language" role="tabpanel"
+       aria-labelledby="settings-tab-language" tabindex="0">
+
+    <div class="settings-option-card">
+      <div class="settings-card-heading">
+        <strong>Site language</strong>
+        <small>
+          Pick a language and the site text is translated shortly after. Some
+          names and places are translated by hand and are always correct.
+        </small>
+      </div>
+
+      <div id="lang-buttons" class="lang-grid"></div>
+
+      <p id="lang-status" class="settings-inline-status section-hidden" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <!-- ========================= ACCESSIBILITY ========================== -->
+  <div class="settings-panel" id="settings-panel-accessibility" role="tabpanel"
+       aria-labelledby="settings-tab-accessibility" tabindex="0" hidden>
+
+    <div class="settings-option-card textsize-settings-card" id="textsize-buttons"></div>
+
+    <div class="settings-option-card">
+      <div class="settings-card-heading">
+        <strong>Animations</strong>
+        <small>
+          How much the site moves. <b>Reduced</b> keeps everything but runs it
+          four times quicker; <b>None</b> switches movement off. Hover tints and
+          the focus ring are never taken away, because they are how the site
+          tells you what is clickable.
+        </small>
+      </div>
+
+      <div class="settings-choice-grid" role="group" aria-label="Animation level">
+        <button type="button" class="settings-choice" data-anim-choice="normal" aria-pressed="false">
+          <strong>Normal</strong>
+          <small>Full speed.</small>
+        </button>
+        <button type="button" class="settings-choice" data-anim-choice="reduced" aria-pressed="false">
+          <strong>Reduced</strong>
+          <small>Same movement, 75% less time.</small>
+        </button>
+        <button type="button" class="settings-choice" data-anim-choice="none" aria-pressed="false">
+          <strong>None</strong>
+          <small>Nothing moves.</small>
+        </button>
+      </div>
+
+      <p class="settings-note" data-anim-system-note>
+        Your system asks for reduced motion, so that is what a first visit
+        starts on. Choosing here overrides it.
+      </p>
+    </div>
+
+    <div class="settings-option-card">
+      <div class="settings-card-heading">
+        <strong>Sidebar width</strong>
+        <small>
+          The same width the drag handle and its arrow keys set. Dragging the
+          handle still works, and this slider follows along.
+        </small>
+      </div>
+
+      <div class="audio-control-card">
+        <div class="audio-slider-row">
+          <span class="audio-slider-copy">
+            <strong>Width</strong>
+            <small>From 220px to 500px.</small>
+          </span>
+          <span id="sidebar-width-value" class="audio-slider-value">280px</span>
+        </div>
+        <input id="sidebar-width-slider" class="range-slider" type="range"
+               min="220" max="500" step="4" value="280" aria-label="Sidebar width" />
+      </div>
+
+      <div class="button-row">
+        <button type="button" id="sidebar-width-reset-btn">Back to 280px</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================== THEME ============================= -->
+  <div class="settings-panel" id="settings-panel-theme" role="tabpanel"
+       aria-labelledby="settings-tab-theme" tabindex="0" hidden>
+
+    <div class="settings-option-card">
+      <div class="settings-card-heading">
+        <strong>Color theme</strong>
+        <small>Applies to the whole site straight away.</small>
+      </div>
+
+      <div id="theme-buttons" class="theme-grid"></div>
+    </div>
+  </div>
+
+  <!-- ============================== AUDIO ============================= -->
+  <div class="settings-panel" id="settings-panel-audio" role="tabpanel"
+       aria-labelledby="settings-tab-audio" tabindex="0" hidden>
+
+    <div class="settings-option-card audio-slider-list" id="audio-options">
+      <div class="audio-control-card">
+        <div class="audio-slider-row">
+          <span class="audio-slider-copy">
+            <strong>Master Volume</strong>
+            <small>Controls every site sound at once, including popups and future music.</small>
+          </span>
+          <div class="audio-slider-actions">
+            <span id="master-volume-value" class="audio-slider-value">100%</span>
+            <button id="mute-master-volume-btn" type="button" class="audio-inline-button">Mute</button>
+          </div>
+        </div>
+        <input id="master-volume-slider" class="range-slider" type="range" min="0" max="100" step="1" value="100" aria-label="Master volume" />
+      </div>
+
+      <div class="audio-control-card">
+        <div class="audio-slider-row">
+          <span class="audio-slider-copy">
+            <strong>Music Volume</strong>
+            <small>Controls the site music player from the menu, and stays in sync everywhere.</small>
+          </span>
+          <div class="audio-slider-actions">
+            <span id="music-volume-value" class="audio-slider-value">70%</span>
+            <button id="mute-music-volume-btn" type="button" class="audio-inline-button">Mute</button>
+          </div>
+        </div>
+        <input id="music-volume-slider" class="range-slider" type="range" min="0" max="100" step="1" value="70" aria-label="Music volume" />
+      </div>
+
+      <div class="audio-control-card">
+        <div class="audio-slider-row">
+          <span class="audio-slider-copy">
+            <strong>Pop-Up Volume</strong>
+            <small>Controls the popup sound for notifications, achievements, and streak rewards.</small>
+          </span>
+          <div class="audio-slider-actions">
+            <span id="popup-volume-value" class="audio-slider-value">70%</span>
+            <button id="mute-popup-volume-btn" type="button" class="audio-inline-button">Mute</button>
+          </div>
+        </div>
+        <input id="popup-volume-slider" class="range-slider" type="range" min="0" max="100" step="1" value="70" aria-label="Pop-up volume" />
+      </div>
+
+      <p id="audio-status" class="settings-inline-status section-hidden" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <!-- ============================ DEVELOPER =========================== -->
+  <div class="settings-panel" id="settings-panel-developer" role="tabpanel"
+       aria-labelledby="settings-tab-developer" tabindex="0" hidden>
+
+    <div class="settings-option-card">
+      <div class="settings-card-heading">
+        <strong>Pop-up settings</strong>
+        <small>Instantly remove any visible or queued popups if you want a clean screen.</small>
+      </div>
+      <div class="button-row audio-button-row">
+        <button id="clear-all-popups-btn" type="button">Remove all popups</button>
+      </div>
+      <p id="other-status" class="settings-inline-status section-hidden" aria-live="polite"></p>
+    </div>
+
+    <div class="settings-option-card">
+      <div class="settings-card-heading">
+        <strong>Testing</strong>
+        <small>Send yourself a test popup that uses the same style and sound as the real ones.</small>
+      </div>
+      <div class="settings-inline-fields">
+        <input id="testing-toast-title" type="text" maxlength="60" placeholder="Message title" aria-label="Message title" />
+        <input id="testing-toast-body" type="text" maxlength="140" placeholder="Message body" aria-label="Message body" />
+      </div>
+      <div class="button-row">
+        <button id="send-test-popup-btn" type="button">Send test popup</button>
+      </div>
+      <p id="testing-status" class="settings-inline-status section-hidden" aria-live="polite"></p>
+    </div>
+
+    <div class="settings-option-card">
+      <div class="settings-card-heading">
+        <strong>What is synced, and what is only on this device</strong>
+        <small>
+          Every setting on this page is stored in this browser only. None of
+          them are uploaded, which is worth knowing before you reset or clear
+          them.
+        </small>
+      </div>
+      <dl class="settings-facts">
+        <dt>Only on this device</dt>
+        <dd>
+          Theme, text size, language, animation level, sidebar width, the three
+          audio levels, which music track was playing and which tracks you
+          have switched off. They live in this browser's local storage, so they
+          follow you between pages and survive closing the tab, but they do not
+          follow you to another device or another browser. Clearing site data
+          here removes them and only here.
+        </dd>
+
+        <dt>Kept on your account</dt>
+        <dd>
+          Your sign-in details, profile, friends and messages, achievements and
+          the site time you have spent. Those are the things that follow you
+          between devices, and none of them are touched by the Reset button
+          below.
+        </dd>
+      </dl>
+    </div>
+
+    <div class="settings-option-card settings-danger-card">
+      <div class="settings-card-heading">
+        <strong>Reset all settings</strong>
+        <small>
+          Puts every setting on this page back to how the site ships: default
+          theme, default text size, English, Normal animations, the default
+          sidebar width and the default audio levels. Your account, your
+          progress and your achievements are not touched.
+        </small>
+      </div>
+      <div class="button-row">
+        <button type="button" id="reset-all-settings-btn" class="settings-danger-button">Reset everything</button>
+      </div>
+      <p id="reset-status" class="settings-inline-status section-hidden" aria-live="polite"></p>
+    </div>
+  </div>
+
+  </section>
 
 </body>
 </html>

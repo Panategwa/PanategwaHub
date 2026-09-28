@@ -650,7 +650,7 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
       startAchievementSpotlight(targetId);
       setTimeout(() => {
         document.getElementById(`achievement-card-${targetId}`)?.scrollIntoView({
-          behavior: "smooth",
+          behavior: window.PanategwaScrollBehavior ? window.PanategwaScrollBehavior() : "smooth",
           block: "center"
         });
       }, 180);
@@ -975,7 +975,7 @@ function renderAchievements(state) {
       : (achievement.requirement?.note || achievement.description);
 
     return `
-      <div class="achievement-card ${isUnlocked ? "unlocked" : "locked"}" id="achievement-card-${escapeHtml(achievement.id)}" data-achievement-id="${escapeHtml(achievement.id)}">
+      <div class="achievement-card ${isUnlocked ? "unlocked" : "locked"}" id="achievement-card-${escapeHtml(achievement.id)}" data-achievement-id="${escapeHtml(achievement.id)}" data-anim="full">
         <div class="achievement-status ${isUnlocked ? "unlocked" : "locked"}">${isUnlocked ? "Unlocked" : "Locked"}</div>
         <div class="achievement-copy">
           <div class="achievement-name">${escapeHtml(title)}</div>

@@ -168,8 +168,10 @@ function buildTextSizeButtons() {
     </div>
   `;
 
-  container.style.display = "none";
-
+  // No display:none here any more. The text size card lives inside the
+  // Accessibility category, and the category panel owns its own visibility --
+  // this used to hide the container on every init, which left the card
+  // invisible even with the right category open.
   container.querySelectorAll("[data-textsize-preset]").forEach((btn) => {
     btn.addEventListener("click", () => setTextSize(btn.dataset.textsizePreset || "medium"));
   });
@@ -185,16 +187,10 @@ function buildTextSizeButtons() {
   });
 }
 
-function toggleTextSizes() {
-  const container = document.getElementById("textsize-buttons");
-  const msg = document.getElementById("textsize-message");
-
-  if (!container || !msg) return;
-
-  const open = container.classList.toggle("is-open");
-  container.style.display = open ? "block" : "none";
-  msg.style.display = open ? "block" : "none";
-}
+// The settings page's Reset button needs to put the size back without
+// synthesising a click, and these are classic scripts rather than modules, so
+// the setters are published for it to call.
+window.setTextSize = setTextSize;
 
 function initTextSize() {
   buildTextSizeButtons();

@@ -53,7 +53,7 @@ import "./router.js";
 // module of its own, add a new key.
 var PAGE_MODULES = {
   "account-page.html": ["../auth/account.js", "../auth/settings.js"],
-  "settings-page.html": ["../settings/audio-settings.js"],
+  "settings-page.html": ["../settings/audio-settings.js", "../settings/settings-page.js"],
   "streak-page.html": ["../auth/streak.js"]
 };
 

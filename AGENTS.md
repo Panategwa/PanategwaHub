@@ -251,7 +251,7 @@ evaluate only on the page that needs them — after everything the shared import
 above have already booted:
 
 - **`account-page.html`** → `auth/account.js`, `auth/settings.js`
-- **`settings-page.html`** → `settings/audio-settings.js`
+- **`settings-page.html`** → `settings/audio-settings.js`, `settings/settings-page.js`
 - **`streak-page.html`** → `auth/streak.js`
 
 **A page carries exactly one `<script type="module">` tag**, the one pointing at
@@ -302,6 +302,134 @@ Two rules were deliberately moved out of `account.css` into `general.css`:
 had to stop being account-only. The reverse also holds: `account.css` keeps a
 second `:root` block, but nothing outside that file references those ten
 properties, so they no longer leak onto pages that never load it.
+
+### Settings Page
+
+The settings page is **five categories**, shown as a tab bar with one panel
+visible at a time, rather than five stacked expandable sections:
+
+| Category | Holds |
+| --- | --- |
+| Language | the 24-language grid |
+| Accessibility | text size, animation level, sidebar width |
+| Theme | the theme grid |
+| Audio | master, music and pop-up volume |
+| Developer | pop-up tools, testing, what is stored where, reset |
+
+`settings/settings-page.js` owns the tabs, the animation buttons, the width
+slider and the reset. The five tab buttons carry `data-settings-tab` and
+`aria-controls`; the panels carry `role="tabpanel"`, and all but the Language
+one ship with `hidden` so a visitor without JS gets the headings rather than a
+flash of five panels. Tabs use a **roving tabindex** — only the selected tab is
+in the tab order and the arrow/Home/End keys move between them.
+
+The animation preference is deliberately *not* handled there. It has to be in
+force before the first paint on every page, or the site visibly animates itself
+in and then settles, which is precisely what someone who needs reduced motion
+is trying to avoid. So `settings/settings.js` — which every page loads —
+applies it, and the settings page only writes the choice.
+
+**Every setting on this page is `localStorage` only.** Nothing here is written
+to Firestore: the account, profile, friends, achievements and site time are the
+things that follow a visitor between devices. The Developer category says so,
+so keep it true if the storage ever changes.
+
+The languages are one button each in a wrapping grid, `.lang-grid`. They were a
+single full-width button per row, which made the list 1120px tall and started
+535px down the page — a wall of rows with seven entries above the fold, which is
+what made the picker look like it was missing rather than merely below the
+viewport.
+
+### Animation Tiers
+
+The Animation setting (Accessibility → Animations) writes one attribute on
+`<html>` and everything else is CSS, so no module has to ask what the
+preference is:
+
+- `data-anim="normal" | "reduced" | "none"` — the resolved tier, which
+  general.css keys off
+- `data-anim-choice` — present only once the visitor has actually chosen. Its
+  presence is what stops the OS preference from overriding them, so **do not
+  scope a selector to a bare `[data-anim-choice]`**: that attribute name is
+  shared with the settings page's buttons. Use `button[data-anim-choice]`.
+
+The three tiers, defined once in the ANIMATION TIERS block in `general.css`:
+
+| Tier | Effect |
+| --- | --- |
+| Normal | nothing changes |
+| Reduced | `data-anim="full"` elements run 4× quicker — 75% less time, not less movement |
+| None | `optional` and `full` elements lose their transitions and animations entirely |
+
+Elements opt in with a `data-anim` attribute naming the tier they belong to:
+
+| Value | Meaning | Current users |
+| --- | --- | --- |
+| `always` | feedback that would be wrong to remove — hover tints, focus ring, presses | (none yet; the shared `button` rules are the place to start) |
+| `optional` | decorative movement, normal or off | (none yet) |
+| `full` | movement that *is* the feature — a faster version still communicates | the music player's unravel, the achievement spotlight |
+
+To make a duration respect Reduced, multiply it by the scale:
+
+```css
+transition: background-color calc(0.16s * var(--anim-scale, 1)) ease;
+```
+
+`--anim-scale` is `1` by default and only `0.25` on a `data-anim="full"`
+element while `<html>` is `data-anim="reduced"`, which is what keeps an
+`optional` or `always` element unchanged by Reduced. The `None` rule is
+belt-and-braces: it force-zeroes `transition-duration` with `!important`, so a
+duration written without the scale still gets switched off.
+
+`prefers-reduced-motion: reduce` is honoured **on a first visit only** — a
+visitor who has never chosen a tier starts on Reduced. Once they pick one, the
+stored choice wins and the system preference is not consulted again.
+
+Two traps, both of which have already bitten:
+
+- **A custom property declared loose between two rules is not valid CSS.** The
+  parser folds the following selector into it as one malformed rule and drops
+  both. Declared values like this must live in a real `:root { }` — see
+  `--spotlight-*` in `account.css`, which is where they are.
+- **`scrollIntoView({ behavior: "smooth" })` is a script request**, so no
+  stylesheet can talk it out of animating. Anything that scrolls on the user's
+  behalf should ask `window.PanategwaScrollBehavior()` instead of hardcoding
+  `"smooth"`; it returns `"auto"` under `None`.
+
+### Music Player Collapsing
+
+The sidebar music player **unravels** rather than being `display:none`d, and the
+unravel reverses cleanly. The technique is `grid-template-rows: 0fr → 1fr` with
+`overflow: hidden` on a single child. Animating `height` would not work — it is
+a layout property with no transition — and the old auto-height trick needed a
+hard-coded pixel value that broke whenever the panel's contents changed height.
+
+Two things are load-bearing:
+
+- **The wrapper must survive a re-render.** `renderMenuMusic` rewrites the card,
+  and a transition needs the same element on both sides of the change, so the
+  slot's own `innerHTML` is written exactly once, by `ensureMusicShell`, which
+  creates a persistent `#menu-music-head-host` (rewritten every render) and a
+  persistent `#menu-music-unravel` (never rewritten). **A `menuSlot.innerHTML =`
+  line in `renderMenuMusic` destroys the wrapper**, `ensureMusicShell` quietly
+  builds a new one, and the player snaps open with no animation at all — which
+  looks correct in a screenshot. Only the panel *inside* the wrapper is
+  replaced. The `.is-open` class is what changes state.
+- **The card's surface is split across two boxes.** The header and the panel are
+  siblings, not nested, so the shared border/background lives on both. Anything
+  that would still occupy space when rolled up — padding, border, margin —
+  belongs on `.menu-music-panel`, never on the wrapper, or it survives the
+  collapse as a sliver. `min-height: 0` on the inner is likewise required, not
+  cosmetic: a grid item defaults to `min-height: auto` and pins the row open.
+
+The inner uses `visibility`, not `display`, with a delay equal to the duration,
+so opening reveals the content immediately and closing hides it only once it has
+finished winding away. That also takes the collapsed player out of the tab order
+and the accessibility tree, which the old `display: none` used to do. The
+duration is `--anim-unravel` in `menu.css`, and the wrapper is
+`data-anim="full"`, so **Reduced** quickens it to 0.25s and **None** switches it
+off. A second of large-area movement is exactly what someone who has asked for
+reduced motion wants less of, and a faster unravel still reads as an unravel.
 
 ### Theme System
 
@@ -417,6 +545,7 @@ does) needs `../../../` instead.
 │   └── site.js                 # Sidebar behavior (avatar, site time, resize)
 ├── settings/
 │   ├── settings.js           # Bootstrap loader for settings scripts
+│   ├── settings-page.js      # Settings page: category tabs, animation, width, reset
 │   ├── text-size.js          # Text size customization
 │   ├── color-theme.js        # Theme list — 5 base colors per theme
 │   ├── translate.js          # Language translation

@@ -134,6 +134,20 @@ they no longer leak into pages that do not load it.
   --button-hover-border: rgba(191, 219, 254, 0.34);
   --button-shadow: 0 14px 30px rgba(2, 6, 23, 0.18);
   --soft-shadow: 0 24px 54px rgba(2, 6, 23, 0.22);
+
+  /* --- achievement spotlight ---
+     The three values worth changing, in one place. They live here rather than
+     next to the rules that use them because a custom property declared loose
+     between two rules is not valid CSS: the parser folds the following
+     selector into it as one malformed rule and drops both, which is how the
+     spotlight quietly stopped dimming anything.
+
+     The dim level is an opacity, where 0 is invisible and 1 is opaque, so
+     "more transparent" is the smaller number. 0.25 leaves a quarter of each
+     card's opacity showing, against 0.5 before. */
+  --spotlight-dim-opacity: 0.25;
+  --spotlight-lift: rgba(255, 255, 255, 0.25);
+  --spotlight-settle: 3s;
 }
 
     .account-wrap {
@@ -721,8 +735,17 @@ they no longer leak into pages that do not load it.
          transitions, so removing the spotlight class is what animates -- see
          .is-spotlighting below. background-color has to be in this list or the
          lifted fill snaps off the instant the class is dropped, while the
-         opacity keeps easing for its full three seconds. */
-      transition: opacity 3s ease, background-color 3s ease, filter 3s ease;
+         opacity keeps easing for its full settle time.
+
+         Multiplied by --anim-scale so the Animations setting's Reduced tier
+         shortens the three-second fade back rather than just the music player.
+         The two timers in account.js stay as they are: they decide when the
+         class comes off, and holding a card still for two seconds is not
+         motion. */
+      transition:
+        opacity calc(var(--spotlight-settle, 3s) * var(--anim-scale, 1)) ease,
+        background-color calc(var(--spotlight-settle, 3s) * var(--anim-scale, 1)) ease,
+        filter calc(var(--spotlight-settle, 3s) * var(--anim-scale, 1)) ease;
     }
 
     .achievement-card.locked {
@@ -736,8 +759,8 @@ they no longer leak into pages that do not load it.
     }
 
     /* Spotlight: opening a notification for an achievement lands on that card
-       and lifts it out of the list with everything else pushed back to half
-       opacity, for two seconds, before the whole thing eases back over three.
+       and lifts it out of the list with everything else pushed well back, for
+       two seconds, before the whole thing eases back over three.
 
        The lift is a background-color rather than filter: brightness() washed
        over the text and the status pill as well and needed an accent ring to
@@ -750,15 +773,18 @@ they no longer leak into pages that do not load it.
        `transition: none`, so adding the class lands instantly and *removing* it
        is what performs the fade back. One class therefore drives both halves,
        and no script has to animate anything -- the timers in account.js only
-       decide when to drop it. */
+       decide when to drop it.
+
+       The dim level, the lifted fill and the settle time are the
+       --spotlight-* custom properties on :root at the top of this file. */
     .achievement-list.is-spotlighting .achievement-card {
-      opacity: 0.5;
+      opacity: var(--spotlight-dim-opacity, 0.25);
       transition: none;
     }
 
     .achievement-list.is-spotlighting .achievement-card.is-spotlight {
       opacity: 1;
-      background-color: rgba(255, 255, 255, 0.25);
+      background-color: var(--spotlight-lift, rgba(255, 255, 255, 0.25));
     }
 
     .achievement-status {

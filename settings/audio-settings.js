@@ -62,16 +62,6 @@ function syncAudioControls(settings = getToastAudioSettings()) {
   if ($("mute-music-volume-btn")) $("mute-music-volume-btn").textContent = musicVolume > 0 ? "Mute" : "Unmute";
 }
 
-function togglePanel(messageId, optionsId) {
-  const message = $(messageId);
-  const options = $(optionsId);
-  if (!message || !options) return;
-
-  const open = options.classList.toggle("is-open");
-  options.style.display = open ? "block" : "none";
-  message.style.display = open ? "block" : "none";
-}
-
 function sendTestPopup() {
   ensurePanategwaToast();
   const title = String($("testing-toast-title")?.value || "").trim() || "Message title";
@@ -210,9 +200,6 @@ function start() {
   syncAudioControls();
   bindAudioControls();
 }
-
-window.toggleAudioSettings = () => togglePanel("audio-message", "audio-options");
-window.toggleOtherSettings = () => togglePanel("other-message", "other-options");
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", function () {

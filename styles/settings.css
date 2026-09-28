@@ -1,33 +1,141 @@
 /* =========================
    SETTINGS.CSS
    =========================
-The standalone settings page: theme picker, text size presets and the
-audio controls injected by settings/audio-settings.js. Only
-settings-page.html links it.
+   The standalone settings page: the five category tabs, the language and
+   theme grids, the text size, animation, sidebar width and audio controls, and
+   the Developer cards. The behaviour is settings/settings-page.js (page
+   specific) and settings/settings.js (shared); the animation tiers this page
+   sets are defined in general.css. Only settings-page.html links this file.
    ========================= */
 
-.settings-group {
+.settings-page-title {
+  margin-bottom: 4px;
+}
+
+.settings-page-lede {
+  margin: 0 auto 20px;
+  max-width: 720px;
+  opacity: 0.8;
+  line-height: 1.5;
+}
+
+/* ------------------------------------------------------------
+   Category tabs
+   ------------------------------------------------------------
+   Five buttons in a row, each naming a panel below. They wrap to a
+   single column rather than scroll horizontally: a tab bar that has to
+   be dragged sideways to find its last entry is no quicker than the
+   vertical list of five headings it replaced. */
+.settings-tabs {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  width: min(720px, 100%);
+  margin: 0 auto 20px;
 }
 
-.settings-main {
-  width: 200px;
-  height: 100px;
-  font-size: 20px;
-  cursor: pointer;
-}
-
-.settings-options button {
-  width: 100%;
+.settings-tab {
+  flex: 1 1 130px;
   margin: 0;
-  box-sizing: border-box;
+  padding: 12px 10px;
+  border-radius: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
-.settings-options-rich {
-  width: min(560px, 100%);
+.settings-tab[aria-selected="true"] {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.06)),
+    rgba(59, 130, 246, 0.28);
+  border-color: rgba(191, 219, 254, 0.36);
+  box-shadow: 0 18px 34px rgba(37, 99, 235, 0.24);
+  color: var(--button-text);
+}
+
+/* The selected tab has to keep its own look on hover and press, or the shared
+   hover fill would replace the "you are here" state -- the same trap
+   .theme-button.active below already had to be taught. */
+.settings-tab[aria-selected="true"]:hover,
+.settings-tab[aria-selected="true"]:active {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.06)),
+    rgba(59, 130, 246, 0.28);
+  border-color: rgba(191, 219, 254, 0.36);
+  color: var(--button-text);
+  transform: none;
+}
+
+/* A hidden panel is display:none, which is what `hidden` already does; this
+   is only here to stop a .settings-panel rule in the cascade from giving it a
+   display value again. */
+.settings-panel[hidden] {
+  display: none;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 16px;
+  width: min(720px, 100%);
+  margin: 0 auto;
+  /* tabindex="0" makes the panel focusable so the arrow keys work from
+     anywhere inside it; without an outline the focus would be invisible. */
+  outline: none;
+}
+
+/* ------------------------------------------------------------
+   Language
+   ------------------------------------------------------------
+   Twenty-four languages as a wrapping grid of small buttons.
+
+   They were one full-width button per row, which made the list 1120px tall
+   and started 535px down the page: a wall of rows with seven entries above
+   the fold, which is what made the picker look like it was missing. A
+   fixed-ish track count puts the whole list in a few rows where all of
+   it is reachable at once. */
+.lang-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.lang-grid button {
+  width: auto;
+  margin: 0;
+  padding: 10px 8px;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+
+.lang-grid button.active {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.06)),
+    rgba(59, 130, 246, 0.28);
+  border-color: rgba(191, 219, 254, 0.36);
+  color: var(--button-text);
+}
+
+.lang-grid button.active:hover,
+.lang-grid button.active:active {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.06)),
+    rgba(59, 130, 246, 0.28);
+  border-color: rgba(191, 219, 254, 0.36);
+  color: var(--button-text);
+  transform: none;
+}
+
+/* ------------------------------------------------------------
+   Theme
+   ------------------------------------------------------------ */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+  width: 100%;
 }
 
 .settings-option-card {
@@ -156,7 +264,108 @@ settings-page.html links it.
   gap: 12px;
 }
 
+/* ------------------------------------------------------------
+   Animation level
+   ------------------------------------------------------------
+   Three labelled buttons rather than a select or a switch, because the
+   three options need their explanation next to them -- "Reduced" on its
+   own does not say what it does, and a switch can only ever say on/off. */
+.settings-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-choice {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 12px 10px;
+  border-radius: 14px;
+  text-align: left;
+  line-height: 1.35;
+}
+
+.settings-choice small {
+  opacity: 0.78;
+  font-weight: 400;
+}
+
+.settings-choice.active {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.06)),
+    rgba(59, 130, 246, 0.28);
+  border-color: rgba(191, 219, 254, 0.36);
+  box-shadow: 0 18px 34px rgba(37, 99, 235, 0.24);
+  color: var(--button-text);
+}
+
+.settings-choice.active:hover,
+.settings-choice.active:active {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.06)),
+    rgba(59, 130, 246, 0.28);
+  border-color: rgba(191, 219, 254, 0.36);
+  color: var(--button-text);
+  transform: none;
+}
+
+.settings-note {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  opacity: 0.82;
+  padding-left: 12px;
+  border-left: 3px solid var(--surface-border-strong);
+}
+
+/* ------------------------------------------------------------
+   Developer
+   ------------------------------------------------------------ */
+.settings-facts {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  text-align: left;
+}
+
+.settings-facts dt {
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.settings-facts dt:first-child {
+  margin-top: 0;
+}
+
+.settings-facts dd {
+  margin: 0;
+  opacity: 0.82;
+  line-height: 1.5;
+  font-size: 0.94rem;
+}
+
+.settings-danger-card {
+  border-color: color-mix(in srgb, var(--c-accent) 26%, var(--c-line));
+}
+
+.settings-danger-button {
+  border-color: color-mix(in srgb, var(--c-accent) 55%, var(--c-line));
+  font-weight: 700;
+}
+
 @media (max-width: 640px) {
+  /* Three labelled choices side by side stop being readable well before this
+     width; one per row keeps each one's explanation intact. */
+  .settings-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lang-grid,
+  .theme-grid {
+    grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  }
+
   .audio-slider-row {
     flex-direction: column;
     align-items: stretch;
@@ -206,7 +415,7 @@ settings-page.html links it.
 
 .theme-button {
   width: 100%;
-  margin: 5px 0;
+  margin: 0;
   padding: 10px;
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,0.14);

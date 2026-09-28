@@ -189,7 +189,6 @@ function buildThemeButtons() {
   if (!container) return;
 
   container.innerHTML = "";
-  container.style.display = "none";
 
   THEMES.forEach(theme => {
     const btn = document.createElement("button");
@@ -204,16 +203,11 @@ function buildThemeButtons() {
   });
 }
 
-function toggleThemes() {
-  const container = document.getElementById("theme-buttons");
-  const msg = document.getElementById("theme-message");
-
-  if (!container || !msg) return;
-
-  const open = container.classList.toggle("is-open");
-  container.style.display = open ? "block" : "none";
-  msg.style.display = open ? "block" : "none";
-}
+// The settings page's Reset button needs to put the theme back without
+// synthesising a click, and this is a classic script rather than a module, so
+// the setter is published for it to call.
+window.setTheme = setTheme;
+window.PanategwaDefaultThemeName = THEMES[0].name;
 
 function initTheme() {
   buildThemeButtons();

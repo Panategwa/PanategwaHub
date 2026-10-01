@@ -207,9 +207,26 @@ function bindSidebarWidth() {
     slider.removeEventListener("change", onChange);
   });
 
-  $("sidebar-width-reset-btn")?.addEventListener("click", () => {
-    syncSidebarWidth(window.PanategwaSetMenuWidth(range.default));
-  });
+  // The handle broadcasts its width from inside site.js, so the slider follows
+  // a drag, an arrow-key press or a double-click on it. It also fires for this
+  // slider's own writes, which is harmless: syncSidebarWidth already skips
+  // reassigning a focused slider, so the two controls converge instead of
+  // fighting.
+  const onWidthChange = (event) => {
+    const width = Number(event?.detail?.width);
+    if (Number.isFinite(width)) syncSidebarWidth(width);
+  };
+  window.addEventListener("panategwa:menuwidthchange", onWidthChange);
+  disposers.push(() => window.removeEventListener("panategwa:menuwidthchange", onWidthChange));
+
+  const resetBtn = $("sidebar-width-reset-btn");
+  if (resetBtn) {
+    const onResetClick = () => {
+      syncSidebarWidth(window.PanategwaSetMenuWidth(range.default));
+    };
+    resetBtn.addEventListener("click", onResetClick);
+    disposers.push(() => resetBtn.removeEventListener("click", onResetClick));
+  }
 }
 
 // ========================================================

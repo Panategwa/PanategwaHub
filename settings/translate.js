@@ -71,7 +71,13 @@ const PROPER_NOUNS = {
   "Panategwa Hub": {},
   "Thrinsachelom": {},
   "Dendrospheres": {},
-  "Pitons": {}
+  "Pitons": {},
+  // Singular forms. The Pitons page's headings use them, and the plural entry
+  // above only protected the plural -- so "The Piton Race" came back as
+  // "La carrera del Pitón", the service having treated the coined word as the
+  // ordinary Spanish noun for a mountain peak.
+  "Piton": {},
+  "Piton Race": {}
 };
 
 function buildManualTranslations() {
@@ -116,6 +122,13 @@ const MANUAL_PHRASES = Object.keys(MANUAL_TRANSLATIONS.en || {}).sort(
 );
 
 let isTranslating = false;
+// The language a run is currently working towards, and the one asked for while
+// it was running. The old `if (isTranslating) return;` guard threw the second
+// request away rather than queueing it, so picking a language and then picking
+// another before the first finished left the page showing the first language
+// while the settings said otherwise.
+let activeLang = null;
+let pendingLang = null;
 const ORIGINAL_TEXT = new WeakMap();
 
 function getCurrentLang() {
@@ -268,28 +281,112 @@ function markOriginals() {
   }
 }
 
-async function googleTranslate(text, lang) {
-  if (lang === "en") return text;
+// The number of strings to put in one request. The service caps a request at
+// roughly 5000 characters, so this is a character budget rather than a fixed
+// count -- a page of short labels gets many more per request than a page of
+// long paragraphs does, and the limit is what actually matters.
+const MAX_BATCH_CHARS = 1400;
+const BATCH_SEP = "\n";
 
-  try {
-    const res = await fetch(
-      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${lang}&dt=t&q=${encodeURIComponent(text)}`
-    );
+function translateEndpoint(lang) {
+  return `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${lang}&dt=t&q=`;
+}
 
-    const data = await res.json();
-
-    let translated = "";
-    if (data?.[0]) {
-      for (const part of data[0]) {
-        if (part?.[0]) translated += part[0];
-      }
-    }
-
-    return translated || text;
-  } catch (err) {
-    console.log("Translation failed:", err);
-    return text;
+function joinBatchResponse(data) {
+  if (!Array.isArray(data?.[0])) return "";
+  let text = "";
+  for (const part of data[0]) {
+    if (part?.[0]) text += part[0];
   }
+  return text;
+}
+
+async function requestTranslation(payload, lang) {
+  const res = await fetch(translateEndpoint(lang) + encodeURIComponent(payload));
+  return joinBatchResponse(await res.json());
+}
+
+// Translates a list of strings in as few requests as possible.
+//
+// This exists because the previous version sent one request per text node. The
+// account page has 279 text nodes, so picking a language fired 279 requests ten
+// at a time and took about five seconds -- nearly all of it waiting on the
+// network round trip rather than doing any work. Joining the strings with a
+// newline and sending them together is about eleven times faster in practice.
+//
+// The newline is what makes it work, and the caveat is that it only works
+// because every string is normalized first. A string that already contains a
+// newline would come back as two lines and shift every string after it, so
+// normalize() (which collapses all whitespace runs to single spaces) has to run
+// before anything is joined. The line count is checked on the way back: if it
+// does not match, the batch is discarded and retried one string at a time, so a
+// surprise from the service costs a slow page rather than scrambled text.
+async function translateMany(texts, lang) {
+  if (!texts.length) return [];
+
+  const unique = [];
+  const seen = new Set();
+  for (const text of texts) {
+    const key = normalize(text);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(key);
+  }
+
+  const results = new Map();
+  const pending = [];
+
+  let batch = [];
+  let batchChars = 0;
+  const flush = () => {
+    if (!batch.length) return;
+    const group = batch;
+    const chars = batchChars;
+    batch = [];
+    batchChars = 0;
+    pending.push(
+      requestTranslation(group.join(BATCH_SEP), lang)
+        .then((out) => {
+          const lines = out.split(BATCH_SEP);
+          if (lines.length !== group.length) {
+            // The service did not preserve the line structure. Fall back to one
+            // request per string rather than writing the wrong text into the
+            // wrong nodes.
+            return Promise.all(group.map((t) => requestTranslation(t, lang)));
+          }
+          return lines.map((line) => line.trim());
+        })
+        .then((lines) => {
+          group.forEach((key, i) => results.set(key, lines[i] || key));
+        })
+        .catch((err) => {
+          console.log("Translation failed:", err);
+          group.forEach((key) => results.set(key, key));
+        })
+    );
+    return chars;
+  };
+
+  for (const text of unique) {
+    const cost = text.length + 1;
+    if (batch.length && batchChars + cost > MAX_BATCH_CHARS) flush();
+    batch.push(text);
+    batchChars += cost;
+  }
+  flush();
+
+  // A handful at a time, not all at once: the service rate-limits bursts, and
+  // a wide fan-out is what made this fragile rather than fast.
+  const CONCURRENCY = 4;
+  for (let i = 0; i < pending.length; i += CONCURRENCY) {
+    await Promise.all(pending.slice(i, i + CONCURRENCY));
+  }
+
+  return texts.map((text) => {
+    const key = normalize(text);
+    const hit = results.get(key);
+    return hit || key || text;
+  });
 }
 
 function syncNavigationForLanguage() {
@@ -335,14 +432,7 @@ function patchOnclick(code) {
   return out;
 }
 
-async function translatePage(lang) {
-  // Default to the stored/current language so a caller that forgets the
-  // argument degrades to the right behaviour instead of requesting
-  // "tl=undefined" and silently restoring the original English.
-  const target = lang || getCurrentLang();
-  if (isTranslating) return;
-  isTranslating = true;
-
+async function runTranslate(target) {
   markOriginals();
 
   const nodes = getTextNodes(document.body);
@@ -356,33 +446,99 @@ async function translatePage(lang) {
 
   if (target === "en") {
     syncNavigationForLanguage();
-    isTranslating = false;
     return;
   }
 
-  const batchSize = 10;
-  for (let i = 0; i < nodes.length; i += batchSize) {
-    const batch = nodes.slice(i, i + batchSize);
-    await Promise.all(batch.map(async (node) => {
-      const original = ORIGINAL_TEXT.get(node);
-      if (!original || !original.trim()) return;
+  // Collect the strings that actually need the service. The manual table is
+  // consulted first, so the seven hand-written proper nouns never cost a
+  // request, and duplicates are collapsed before anything is sent -- the
+  // sidebar alone repeats the same handful of labels on every page.
+  const manual = new Map();
+  const toTranslate = [];
 
-      if (MANUAL_TRANSLATIONS[target]?.[normalize(original)]) {
-        applyText(node, MANUAL_TRANSLATIONS[target][normalize(original)]);
-        return;
-      }
+  for (const node of nodes) {
+    const original = ORIGINAL_TEXT.get(node);
+    if (!original || !original.trim()) continue;
 
-      const protectedInfo = protectPhrases(original, target);
-      const translated = await googleTranslate(protectedInfo.output, target);
-      let restored = restorePhrases(translated, protectedInfo.replacements);
-      restored = restored.replace(/:\s*/g, ": ").replace(/,\s*/g, ", ").replace(/;\s*/g, "; ");
-      restored = restored.replace(/:([^\s])/g, ": $1");
-      applyText(node, restored);
-    }));
+    const key = normalize(original);
+    const fixed = MANUAL_TRANSLATIONS[target]?.[key];
+    if (fixed) {
+      manual.set(key, fixed);
+      continue;
+    }
+    if (!manual.has(key)) toTranslate.push(original);
+  }
+
+  // Protected proper nouns are substituted out before the join, so the
+  // placeholder tokens themselves are never inside a batched payload where a
+  // translator could reorder them.
+  const protectedByKey = new Map();
+  const sendable = toTranslate.map((text) => {
+    const info = protectPhrases(text, target);
+    protectedByKey.set(normalize(text), info.replacements);
+    return info.output;
+  });
+
+  const translated = await translateMany(sendable, target);
+
+  const finished = new Map(manual);
+  toTranslate.forEach((original, i) => {
+    let value = translated[i];
+    const replacements = protectedByKey.get(normalize(original)) || [];
+    value = restorePhrases(value, replacements);
+    value = value.replace(/:\s*/g, ": ").replace(/,\s*/g, ", ").replace(/;\s*/g, "; ");
+    value = value.replace(/:([^\s])/g, ": $1");
+    finished.set(normalize(original), value);
+  });
+
+  // A newer pick landed while this run was in flight. Its results are the
+  // wrong language, so stop rather than writing them; the caller restarts
+  // against the newer one, which re-reads the originals and starts clean.
+  if (pendingLang && pendingLang !== target) return;
+
+  for (const node of nodes) {
+    const original = ORIGINAL_TEXT.get(node);
+    if (!original || !original.trim()) continue;
+    const hit = finished.get(normalize(original));
+    if (hit) applyText(node, hit);
   }
 
   syncNavigationForLanguage();
-  isTranslating = false;
+}
+
+async function translatePage(lang) {
+  // Default to the stored/current language so a caller that forgets the
+  // argument degrades to the right behaviour instead of requesting
+  // "tl=undefined" and silently restoring the original English.
+  const target = lang || getCurrentLang();
+
+  if (isTranslating) {
+    pendingLang = target;
+    return;
+  }
+
+  isTranslating = true;
+  activeLang = target;
+
+  try {
+    do {
+      const run = activeLang;
+      pendingLang = null;
+      await runTranslate(run);
+      // Adopt the newer request only if it is genuinely a different language.
+      // Clearing it when it matches is what stops the loop: an identical
+      // request would otherwise restart a full page translation for nothing.
+      if (pendingLang && pendingLang !== run) {
+        activeLang = pendingLang;
+      } else {
+        pendingLang = null;
+      }
+    } while (pendingLang);
+  } finally {
+    isTranslating = false;
+    activeLang = null;
+    pendingLang = null;
+  }
 }
 
 function setLang(lang) {
@@ -471,9 +627,24 @@ function syncLanguageButtons() {
 }
 
 let navigationSyncFrame = 0;
+// The live observer. initTranslate() runs on every visit to the settings page,
+// not just on a document load, because the router swaps content without one.
+// Without disconnecting the previous one, each visit left another observer
+// watching the whole body, so the third visit to the page was walking every
+// link and button in the document three times per mutation burst.
+let navigationObserver = null;
 
 function startNavigationObserver() {
   if (!document.body) return null;
+
+  if (navigationObserver) {
+    navigationObserver.disconnect();
+    navigationObserver = null;
+  }
+  if (navigationSyncFrame) {
+    cancelAnimationFrame(navigationSyncFrame);
+    navigationSyncFrame = 0;
+  }
 
   const observer = new MutationObserver(() => {
     // Dynamic content -- friend lists, notifications, the music player -- mutates
@@ -495,6 +666,7 @@ function startNavigationObserver() {
     subtree: true
   });
 
+  navigationObserver = observer;
   return observer;
 }
 

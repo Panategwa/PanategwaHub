@@ -116,6 +116,8 @@ const THEMES = [
   }
 ];
 
+const DEFAULT_THEME_NAME = THEMES[0].name;
+
 function applyTheme(theme) {
   // Only the five base colours are written; every derived token updates
   // automatically because styles/general.css mixes them from these.
@@ -123,6 +125,12 @@ function applyTheme(theme) {
     document.documentElement.style.setProperty(key, value);
   }
 
+  // The default theme is still written here. It was briefly not stored, on the
+  // reasoning that a value the visitor never chose should not be persisted --
+  // which also kept ?theme= off every internal link, since syncThemeUrl reads
+  // this back. That turned out to change how the router classifies a link to
+  // the page you are already on (see the same-page branch in js/router.js), so
+  // it is deliberately not done: the URL is kept stamped with the theme.
   localStorage.setItem("theme", theme.name);
   window.dispatchEvent(new CustomEvent("panategwa:themechange", {
     detail: { theme: theme.name }
@@ -132,7 +140,9 @@ function applyTheme(theme) {
 function syncThemeUrl(name) {
   const url = new URL(window.location.href);
 
-  if (name) {
+  // A pre-existing ?theme= can still be there from a link, so compare against
+  // the default rather than relying on there being no stored value to find.
+  if (name && name !== DEFAULT_THEME_NAME) {
     url.searchParams.set("theme", name);
   } else {
     url.searchParams.delete("theme");
@@ -207,13 +217,21 @@ function buildThemeButtons() {
 // synthesising a click, and this is a classic script rather than a module, so
 // the setter is published for it to call.
 window.setTheme = setTheme;
-window.PanategwaDefaultThemeName = THEMES[0].name;
+window.PanategwaDefaultThemeName = DEFAULT_THEME_NAME;
 
 function initTheme() {
   buildThemeButtons();
 
+  // The URL is consulted before storage, not after. buildSettingsUrl writes
+  // ?theme= onto every internal link, so a link is how a theme travels between
+  // pages -- and it used to be ignored on arrival, which left a shared link
+  // silently showing the reader's own theme instead of the one they were sent.
+  const urlTheme = new URLSearchParams(window.location.search).get("theme");
   const saved = localStorage.getItem("theme");
-  const initial = THEMES.some(t => t.name === saved) ? saved : THEMES[0].name;
+  const initial = THEMES.some(t => t.name === saved) ? saved : DEFAULT_THEME_NAME;
 
   setTheme(initial);
+  if (urlTheme && THEMES.some(t => t.name === urlTheme) && urlTheme !== initial) {
+    setTheme(urlTheme);
+  }
 }

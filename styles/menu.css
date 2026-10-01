@@ -481,16 +481,47 @@ immediately after general.css.
 .menu-music-controls {
   display: flex;
   flex-wrap: nowrap;
+  /* Bigger, thumb-sized buttons than the rest of the panel. These five are the
+     only controls a listener reaches for mid-song, and they sit at the bottom
+     of a collapsed sidebar, so they are sized to be hit rather than to sit
+     quietly.
+
+     Two negative margins let the row use the panel's own side padding. Without
+     them the five buttons had to share what was left after 8px of padding on
+     each side, which at the 220px minimum sidebar left 22px per button -- too
+     narrow to hit without looking. The row is the one thing in this panel that
+     is useless when it is too small to use, so it gets the space back and the
+     panel keeps its padding for everything else.
+
+     The gap is a fixed 4px, and deliberately small. At the 220px minimum
+     sidebar the row is 158px wide, so every pixel of gap is a pixel taken
+     directly off the five buttons -- and a container query cannot help here
+     because cqi resolves against an *ancestor* container, never the element
+     declaring it, so a row sized by its own children has nothing to measure.
+     vw fails for the same reason from the other side: it does not move when
+     the visitor drags the sidebar narrower. */
   gap: 4px;
   align-items: center;
   justify-content: space-between;
+  /* Matches the panel's own 8px side padding exactly, so the row spans the
+     full panel width instead of sitting inside it. */
+  margin: 2px -8px;
 }
 
 .menu-music-control-button {
   flex: 1 1 0;
   margin: 0;
   min-width: 0;
-  padding: 4px 2px;
+  /* A fixed height, not min-height. min-height is only a floor, so the primary
+     button -- whose icon is four pixels taller -- grew past the other four and
+     the row came out ragged at 44/44/48/44/44. height pins all five to the
+     same box and centres the icons inside it. */
+  height: 44px;
+  /* No horizontal padding worth the name. The icon is a percentage of the
+     button's *content* box, so every pixel of horizontal padding shrinks the
+     icon directly -- at the 220px sidebar these buttons are 28px wide and the
+     icon had dropped to 12px with 4px of padding either side. */
+  padding: 0 1px;
   font-size: 0.92rem;
   line-height: 1;
   display: inline-flex;
@@ -502,6 +533,9 @@ immediately after general.css.
   box-shadow: none;
   backdrop-filter: none;
   opacity: 0.86;
+  /* Round, because an icon button with no visible edge needs a shape to read
+     as pressable. */
+  border-radius: 10px;
 }
 
 .menu-music-control-button.is-primary {
@@ -530,16 +564,24 @@ immediately after general.css.
   transition-duration: 0.04s;
 }
 
+/* Icons are sized as a share of the button box rather than in fixed pixels, so
+   they scale down with the button at a narrow sidebar instead of overflowing
+   it. The primary keeps a larger share, which is what makes play/pause read as
+   the main control. */
 .menu-music-control-icon {
-  width: 24px;
-  height: 24px;
+  width: 62%;
+  height: 62%;
+  max-width: 28px;
+  max-height: 28px;
   display: block;
   overflow: visible;
 }
 
 .menu-music-control-button.is-primary .menu-music-control-icon {
-  width: 25px;
-  height: 25px;
+  width: 72%;
+  height: 72%;
+  max-width: 32px;
+  max-height: 32px;
 }
 
 .menu-music-volume-block {

@@ -209,6 +209,16 @@
         menuContainer.style.width = pendingWidth + "px";
         document.body.style.paddingLeft = pendingWidth + "px";
         handle.setAttribute("aria-valuenow", String(pendingWidth));
+        // The settings page's width slider is a second control for this same
+        // value, and nothing else tells it the handle moved. Without this it
+        // kept showing the width it had when the page opened, so dragging the
+        // handle left the slider and its label describing a sidebar that no
+        // longer existed. The slider writes the width through
+        // PanategwaSetMenuWidth, which lands here too, so it is the same
+        // single event either control ends up broadcasting.
+        window.dispatchEvent(new CustomEvent("panategwa:menuwidthchange", {
+          detail: { width: appliedWidth }
+        }));
       });
     }
 
@@ -258,7 +268,10 @@
       if (event.button !== 0) return;
       isResizing = true;
       dragStartX = event.clientX;
-      dragStartWidth = menuContainer.offsetWidth;
+      // pendingWidth, not menuContainer.offsetWidth. The measured width carries
+      // the container's 1px border, so seeding the drag from it made every
+      // pointermove resolve one pixel wide, and that pixel was then saved.
+      dragStartWidth = pendingWidth || appliedWidth;
       handle.classList.add("is-active");
       // Suppress CSS transitions while dragging so the sidebar tracks the
       // pointer exactly instead of easing behind it.
@@ -284,7 +297,7 @@
       if (event.pointerId != null && handle.hasPointerCapture(event.pointerId)) {
         handle.releasePointerCapture(event.pointerId);
       }
-      saveWidth(pendingWidth || menuContainer.offsetWidth);
+      saveWidth(pendingWidth || appliedWidth);
     }
 
     handle.addEventListener("pointerup", finishResize);
@@ -297,7 +310,13 @@
     handle.addEventListener("keydown", function (event) {
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
       var direction = event.key === "ArrowRight" ? 1 : -1;
-      paintWidth(menuContainer.offsetWidth + direction * 12);
+      // pendingWidth, not appliedWidth, for two reasons. appliedWidth is only
+      // updated inside the next animation frame, so repeated presses within one
+      // frame all read the same starting value and the sidebar moved a single
+      // 12px step however many keys were hit. And offsetWidth -- the obvious
+      // third choice -- is one wider than what was set, because of the
+      // container's 1px border, so every press ratcheted it up a pixel.
+      paintWidth((pendingWidth || appliedWidth) + direction * 12);
       saveWidth(pendingWidth);
       event.preventDefault();
     });
@@ -331,6 +350,21 @@
       min: MIN_WIDTH,
       max: MAX_WIDTH,
       default: DEFAULT_WIDTH
+    });
+
+    // Applies a width chosen in another tab. The width is a localStorage value
+    // like any other setting, so the sidebar here stayed at whatever it was
+    // opened at while the other tab resized -- two different sidebars for one
+    // saved value. A resize in flight is left alone: applying the other tab's
+    // value mid-drag would fight the pointer, and the drag's own save wins when
+    // it ends.
+    window.addEventListener("storage", function (event) {
+      if (event.key !== "menuWidth" || isResizing) return;
+      var next = parseInt(event.newValue, 10);
+      if (!Number.isFinite(next)) return;
+      if (next < MIN_WIDTH || next > MAX_WIDTH) return;
+      menuContainer.style.transition = "";
+      paintWidth(next);
     });
   }
 

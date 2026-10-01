@@ -30,6 +30,9 @@ let brokenTrackIds = new Set();
 let lastSyncedSecond = -1;
 let boundMenuEvents = false;
 let suppressPauseSync = false;
+// True from the moment play() is called until the play event lands (or the
+// promise rejects). See the pause listener for why this has to exist at all.
+let playRequestPending = false;
 let isSeeking = false;
 let draggedTrackId = "";
 let lastSaveTime = 0;
@@ -351,7 +354,16 @@ function formatStatusLine() {
   if (!track) return "No songs added yet.";
   if (!trackIsEnabled(track.id)) return "Skipped. This song is currently turned off.";
   if (brokenTrackIds.has(track.id)) return "This song source could not be loaded.";
-  return currentState.isPlaying ? "Playing now." : "Ready to play.";
+  return isActuallyPlaying() ? "Playing now." : "Ready to play.";
+}
+
+function isActuallyPlaying() {
+  // The element is the authority on whether sound is coming out. currentState
+  // is a stored cache that is written on events, and every control that decides
+  // what to do next reads this instead -- otherwise a missed or reordered event
+  // leaves the button describing one thing while the audio does another.
+  if (audioEl) return !audioEl.paused && !audioEl.ended;
+  return !!currentState?.isPlaying;
 }
 
 function ensureAudioElement() {
@@ -380,6 +392,7 @@ function ensureAudioElement() {
   });
 
   audioEl.addEventListener("play", () => {
+    playRequestPending = false;
     currentState.isPlaying = true;
     saveState();
     renderMenuMusic();
@@ -387,7 +400,29 @@ function ensureAudioElement() {
   });
 
   audioEl.addEventListener("pause", () => {
-    if (suppressPauseSync || audioEl.ended) return;
+    // The `pause` event is dispatched asynchronously, as a queued task, so it
+    // arrives *after* the synchronous code that set suppressPauseSync has
+    // already cleared it again. That flag therefore guarded nothing: switching
+    // track (playTrack -> syncTrackSource pauses, then plays) produced a real
+    // pause event that arrived after playback had resumed, and this handler
+    // dutifully wrote isPlaying = false. The UI then showed a paused player
+    // while the audio kept playing, and pressing Pause ran pauseMusic() against
+    // an element that was not paused -- so it looked stuck.
+    //
+    // playRequestPending is the check that actually works: it is set before
+    // play() and cleared by the play event, so a pause belonging to a track
+    // change is ignored while a genuine user pause is still honoured.
+    if (audioEl.ended) return;
+    // The decisive check, and the only one that cannot be fooled by timing:
+    // a pause event that arrives while the element is still playing is stale.
+    // pause() is async, so a pause belonging to a track change can land after
+    // playback resumed -- and honouring it wrote isPlaying = false, leaving the
+    // button describing a paused player while the audio kept playing. Pressing
+    // Pause then ran against an element that was not paused, so it looked stuck.
+    if (!audioEl.paused) return;
+    if (playRequestPending) return;
+    if (suppressPauseSync) return;
+
     currentState.isPlaying = false;
     currentState.currentTime = clampTime(audioEl.currentTime);
     saveState();
@@ -495,14 +530,29 @@ async function syncFromState(tryPlay = false) {
     return;
   }
 
+  await requestPlay(el);
+
+  renderMenuMusic();
+}
+
+// Single place where playback is started, so playRequestPending is always set
+// before play() and always cleared when it settles. Calling play() directly
+// from anywhere else leaves the pause listener unable to tell a track change
+// from a user pause, which is what left the play/pause button stuck.
+async function requestPlay(el) {
+  playRequestPending = true;
   try {
     await el.play();
+    // A browser can resolve play() without ever firing the event (it is
+    // already playing), so the state is corrected here rather than relying on
+    // the listener alone.
+    currentState.isPlaying = true;
+    saveState();
   } catch {
+    playRequestPending = false;
     currentState.isPlaying = false;
     saveState();
   }
-
-  renderMenuMusic();
 }
 
 async function playTrack(trackId, startAt = null) {
@@ -541,18 +591,16 @@ async function playTrack(trackId, startAt = null) {
     el.currentTime = clampTime(currentState.currentTime);
   } catch {}
 
-  try {
-    await el.play();
-  } catch {
-    currentState.isPlaying = false;
-    saveState();
-  }
+  await requestPlay(el);
 
   renderMenuMusic();
 }
 
 function pauseMusic() {
   const el = ensureAudioElement();
+  // Cleared first: this is a deliberate pause, so the pause event that follows
+  // is the real thing and must not be filtered out as a track change.
+  playRequestPending = false;
   currentState.isPlaying = false;
   currentState.currentTime = clampTime(el.currentTime);
   saveState();
@@ -748,7 +796,7 @@ function renderMenuMusic() {
             <strong>Music</strong>
             <span class="menu-music-toggle-meta">
               <small class="menu-music-toggle-track">${trackName}</small>
-              <small class="menu-music-toggle-state">${currentState.isPlaying ? "Playing" : "Paused"}</small>
+              <small class="menu-music-toggle-state">${isActuallyPlaying() ? "Playing" : "Paused"}</small>
             </span>
           </span>
           <span class="menu-music-chevron" aria-hidden="true"></span>
@@ -794,7 +842,7 @@ function renderMenuMusic() {
         <div class="menu-music-controls">
           <button type="button" class="menu-music-control-button" data-music-action="previous-track" title="Previous song" aria-label="Previous song">${controlIcon("previous-track")}</button>
           <button type="button" class="menu-music-control-button" data-music-action="seek-back" title="Back 10 seconds" aria-label="Back 10 seconds">${controlIcon("seek-back")}</button>
-          <button type="button" class="menu-music-control-button is-primary" data-music-action="toggle-play" title="${currentState.isPlaying ? "Pause" : "Play"}" aria-label="${currentState.isPlaying ? "Pause" : "Play"}">${controlIcon("toggle-play", currentState.isPlaying)}</button>
+          <button type="button" class="menu-music-control-button is-primary" data-music-action="toggle-play" title="${isActuallyPlaying() ? "Pause" : "Play"}" aria-label="${isActuallyPlaying() ? "Pause" : "Play"}">${controlIcon("toggle-play", isActuallyPlaying())}</button>
           <button type="button" class="menu-music-control-button" data-music-action="seek-forward" title="Forward 10 seconds" aria-label="Forward 10 seconds">${controlIcon("seek-forward")}</button>
           <button type="button" class="menu-music-control-button" data-music-action="next-track" title="Next song" aria-label="Next song">${controlIcon("next-track")}</button>
         </div>
@@ -855,7 +903,13 @@ function bindMenuSlot() {
     const trackId = String(target.dataset.trackId || "").trim();
 
     if (action === "toggle-play") {
-      if (currentState.isPlaying) {
+      // The element, not currentState.isPlaying, decides which way the toggle
+      // goes. The stored flag is a cache of what the element was last known to
+      // be doing, and when the two disagreed the button stopped responding:
+      // pressing it ran play() against audio that was already playing, which
+      // looked exactly like a stuck pause button.
+      const el = ensureAudioElement();
+      if (!el.paused) {
         pauseMusic();
       } else {
         await playTrack(currentState.trackId || firstEnabledTrackId(), currentState.currentTime);

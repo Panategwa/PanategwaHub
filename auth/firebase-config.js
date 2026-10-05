@@ -224,7 +224,7 @@ export function observeActiveAuth(callback) {
 
 // Ask every active-account observer to reattach and receive the current user
 // snapshot after an explicit reload has refreshed mutable Auth properties,
-// such as emailVerified.
+// such as emailVerified or phoneNumber.
 export function notifyActiveAuthObservers() {
   activeAuthSubscribers.forEach((subscriber) => subscriber());
 }

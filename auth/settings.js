@@ -1,7 +1,6 @@
 import {
   saveUsername,
   changeEmail,
-  changePassword,
   setAvatarPreset,
   AVATAR_PRESET_IDS,
   getAvatarPickerEntries,
@@ -16,8 +15,10 @@ import {
   getProfile,
   logout,
   requestPasswordReset,
-  refreshCurrentUserSession
+  refreshCurrentUserSession,
+  isOnlineAccountVerified
 } from "./auth.js";
+import { bindPhoneLinkPanel } from "./phone-auth.js";
 
 const $ = (id) => document.getElementById(id);
 const PRESET_IDS = [...AVATAR_PRESET_IDS];
@@ -37,6 +38,7 @@ let settingsSyncedUid = "";
 let settingsBound = false;
 let settingsUnsubs = [];
 let settingsWatchUnsub = null;
+let phoneLinkPanelCleanup = null;
 let emailVerificationReturnReason = (() => {
   try {
     const params = new URL(window.location.href).searchParams;
@@ -57,7 +59,7 @@ function clearEmailVerificationReturnMarkers() {
     window.history.replaceState({}, "", url.href);
   } catch {}
 }
-const SETTING_STATUS_IDS = ["profile", "avatar", "email", "password", "actions", "danger", "privacy"];
+const SETTING_STATUS_IDS = ["profile", "avatar", "email", "phone", "password", "actions", "danger", "privacy"];
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -107,6 +109,7 @@ function syncForm(profile, user) {
   const providerIds = new Set((user.providerData || []).map((provider) => provider.providerId));
   const hasPasswordProvider = providerIds.has("password");
   const hasGoogleProvider = providerIds.has("google.com");
+  const hasPhoneProvider = providerIds.has("phone");
   const emailVerified = user.emailVerified === true;
   const verificationCard = $("settings-email-verification-card");
   const verificationStatus = $("settings-email-verification-status");
@@ -117,22 +120,38 @@ function syncForm(profile, user) {
   const changeEmailInput = $("change-email-input");
   const changeEmailPassword = $("change-email-password");
   const changeEmailButton = $("change-email-btn");
+  const phoneCurrent = $("settings-phone-current");
+  const phoneLinkForm = $("settings-phone-link-form");
+  const resetPasswordButton = $("send-reset-email-btn");
+  const resetPasswordNote = $("settings-password-note");
 
   if (verificationCard) verificationCard.dataset.state = emailVerified ? "verified" : "unverified";
   if (verificationStatus) verificationStatus.textContent = emailVerified ? "Email verified" : "Email not verified";
   if (verificationBadge) verificationBadge.textContent = emailVerified ? "Verified" : "Action needed";
   if (currentEmail) currentEmail.textContent = user.email || "No email address is attached to this account.";
-  if (resendButton) resendButton.classList.toggle("section-hidden", emailVerified);
-  if (refreshButton) refreshButton.classList.toggle("section-hidden", emailVerified);
+  if (resendButton) resendButton.classList.toggle("section-hidden", emailVerified || !user.email);
+  if (refreshButton) refreshButton.classList.toggle("section-hidden", emailVerified || !user.email);
   if (changeEmailInput) changeEmailInput.disabled = !hasPasswordProvider && !hasGoogleProvider;
   if (changeEmailPassword) changeEmailPassword.disabled = !hasPasswordProvider;
   if (changeEmailPassword?.closest(".input-group")) {
     changeEmailPassword.closest(".input-group").classList.toggle("section-hidden", !hasPasswordProvider);
   }
   if (changeEmailButton) changeEmailButton.disabled = !hasPasswordProvider && !hasGoogleProvider;
+  if (phoneCurrent) phoneCurrent.textContent = user.phoneNumber
+    ? `Verified phone: ${user.phoneNumber}. This number can sign in to this account.`
+    : "No verified phone number is linked. Add one to sign in with SMS and use online features without email verification.";
+  if (phoneLinkForm) phoneLinkForm.hidden = !!user.phoneNumber || hasPhoneProvider;
+  if (resetPasswordButton) resetPasswordButton.disabled = !hasPasswordProvider || !user.email;
+  if (resetPasswordNote) resetPasswordNote.textContent = hasPasswordProvider
+    ? "A password reset link can be sent to the email address on this account."
+    : hasGoogleProvider
+      ? "This account uses Google sign-in. Manage its password in your Google Account."
+      : "This account has no email/password sign-in method, so there is no Panategwa password to reset.";
 
   if (note) {
-    note.textContent = hasPasswordProvider
+    note.textContent = hasPasswordProvider && hasGoogleProvider
+      ? "Confirm with your Panategwa password, or leave it blank to confirm in a Google popup. Then follow the verification link sent to your new address."
+      : hasPasswordProvider
       ? "Confirm with your Panategwa password, then follow the verification link sent to your new address."
       : hasGoogleProvider
         ? "You’ll confirm in a Google popup. Choose the Google account linked to this profile, then follow the verification link sent to your new address."
@@ -326,28 +345,6 @@ async function refreshEmailVerificationStatus() {
   }
 }
 
-async function applyPasswordChange() {
-  const currentPassword = String($("current-password")?.value || "");
-  const nextPassword = String($("new-password")?.value || "");
-  const confirmPassword = String($("confirm-password")?.value || "");
-
-  if (nextPassword !== confirmPassword) {
-    setScopedStatus("password", "New passwords do not match.", "error");
-    return;
-  }
-
-  try {
-    await changePassword(currentPassword, nextPassword);
-    setScopedStatus("password", "Password updated.", "success");
-    if ($("current-password")) $("current-password").value = "";
-    if ($("new-password")) $("new-password").value = "";
-    if ($("confirm-password")) $("confirm-password").value = "";
-  } catch (error) {
-    console.error(error);
-    setScopedStatus("password", error.message || "Could not change password.", "error");
-  }
-}
-
 function bindButtons() {
   $("profile-privacy-preset")?.addEventListener("change", async (event) => {
     const preset = String(event.target.value || "private");
@@ -381,17 +378,17 @@ function bindButtons() {
       setScopedStatus("email", error.message || "Could not send a verification email.", "error");
     }
   });
-  $("change-password-btn")?.addEventListener("click", applyPasswordChange);
   $("send-reset-email-btn")?.addEventListener("click", async () => {
     const email = String(currentUser?.email || "").trim();
-    if (!email) {
-      setScopedStatus("password", "There is no email address attached to this account.", "error");
+    const hasPasswordProvider = (currentUser?.providerData || []).some((provider) => provider.providerId === "password");
+    if (!email || !hasPasswordProvider) {
+      setScopedStatus("password", "This account does not have a Panategwa email/password sign-in method to reset.", "error");
       return;
     }
 
     try {
       await requestPasswordReset(email);
-      setScopedStatus("password", "Reset email sent.", "success");
+      setScopedStatus("password", "If this email has a password sign-in method, a reset link is on its way.", "success");
     } catch (error) {
       console.error(error);
       setScopedStatus("password", error.message || "Could not send reset email.", "error");
@@ -476,11 +473,32 @@ function start() {
 
   renderAvatarChoices();
   bindButtons();
+  phoneLinkPanelCleanup = bindPhoneLinkPanel({
+    phoneInputId: "settings-phone-number",
+    codeInputId: "settings-phone-code",
+    codeGroupId: "settings-phone-code-group",
+    sendButtonId: "settings-phone-send",
+    confirmButtonId: "settings-phone-confirm",
+    recaptchaContainerId: "settings-phone-recaptcha",
+    consentCheckboxId: "settings-phone-consent",
+    statusId: "settings-phone-status",
+    onSuccess: ({ user, profile }) => {
+      currentUser = user;
+      currentProfile = profile || currentProfile;
+      syncForm(currentProfile, user);
+      setScopedStatus("phone", "Phone number verified and linked. You can now use it to sign in.", "success");
+    }
+  });
+  settingsUnsubs.push(() => {
+    phoneLinkPanelCleanup?.();
+    phoneLinkPanelCleanup = null;
+  });
   syncAvatarPresetLocks({});
 
   settingsWatchUnsub = watchAuth(async (user, profile) => {
     if (settingsSyncedUid && settingsSyncedUid !== user?.uid) {
-      ["change-email-input", "change-email-password", "current-password", "new-password", "confirm-password", "delete-password"].forEach((id) => {
+      phoneLinkPanelCleanup?.reset?.();
+      ["change-email-input", "change-email-password", "delete-password"].forEach((id) => {
         const input = $(id);
         if (input) input.value = "";
       });
@@ -498,9 +516,9 @@ function start() {
     currentProfile = nextProfile;
     syncForm(nextProfile, user);
     syncAvatarPresetLocks(nextProfile);
-    setStatus(user.emailVerified === true
-      ? "Settings ready. Your email is verified."
-      : "Settings ready. Verify your email to unlock friends, messages, and player profiles.", "info");
+    setStatus(isOnlineAccountVerified(user)
+      ? (user.emailVerified === true ? "Settings ready. Your email is verified." : "Settings ready. Your phone is verified; social features are available.")
+      : "Settings ready. Verify your email or link a phone number to unlock friends, messages, and player profiles.", "info");
 
     if (emailVerificationReturnReason) {
       const returnReason = emailVerificationReturnReason;

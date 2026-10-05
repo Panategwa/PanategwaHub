@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase-config.js";
-import { watchAuth, ensureUserProfile, getDefaultAvatarDataUrl, normalizeSiteTimeMs, getResolvedProfileSiteTime, publishProfileDocuments } from "./auth.js";
+import { watchAuth, ensureUserProfile, getDefaultAvatarDataUrl, normalizeSiteTimeMs, getResolvedProfileSiteTime, publishProfileDocuments, isOnlineAccountVerified } from "./auth.js";
 import { ensurePanategwaToast } from "./toast.js";
 
 import {
@@ -86,7 +86,7 @@ function activeUser() {
 }
 
 function isVerifiedUser(user = null, profile = null) {
-  return user?.emailVerified === true;
+  return isOnlineAccountVerified(user);
 }
 
 async function requireSocialUser(feature = "this feature", options = {}) {
@@ -97,7 +97,7 @@ async function requireSocialUser(feature = "this feature", options = {}) {
   const cachedProfile = socialState.profile?.uid === user.uid ? socialState.profile : null;
   const profile = cachedProfile || await loadUser(user.uid) || await ensureUserProfile(user);
   if (needsVerified && !isVerifiedUser(user, profile)) {
-    throw new Error(`Verify your email before you use ${feature}.`);
+    throw new Error(`Verify your email or link a phone number before you use ${feature}.`);
   }
 
   return { user, profile };
@@ -367,8 +367,8 @@ export async function loadAccountProfile(uid) {
   const viewer = activeUser();
   const viewerUid = cleanUid(viewer?.uid);
   if (!id || !viewerUid) return null;
-  if (id !== viewerUid && viewer?.emailVerified !== true) {
-    throw new Error("Verify your email before viewing other player profiles.");
+  if (id !== viewerUid && !isOnlineAccountVerified(viewer)) {
+    throw new Error("Verify your email or link a phone number before viewing other player profiles.");
   }
   let data = await loadUser(id);
   if (!data) return null;
@@ -1101,7 +1101,7 @@ function startRealtime() {
       return;
     }
 
-    if (user.emailVerified !== true) {
+    if (!isOnlineAccountVerified(user)) {
       listenerErrors.clear();
       hydratedMessagesUserId = "";
       socialState.ready = true;

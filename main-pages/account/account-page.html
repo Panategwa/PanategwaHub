@@ -153,6 +153,16 @@
             <button type="submit" class="account-add-primary" id="account-add-login-submit">Sign in to account</button>
             <button type="button" class="account-add-google" id="account-add-google-login">Continue with Google</button>
           </div>
+          <section class="phone-auth-card phone-auth-card-compact" aria-labelledby="account-add-phone-title">
+            <div><strong id="account-add-phone-title">Or sign in with your phone</strong><p>Use a number already linked to your Panategwa account. SMS rates may apply.</p></div>
+            <label class="input-group" for="account-add-phone-number"><span>Phone number with country code</span><input id="account-add-phone-number" type="tel" inputmode="tel" autocomplete="tel" placeholder="+1 555 123 4567" /></label>
+            <label class="phone-consent"><input id="account-add-phone-consent" type="checkbox" /><span>I agree to use this number for sign-in. Google processes it for authentication and abuse prevention; carrier SMS rates may apply.</span></label>
+            <div id="account-add-phone-recaptcha" class="phone-recaptcha"></div>
+            <div class="button-row"><button id="account-add-phone-send" type="button">Send sign-in code</button></div>
+            <label id="account-add-phone-code-group" class="input-group" hidden><span>SMS verification code</span><input id="account-add-phone-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" /></label>
+            <div class="button-row"><button id="account-add-phone-confirm" type="button" disabled>Confirm and sign in</button></div>
+            <p id="account-add-phone-status" class="setting-status section-hidden" aria-live="polite"></p>
+          </section>
         </form>
 
         <form id="account-add-signup-form" class="account-add-form" data-account-add-panel="signup" hidden>
@@ -227,6 +237,19 @@
                 <button id="login-btn" class="auth-primary" type="submit">Log in</button>
                 <button id="reset-password-btn" type="button" class="button-ghost">Forgot password?</button>
               </div>
+              <section class="phone-auth-card" aria-labelledby="phone-signin-title">
+                <div>
+                  <strong id="phone-signin-title">Or sign in with your phone</strong>
+                  <p>Use a number already linked to your Panategwa account. Enter it with + and the country code. SMS rates may apply.</p>
+                </div>
+                <label class="input-group" for="phone-signin-number"><span>Phone number</span><input id="phone-signin-number" type="tel" inputmode="tel" autocomplete="tel" placeholder="+1 555 123 4567" /></label>
+                <label class="phone-consent"><input id="phone-signin-consent" type="checkbox" /><span>I agree to use this number for sign-in. Google processes it for authentication and abuse prevention; carrier SMS rates may apply.</span></label>
+                <div id="phone-signin-recaptcha" class="phone-recaptcha"></div>
+                <div class="button-row"><button id="phone-signin-send" type="button">Send sign-in code</button></div>
+                <label id="phone-signin-code-group" class="input-group" hidden><span>SMS verification code</span><input id="phone-signin-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Enter the code" /></label>
+                <div class="button-row"><button id="phone-signin-confirm" type="button" disabled>Confirm and sign in</button></div>
+                <p id="phone-signin-status" class="setting-status section-hidden" aria-live="polite"></p>
+              </section>
             </form>
 
             <form id="signup-form" class="auth-panel" data-auth-panel="signup" hidden>
@@ -409,7 +432,7 @@
                     </div>
                     <p class="email-current-label">Current email</p>
                     <p id="settings-email-current" class="email-current-value">Sign in to view your email address.</p>
-                    <p class="setting-desc">Email verification unlocks friends, messages, and viewing other player profiles.</p>
+                    <p class="setting-desc">Verify this email or link a verified phone number to unlock friends, messages, and player profiles.</p>
                   </div>
                 </div>
                 <div class="button-row">
@@ -428,15 +451,26 @@
               </div>
 
               <div class="setting-card">
-                <div class="setting-title">Password</div>
-                <div class="field-row">
-                  <input id="current-password" type="password" placeholder="Current password" aria-label="Current password" />
-                  <input id="new-password" type="password" placeholder="New password" aria-label="New password" />
-                  <input id="confirm-password" type="password" placeholder="Confirm new password" aria-label="Confirm new password" />
+                <div class="setting-title">Phone sign-in</div>
+                <p id="settings-phone-current" class="setting-desc">Sign in to link a verified phone number to this account.</p>
+                <div id="settings-phone-link-form">
+                  <label class="input-group" for="settings-phone-number"><span>Phone number with country code</span><input id="settings-phone-number" type="tel" inputmode="tel" autocomplete="tel" placeholder="+1 555 123 4567" /></label>
+                  <label class="phone-consent"><input id="settings-phone-consent" type="checkbox" /><span>I agree to use this number for sign-in. Google processes it for authentication and abuse prevention; carrier SMS rates may apply.</span></label>
+                  <div id="settings-phone-recaptcha" class="phone-recaptcha"></div>
+                  <div class="button-row"><button id="settings-phone-send" type="button">Send verification code</button></div>
+                  <label id="settings-phone-code-group" class="input-group" hidden><span>SMS verification code</span><input id="settings-phone-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" /></label>
+                  <div class="button-row"><button id="settings-phone-confirm" type="button" disabled>Verify and link phone</button></div>
                 </div>
+                <p class="setting-desc">Firebase verifies ownership by SMS. Your number stays in Authentication and is never published on your player profile. SMS rates may apply.</p>
+                <p id="settings-phone-status" class="setting-status section-hidden" aria-live="polite"></p>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-title">Password</div>
+                <p class="setting-desc">For security, reset your password only through a one-time link sent to your email. The new password is never entered on this page.</p>
+                <p id="settings-password-note" class="setting-desc"></p>
                 <div class="button-row">
-                  <button id="change-password-btn" type="button">Change password</button>
-                  <button id="send-reset-email-btn" type="button">Send reset email</button>
+                  <button id="send-reset-email-btn" type="button">Send password reset link</button>
                 </div>
                 <p id="settings-password-status" class="setting-status section-hidden" aria-live="polite"></p>
               </div>

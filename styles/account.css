@@ -806,6 +806,64 @@ they no longer leak into pages that do not load it.
       display: none !important;
     }
 
+    .phone-auth-card {
+      display: grid;
+      gap: 12px;
+      padding: 15px;
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--panel-bg) 74%, transparent);
+    }
+
+    .phone-auth-card > div:first-child {
+      display: grid;
+      gap: 5px;
+    }
+
+    .phone-auth-card > div:first-child strong { font-weight: 800; }
+
+    .phone-auth-card > div:first-child p {
+      margin: 0;
+      color: color-mix(in srgb, var(--c-text) 72%, transparent);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .phone-auth-card .input-group { margin: 0; }
+
+    .phone-auth-card .input-group[hidden] { display: none !important; }
+
+    #settings-phone-link-form[hidden] { display: none !important; }
+
+    .phone-consent {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      color: color-mix(in srgb, var(--c-text) 72%, transparent);
+      font-size: 0.82rem;
+      line-height: 1.4;
+      cursor: pointer;
+    }
+
+    .phone-consent input {
+      width: 17px;
+      height: 17px;
+      margin: 1px 0 0;
+      flex: 0 0 auto;
+      accent-color: var(--c-accent);
+    }
+
+    .phone-recaptcha {
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .phone-recaptcha:empty { display: none; }
+
+    .phone-recaptcha iframe { max-width: 100%; }
+
+    .phone-auth-card-compact { margin-top: 2px; }
+
     .signup-privacy {
       min-width: 0;
       margin: 0;
@@ -1078,6 +1136,27 @@ they no longer leak into pages that do not load it.
       align-items: center;
       gap: 12px;
       margin-bottom: 14px;
+    }
+
+    .account-contact-private {
+      display: grid;
+      justify-items: start;
+      gap: 5px;
+      margin-top: 6px;
+    }
+
+    .account-contact-value {
+      margin: 0;
+      color: color-mix(in srgb, var(--c-text) 72%, transparent);
+      font-size: 0.85rem;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+
+    .account-contact-private button {
+      min-height: 32px;
+      padding: 5px 9px;
+      font-size: 0.82rem;
     }
 
     .account-avatar,

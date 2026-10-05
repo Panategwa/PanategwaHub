@@ -5,8 +5,17 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function contactIsVerified() {
+      return signedIn()
+        && (("email_verified" in request.auth.token
+            && request.auth.token.email_verified == true)
+          || ("phone_number" in request.auth.token
+            && request.auth.token.phone_number is string
+            && request.auth.token.phone_number.size() > 0));
+    }
+
     function verified() {
-      return signedIn() && request.auth.token.email_verified == true;
+      return contactIsVerified();
     }
 
     function isUser(uid) {
@@ -79,7 +88,7 @@ service cloud.firestore {
         && (!("xp" in d) || (d.xp is number && d.xp >= 0 && d.xp <= 1000000))
         && (!("siteTimeMs" in d) || (d.siteTimeMs is number && d.siteTimeMs >= 0))
         && (!("longestStreak" in d) || (d.longestStreak is number && d.longestStreak >= 0))
-        && (!("verified" in d) || d.verified == (request.auth.token.email_verified == true))
+        && (!("verified" in d) || d.verified == contactIsVerified())
         && (!("achievements" in d) || (d.achievements is list && d.achievements.size() <= 500))
         && (!("achievementRewardSnapshot" in d) || d.achievementRewardSnapshot is map)
         && (!("visitedPages" in d) || (d.visitedPages is list && d.visitedPages.size() <= 500))
@@ -150,7 +159,7 @@ service cloud.firestore {
 
     function validFriendProfile(d, uid) {
       return friendProfileFieldsMatchPrivacy(d, uid)
-        && (!("verified" in d) || d.verified == (request.auth.token.email_verified == true));
+        && (!("verified" in d) || d.verified == contactIsVerified());
     }
 
     function messageRoutingUnchanged(d, old) {

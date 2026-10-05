@@ -15,9 +15,11 @@ import {
   removeAccountSlot,
   subscribeAccountSlots,
   watchAuth,
-  getProfile
+  getProfile,
+  isOnlineAccountVerified
 } from "./auth.js";
 import { initializeLoginUI } from "./login.js";
+import { bindPhoneSignInPanel } from "./phone-auth.js";
 import { auth, authReady } from "./firebase-config.js";
 
 import {
@@ -248,7 +250,7 @@ function formatNotificationBody(kind, value) {
 function isVerifiedState(user, profile = null) {
   // Only Firebase's current Auth state is authoritative. Profile documents
   // can lag behind a changed email or a refreshed verification link.
-  return user?.emailVerified === true;
+  return isOnlineAccountVerified(user);
 }
 
 function resolvedUser(state = currentState) {
@@ -370,7 +372,7 @@ function ensureViewedProfileLoaded(state) {
   }
 
   const cachedProfile = state.friendProfiles?.[targetUid];
-  if (user.emailVerified !== true) {
+  if (!isOnlineAccountVerified(user)) {
     viewedProfileLoadKey = "";
     if (cachedProfile?.unavailableReason !== "verification-required") {
       currentState.friendProfiles = {
@@ -561,9 +563,9 @@ function updateLockedPanel(prefix, loggedIn, verified, restoring = false) {
           ? "Log in to use the friends system"
           : "Log in to edit your settings")
       : (prefix === "messages"
-        ? "Verify your email to unlock messaging"
+        ? "Verify your account to unlock messaging"
         : prefix === "friends"
-          ? "Verify your email to unlock friends"
+          ? "Verify your account to unlock friends"
           : "Log in to edit your settings");
   }
 
@@ -575,14 +577,14 @@ function updateLockedPanel(prefix, loggedIn, verified, restoring = false) {
           ? "Your friends, requests, and saved profiles only load after you sign in."
         : "Your profile, password, avatar, and account actions are available after you sign in.")
       : (prefix === "messages"
-        ? "Direct messages, friend activity, achievements, and streak updates unlock after your email is verified."
+        ? "Direct messages, friend activity, achievements, and streak updates unlock after your email is verified or a phone number is linked."
         : prefix === "friends"
-          ? "Friend requests, blocked users, and your friends list unlock after your email is verified."
+          ? "Friend requests, blocked users, and your friends list unlock after your email is verified or a phone number is linked."
         : "Sign in to manage your email, privacy, and account settings.");
   }
 
   setVisible(`${prefix}-locked-refresh-btn`, loggedIn && !verified);
-  setVisible(`${prefix}-locked-resend-btn`, loggedIn && !verified);
+  setVisible(`${prefix}-locked-resend-btn`, loggedIn && !verified && !!resolvedUser()?.email);
 }
 
 async function handleVerificationRefresh() {
@@ -594,8 +596,8 @@ async function handleVerificationRefresh() {
     refreshLocalNotifications(refreshed.user?.uid || "");
     renderAll(currentState);
     setStatus(isVerifiedState(refreshed.user, refreshed.profile)
-      ? "Email verified. Friends, messages, and player profiles are now available."
-      : "Your email still looks unverified. Check the inbox link, then try again.", isVerifiedState(refreshed.user, refreshed.profile) ? "success" : "info");
+      ? (refreshed.user.emailVerified ? "Email verified. Friends, messages, and player profiles are available." : "Your phone is verified. Friends, messages, and player profiles are available.")
+      : "Verify your email or link a phone number to unlock social features.", isVerifiedState(refreshed.user, refreshed.profile) ? "success" : "info");
   } catch (error) {
     console.error(error);
     setStatus(error?.message || "Could not refresh verification.", "error");
@@ -866,8 +868,12 @@ function renderAuth(state) {
   }
 
   const username = ownProfile.username || user.displayName || "Player";
-  const email = user.email || "--";
-  const verified = user.emailVerified ? "Yes" : "No";
+  const email = String(user.email || "");
+  const phone = String(user.phoneNumber || "");
+  let showContact = false;
+  try { showContact = sessionStorage.getItem(`ptg_contact_visible_${user.uid}`) === "1"; } catch {}
+  const contactDetails = [email && `Email: ${email}`, phone && `Phone: ${phone}`].filter(Boolean).join(" · ") || "No email or phone number is linked.";
+  const verified = isOnlineAccountVerified(user) ? "Yes" : "No";
   const xp = typeof ownProfile.xp === "number" ? ownProfile.xp : 0;
   const streak = ownProfile?.streak?.current || 0;
   const longestStreak = ownProfile?.longestStreak || ownProfile?.streak?.longest || streak || 0;
@@ -877,8 +883,8 @@ function renderAuth(state) {
   const copied = isUserIdCopied(user.uid);
   const verifyNotice = !isVerifiedState(user, ownProfile) ? `
     <div class="verify-callout">
-      <strong>Verify your email to unlock social features</strong>
-      <p>Verify your email to use friends and messages or view other player profiles. You can manage your email and privacy settings now.</p>
+      <strong>Verify your account to unlock social features</strong>
+      <p>Verify your email or link a phone number in Account settings to use friends, messages, and player profiles.</p>
       <div class="button-row">
         <button id="inline-refresh-verification-btn" type="button">I've verified my email</button>
         <button id="inline-resend-verification-btn" type="button">Resend verification email</button>
@@ -891,14 +897,16 @@ function renderAuth(state) {
       ${avatar}
       <div>
         <p style="margin: 0;"><strong>${escapeHtml(username)}</strong></p>
-        <p style="margin: 0; opacity: 0.8;">${escapeHtml(email)}</p>
+        <div class="account-contact-private">
+          <p id="own-contact-details" class="account-contact-value">${showContact ? escapeHtml(contactDetails) : "Contact details are hidden"}</p>
+          <button id="toggle-own-contact" type="button" class="button-ghost" aria-controls="own-contact-details" aria-expanded="${showContact ? "true" : "false"}">${showContact ? "Hide email and phone" : "Show email and phone"}</button>
+        </div>
       </div>
     </div>
 
     <div class="info-grid">
       <div class="info-row"><span>Verified</span><strong>${verified}</strong></div>
       <div class="info-row"><span>Username</span><strong>${escapeHtml(username)}</strong></div>
-      <div class="info-row"><span>Email</span><strong>${escapeHtml(email)}</strong></div>
       <div class="info-row">
         <span>Account ID</span>
         <strong style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -927,6 +935,11 @@ function renderAuth(state) {
     } catch {
       window.prompt("Copy this ID:", user.uid);
     }
+  });
+  $("toggle-own-contact")?.addEventListener("click", () => {
+    const next = !showContact;
+    try { sessionStorage.setItem(`ptg_contact_visible_${user.uid}`, next ? "1" : "0"); } catch {}
+    renderAuth(currentState);
   });
   $("inline-refresh-verification-btn")?.addEventListener("click", handleVerificationRefresh);
   $("inline-resend-verification-btn")?.addEventListener("click", handleVerificationResend);
@@ -1418,7 +1431,7 @@ function renderDirectMessages(state) {
   if (!list || !chatView || !empty || !messages) return;
 
   if (!uid) {
-    if (status) status.textContent = "Sign in and verify your email to chat with friends.";
+    if (status) status.textContent = "Sign in, then verify your email or link a phone number to chat with friends.";
     list.innerHTML = `<div class="msg-empty">Sign in to see your chats.</div>`;
     count && (count.textContent = "0");
     empty.hidden = false;
@@ -1715,6 +1728,7 @@ function renderAll(state) {
     targetId: currentInfoTargetId(),
     username: profile?.username || "",
     email: user?.email || "",
+    phone: user?.phoneNumber || "",
     verified: isVerifiedState(user, profile),
     photoURL: profile?.photoURL || "",
     xp: profile?.xp || 0,
@@ -2219,6 +2233,43 @@ function bindAccountSwitcher() {
     dialog.querySelectorAll("button").forEach((button) => { button.disabled = value; });
   };
 
+  let phoneTargetSlotId = "";
+  const phoneSignInCleanup = bindPhoneSignInPanel({
+    phoneInputId: "account-add-phone-number",
+    codeInputId: "account-add-phone-code",
+    codeGroupId: "account-add-phone-code-group",
+    sendButtonId: "account-add-phone-send",
+    confirmButtonId: "account-add-phone-confirm",
+    recaptchaContainerId: "account-add-phone-recaptcha",
+    consentCheckboxId: "account-add-phone-consent",
+    statusId: "account-add-phone-status",
+    onBusyChange: setBusy,
+    beforeSend: async () => {
+      const slots = await getAccountSlots();
+      if (!phoneTargetSlotId) {
+        if (slots.filter((slot) => slot.signedIn).length >= 3) {
+          throw new Error("Remove one saved account before adding another.");
+        }
+        if (!originalSlotId) originalSlotId = getActiveAccountSlotId();
+        phoneTargetSlotId = await activateFirstEmptyAccountSlot();
+      }
+    },
+    onSuccess: async (user) => {
+      const duplicate = (await getAccountSlots()).find((slot) => slot.signedIn && !slot.active && slot.uid === user.uid);
+      if (duplicate && phoneTargetSlotId) {
+        await removeAccountSlot(phoneTargetSlotId);
+        await activateAccountSlot(duplicate.id);
+        setStatus("That account is already saved on this device. Switched to it.", "info");
+      } else {
+        setAccountAddStatus("Account added. You can switch to it any time.", "success");
+      }
+      phoneTargetSlotId = "";
+      originalSlotId = "";
+      dialog.close();
+    }
+  });
+  removers.push(phoneSignInCleanup);
+
   const render = (slots = []) => {
     if (!live) return;
     const signedIn = slots.filter((slot) => slot.signedIn);
@@ -2306,6 +2357,9 @@ function bindAccountSwitcher() {
   });
   bind(dialog, "close", async () => {
     dialog.querySelectorAll('input[type="password"]').forEach((input) => { input.value = ""; });
+    if ($("account-add-phone-code")) $("account-add-phone-code").value = "";
+    phoneSignInCleanup.reset?.();
+    phoneTargetSlotId = "";
     if (busy || !originalSlotId) return;
     try {
       const slots = await getAccountSlots();
@@ -2507,7 +2561,7 @@ function start() {
 
     setStatus(isVerifiedState(user, currentState.profile)
       ? "Logged in and verified."
-      : "Logged in. Verify your email to unlock friends, messages, and player profiles.", "success");
+      : "Logged in. Verify your email or link a phone number to unlock friends, messages, and player profiles.", "success");
   });
   if (typeof __watchAuthUnsub === "function") accountUnsubs.push(__watchAuthUnsub);
 

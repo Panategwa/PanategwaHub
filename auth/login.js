@@ -5,8 +5,10 @@ import {
   requestPasswordReset,
   resendVerificationEmail,
   refreshCurrentUserSession,
-  normalizePrivacySettings
+  normalizePrivacySettings,
+  isOnlineAccountVerified
 } from "./auth.js";
+import { bindPhoneSignInPanel } from "./phone-auth.js";
 
 const byId = (id) => document.getElementById(id);
 
@@ -175,7 +177,7 @@ export function initializeLoginUI() {
     try {
       setAuthStatus("Sending your password reset link…", "info");
       await requestPasswordReset(email);
-      setAuthStatus("If an account uses that email, a password reset link is on its way.", "success");
+      setAuthStatus("If that email has a Panategwa password, a reset link is on its way. Google passwords are managed by Google.", "success");
     } catch (error) {
       setAuthStatus(error?.message || "We couldn't send a reset link.", "error");
     }
@@ -187,7 +189,10 @@ export function initializeLoginUI() {
       try {
         setAuthStatus("Checking your verification…", "info");
         const result = await refreshCurrentUserSession();
-        setAuthStatus(result.user?.emailVerified ? "Email verified. Friends, messages, and player profiles are available." : "We haven't seen the verification yet. Check your inbox and try again.", result.user?.emailVerified ? "success" : "info");
+        const verified = isOnlineAccountVerified(result.user);
+        setAuthStatus(verified
+          ? (result.user?.emailVerified ? "Email verified. Friends, messages, and player profiles are available." : "Your phone is verified. Friends, messages, and player profiles are available.")
+          : "We haven't seen verification yet. Check your inbox or link a phone number, then try again.", verified ? "success" : "info");
       } catch (error) {
         setAuthStatus(error?.message || "We couldn't refresh your account.", "error");
       }
@@ -203,6 +208,18 @@ export function initializeLoginUI() {
       }
     });
   }
+
+  removers.push(bindPhoneSignInPanel({
+    phoneInputId: "phone-signin-number",
+    codeInputId: "phone-signin-code",
+    codeGroupId: "phone-signin-code-group",
+    sendButtonId: "phone-signin-send",
+    confirmButtonId: "phone-signin-confirm",
+    recaptchaContainerId: "phone-signin-recaptcha",
+    consentCheckboxId: "phone-signin-consent",
+    statusId: "phone-signin-status",
+    onSuccess: () => setAuthStatus("Signed in with your verified phone number.", "success")
+  }));
 
   return () => {
     removers.forEach((remove) => remove());

@@ -28,7 +28,7 @@ import {
   EmailAuthProvider,
   sendPasswordResetEmail,
   verifyBeforeUpdateEmail,
-  updatePassword
+  linkWithPhoneNumber
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
 import {
@@ -79,6 +79,18 @@ async function waitForAccountSetup(gateIsOwner = false) {
 
 function cleanText(text) {
   return String(text || "").trim();
+}
+
+export function isOnlineAccountVerified(user) {
+  return user?.emailVerified === true || (typeof user?.phoneNumber === "string" && user.phoneNumber.length > 0);
+}
+
+function cleanPhoneNumber(value) {
+  const phone = String(value || "").trim().replace(/[\s().-]/g, "");
+  if (!/^\+[1-9]\d{6,14}$/.test(phone)) {
+    throw new Error("Enter a phone number in international format, including its +country code.");
+  }
+  return phone;
 }
 
 function cleanEmail(email) {
@@ -658,7 +670,7 @@ function baseProfile(user) {
     photoURL: getDefaultAvatarDataUrl(),
     avatarType: "default",
     avatarPreset: "default",
-    verified: !!user.emailVerified,
+    verified: isOnlineAccountVerified(user),
     xp: 0,
     achievements: [],
     achievementRewardSnapshot: {},
@@ -741,11 +753,23 @@ function friendlyAuthError(error) {
   }
   if (code === "auth/popup-closed-by-user") return "The Google popup was closed before it finished.";
   if (code === "auth/popup-blocked") return "Your browser blocked the Google popup.";
+  if (code === "auth/operation-not-supported-in-this-environment") return "Google sign-in needs a supported browser page. Run the site on localhost or HTTPS and allow popups.";
+  if (code === "auth/cancelled-popup-request") return "Another Google sign-in popup is already open. Finish or close it, then try again.";
   if (code === "auth/user-mismatch") return "Choose the same Google account that is linked to this Panategwa account.";
   if (code === "auth/unauthorized-domain") {
     return "This domain is not authorized in Firebase yet. Add it in Firebase Authentication -> Settings -> Authorized domains.";
   }
   if (code === "auth/network-request-failed") return "The network request failed. Check your internet connection and try again.";
+  if (code === "auth/invalid-phone-number") return "Enter a valid phone number in international format, including its +country code.";
+  if (code === "auth/invalid-verification-code") return "That SMS code is incorrect. Check the message and try again.";
+  if (code === "auth/code-expired" || code === "auth/session-expired") return "That SMS code expired. Send a new code and try again.";
+  if (code === "auth/quota-exceeded") return "SMS verification is temporarily unavailable because this project reached its sending limit.";
+  if (code === "auth/invalid-app-credential" || code === "auth/missing-app-credential") return "Phone verification is not fully configured. Enable Phone sign-in in Firebase and authorize the hosted website domain. Firebase phone sign-in does not accept localhost.";
+  if (code === "auth/captcha-check-failed") return "The security check expired or failed. Refresh it and try again.";
+  if (code === "auth/credential-already-in-use") return "That phone number is already linked to another account.";
+  if (code === "auth/account-exists-with-different-credential") return "That email already uses another sign-in method. Use the method you originally used to access that account.";
+  if (code === "auth/provider-already-linked") return "A phone number is already linked to this account.";
+  if (code === "auth/requires-recent-login") return "For security, sign in again before making this account change.";
   return error?.message || "Authentication failed.";
 }
 
@@ -794,7 +818,7 @@ export async function publishProfileDocuments(profile) {
     friendView.avatarPreset = String(profile.avatarPreset || "default").slice(0, 64);
     friendView.avatarLetter = String(profile.avatarLetter || "").slice(0, 8);
   }
-  if (privacy.showVerified) friendView.verified = auth.currentUser?.emailVerified === true;
+  if (privacy.showVerified) friendView.verified = isOnlineAccountVerified(auth.currentUser);
   if (privacy.showRank) {
     friendView.xp = Math.max(0, Number(profile.xp || 0));
   }
@@ -845,7 +869,7 @@ export async function ensureUserProfile(user, options = {}) {
     avatarType: normalizedAvatar.avatarType,
     avatarPreset: normalizedAvatar.avatarPreset,
     avatarLetter: normalizedAvatar.avatarLetter,
-    verified: !!user.emailVerified,
+    verified: isOnlineAccountVerified(user),
     xp: typeof data.xp === "number" ? data.xp : achievements.length,
     achievements,
     achievementRewardSnapshot: (!data.achievementRewardSnapshot || typeof data.achievementRewardSnapshot !== "object" || Array.isArray(data.achievementRewardSnapshot))
@@ -1144,29 +1168,6 @@ export async function changeEmail(newEmail, currentPassword) {
   }
 }
 
-export async function changePassword(currentPassword, newPassword) {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not logged in.");
-
-  const providers = new Set((user.providerData || []).map((provider) => provider.providerId));
-  if (!providers.has("password")) {
-    throw new Error("This account uses Google sign-in, so password changes are not available here.");
-  }
-
-  const nextPass = String(newPassword || "");
-  if (!currentPassword) throw new Error("Current password is required.");
-  if (nextPass.length < 6) throw new Error("New password must be at least 6 characters.");
-
-  try {
-    const credential = EmailAuthProvider.credential(user.email, currentPassword);
-    await reauthenticateWithCredential(user, credential);
-    await updatePassword(user, nextPass);
-    return true;
-  } catch (error) {
-    throw new Error(friendlyAuthError(error));
-  }
-}
-
 export async function resendVerificationEmail() {
   const user = auth.currentUser;
   if (!user) throw new Error("Not logged in.");
@@ -1201,6 +1202,87 @@ export async function requestPasswordReset(email) {
 
   try {
     await sendPasswordResetEmail(auth, cleanMail);
+  } catch (error) {
+    throw new Error(friendlyAuthError(error));
+  }
+}
+
+export async function completePhoneSignIn(confirmationResult, verificationCode) {
+  await authReady;
+  if (!confirmationResult || typeof confirmationResult.confirm !== "function") {
+    throw new Error("Request a new SMS code before entering it.");
+  }
+  const code = String(verificationCode || "").trim();
+  if (!code) throw new Error("Enter the SMS verification code.");
+
+  const releaseSetupGate = beginAccountSetupGate();
+  let rejectedNewUserUid = "";
+  try {
+    const credential = await confirmationResult.confirm(code);
+    const user = credential.user;
+    const isNewUser = getAdditionalUserInfo(credential)?.isNewUser === true;
+
+    if (isNewUser) {
+      rejectedNewUserUid = user.uid;
+      const privateProfile = await getDoc(userRef(user.uid));
+      const legacyProfile = privateProfile.exists() ? null : await getDoc(directoryRef(user.uid));
+      if (!privateProfile.exists() && !legacyProfile?.exists()) {
+        await deleteUser(user);
+        rejectedNewUserUid = "";
+        const error = new Error("No Panategwa account is linked to that phone number yet. Sign in with your email or Google account, then link this number in Account settings.");
+        error.code = "auth/panategwa-account-not-linked";
+        throw error;
+      }
+      rejectedNewUserUid = "";
+    }
+
+    await ensureUserProfile(user, { duringAccountSetup: true });
+    await touchLastLoginOnce(user);
+    localStorage.setItem("ptg_logged_in", "1");
+    return user;
+  } catch (error) {
+    if (rejectedNewUserUid && auth.currentUser?.uid === rejectedNewUserUid) {
+      try { await removeAccountSlot(getActiveAccountSlotId()); } catch (cleanupError) {
+        console.error("Could not sign out an unregistered phone account:", cleanupError);
+      }
+    }
+    throw new Error(friendlyAuthError(error));
+  } finally {
+    releaseSetupGate();
+  }
+}
+
+export async function beginPhoneNumberLink(phoneNumber, appVerifier) {
+  await authReady;
+  const user = auth.currentUser;
+  if (!user) throw new Error("Sign in before linking a phone number.");
+  if (user.phoneNumber) throw new Error("A phone number is already linked to this account.");
+  if (!appVerifier) throw new Error("Complete the security check before requesting an SMS code.");
+
+  try {
+    return await linkWithPhoneNumber(user, cleanPhoneNumber(phoneNumber), appVerifier);
+  } catch (error) {
+    throw new Error(friendlyAuthError(error));
+  }
+}
+
+export async function completePhoneNumberLink(confirmationResult, verificationCode) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Sign in before linking a phone number.");
+  if (!confirmationResult || typeof confirmationResult.confirm !== "function") {
+    throw new Error("Request a new SMS code before entering it.");
+  }
+  const code = String(verificationCode || "").trim();
+  if (!code) throw new Error("Enter the SMS verification code.");
+
+  try {
+    const credential = await confirmationResult.confirm(code);
+    if (credential.user.uid !== user.uid) throw new Error("The phone number was linked to a different account. Sign in again and retry.");
+    await reload(credential.user);
+    await credential.user.getIdToken(true);
+    const profile = await ensureUserProfile(credential.user);
+    notifyActiveAuthObservers();
+    return { user: credential.user, profile };
   } catch (error) {
     throw new Error(friendlyAuthError(error));
   }
@@ -1245,8 +1327,8 @@ export async function resetAccountData(mode = "progress") {
     ? String(mode || "").trim().toLowerCase()
     : "progress";
 
-  if ((nextMode === "friends" || nextMode === "all") && user.emailVerified !== true) {
-    throw new Error("Verify your email before resetting friends and social data.");
+  if ((nextMode === "friends" || nextMode === "all") && !isOnlineAccountVerified(user)) {
+    throw new Error("Verify your email or link a phone number before resetting friends and social data.");
   }
 
   const profile = (await getProfile(user.uid)) || {};

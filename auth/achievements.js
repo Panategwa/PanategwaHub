@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase-config.js";
-import { watchAuth, ensureUserProfile, normalizeSiteTimeMs, getLiveSiteTimeMs, siteTimePendingStorageKey } from "./auth.js";
+import { watchAuth, ensureUserProfile, normalizeSiteTimeMs, getLiveSiteTimeMs, siteTimePendingStorageKey, isOnlineAccountVerified } from "./auth.js";
 import { ensurePanategwaToast } from "./toast.js";
 
 import {
@@ -863,7 +863,7 @@ export async function syncAchievementProgress(user, profile) {
       ...data,
       uid: user.uid,
       username: data.username || user.displayName || "",
-      verified: !!user.emailVerified,
+      verified: isOnlineAccountVerified(user),
       achievements: currentAchievements,
       visitedPages: nextVisited,
       achievementRewardSnapshot: rewardSnapshotBaseline,
@@ -875,7 +875,7 @@ export async function syncAchievementProgress(user, profile) {
     const nextRewardSnapshot = rewardSnapshotFor(mergedAchievements);
     const xp = Math.max(0, nonAchievementXp + totalSnapshotReward(nextRewardSnapshot));
     const nextUsername = data.username || user.displayName || "";
-    const nextVerified = !!user.emailVerified;
+    const nextVerified = isOnlineAccountVerified(user);
     const pagesVisited = nextVisited.length;
     const shouldWrite =
       !snap.exists() ||
@@ -1082,7 +1082,7 @@ function startLiveProfileListener() {
         ...freshProfile,
         uid: trackedUser.uid,
         username: freshProfile.username || trackedUser.displayName || "",
-        verified: !!trackedUser.emailVerified,
+        verified: isOnlineAccountVerified(trackedUser),
         achievements: uniqueKnown(freshProfile.achievements || []),
         visitedPages: visitedPages(freshProfile),
         xp: typeof freshProfile.xp === "number" ? freshProfile.xp : uniqueKnown(freshProfile.achievements || []).length

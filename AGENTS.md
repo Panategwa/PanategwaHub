@@ -24,18 +24,21 @@ main-pages/
   panategwa-d/
     panategwa-d-page/panategwa-d-page.html
     panategwa-d-map/panategwa-d-map-page.html
-    panategwa-d-life/panategwa-d-life-page.html
-    panategwa-d-ideologies/panategwa-d-ideologies-page.html
-    pitons/pitons-page.html
-    empire-of-pitosia/empire-of-pitosia-page.html
-    thrinsachelom-history/thrinsachelom-history-page.html
-    bathythalassas-gigaperipatitis/bathythalassas-gigaperipatitis-page.html
-    tri-panategwaoi-anthropoi-civilis/tri-panategwaoi-anthropoi-civilis-page.html
+    panategwa-d-life/
+      panategwa-d-life-page/panategwa-d-life-page.html
+      anthropoi-civilis-civilization/
+        civilization-page/civilization.html
+        history-page/thrinsachelom-history-page.html
+        ideologies-page/panategwa-d-ideologies-page.html
   panategwa-e/
     panategwa-e-page/panategwa-e-page.html
     dendrospheres/dendrospheres-page.html
   panategwa-f/panategwa-f-page/panategwa-f-page.html
   panategwa-g/panategwa-g-page/panategwa-g-page.html
+placeholder/
+  bathythalassas-gigaperipatitis/bathythalassas-gigaperipatitis-page.html
+  empire-of-pitosia/empire-of-pitosia-page.html
+  tri-panategwaoi-anthropoi-civilis/tri-panategwaoi-anthropoi-civilis-page.html
 ```
 
 ### Page Depth
@@ -45,7 +48,10 @@ non-planet pages — `home`, `account`, `settings`, `streak` — sit directly at
 `main-pages/<body>/<page>.html`, two levels deep, so their asset references in
 `<head>` are prefixed with `../../`. Every planet page lives in its own folder,
 `main-pages/<body>/<page>/<page>.html`, three levels deep, so those use `../../../`,
-and a link to a sibling page goes through `../<page>/<page>.html`.
+and a link to a sibling page goes through `../<page>/<page>.html`. The nested
+Panategwa d life explorer is four levels deep, and its civilization pages are
+five levels deep; `placeholder/<subject>/<page>.html` uses two levels. The
+verifier calculates each prefix from the actual file location.
 `tools/verify_site.py` derives the expected prefix from `rel_path.count("/")`, so
 it enforces whichever depth a page actually sits at; moving a page between the two
 layouts needs no tool change, only the page's own relative paths updated.
@@ -92,6 +98,26 @@ Run all three before committing; they catch different classes of breakage:
 `firestore.rules` is the record of what the live rules should be. It is kept in the
 repo so the rules can be copied into the Firebase console, and the console copy is
 kept in sync with it by hand.
+
+Account data is split across three collections:
+
+- `privateUsers/{uid}` holds the full account, social graph, settings, and progress.
+  Only that user may read or write it.
+- `users/{uid}` is the small signed-in directory used to look up a username and
+  friend-request preferences. It must never contain profile, progress, or contact
+  details. Older full documents are readable only by their owner until login
+  migrates them.
+- `friendProfiles/{uid}` is a privacy-filtered profile projection. Private
+  profiles publish no details beyond the username in the directory. Public
+  profiles share every player-facing profile detail with signed-in players;
+  Custom profiles publish only selected details. Firestore Rules verify each
+  field against the owner's switches and block settings.
+
+The client performs the one-time migration at sign-in. After changing this data
+model, update and publish the site code and copy the matching `firestore.rules`
+into the Firebase console as one coordinated change. Users with older profile
+documents need to sign in once before their directory entry can be used for new
+friend requests or public profile reads.
 
 Agents must not publish rules. If you edit `firestore.rules`, say so and spell out
 what needs to change in the console — the maintainer applies it manually. Deploying

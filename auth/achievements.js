@@ -657,7 +657,7 @@ async function flushPendingSiteTime(force = false) {
 
   siteTimeFlushInFlight = (async () => {
     try {
-      await setDoc(doc(db, "users", uid), {
+      await setDoc(doc(db, "privateUsers", uid), {
         siteTimeMs: increment(delta),
         updatedAt: serverTimestamp()
       }, { merge: true });
@@ -800,7 +800,7 @@ function requirementSatisfied(achievement, context, pending = new Set()) {
       return (requirement.baselineAware ? context.siteTimeSinceResetMs : context.siteTimeMs)
         >= requirement.minutesOnSite * 60 * 1000;
     case "verified_email":
-      return !!(context.user?.emailVerified || context.profile?.verified)
+      return context.user?.emailVerified === true
         && (!requirement.baselineAware || !context.baseline.verified);
     case "streak_days":
       return context.streakCurrent >= requirement.streakDays;
@@ -833,7 +833,7 @@ function computeUnlocks(user, profile, pages) {
 }
 
 export async function syncAchievementProgress(user, profile) {
-  const ref = doc(db, "users", user.uid);
+  const ref = doc(db, "privateUsers", user.uid);
   let result = { profile: profile || null, newlyUnlocked: [] };
 
   await runTransaction(db, async (tx) => {
@@ -1070,7 +1070,7 @@ function startLiveProfileListener() {
 
     if (!user) return;
 
-    profileUnsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
+    profileUnsub = onSnapshot(doc(db, "privateUsers", user.uid), (snap) => {
       const freshProfile = snap.exists() ? snap.data() : null;
       trackedProfile = freshProfile;
       broadcastSiteTimeUpdate();

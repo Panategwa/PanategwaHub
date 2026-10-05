@@ -1,16 +1,23 @@
 import {
-  login,
-  loginWithGoogle,
-  createAccount,
-  requestPasswordReset,
   resendVerificationEmail,
   refreshCurrentUserSession,
   getDefaultAvatarDataUrl,
   formatSiteTimeDuration,
   getResolvedProfileSiteTime,
+  normalizePrivacySettings,
+  createAccount,
+  login,
+  loginWithGoogle,
+  getAccountSlots,
+  getActiveAccountSlotId,
+  activateAccountSlot,
+  activateFirstEmptyAccountSlot,
+  removeAccountSlot,
+  subscribeAccountSlots,
   watchAuth,
   getProfile
 } from "./auth.js";
+import { initializeLoginUI } from "./login.js";
 import { auth, authReady } from "./firebase-config.js";
 
 import {
@@ -21,7 +28,9 @@ import {
   blockUser,
   unblockUser,
   markMessageRead,
-  setMessageDeletedForCurrentUser
+  setMessageDeletedForCurrentUser,
+  loadAccountProfile,
+  sendDirectMessage
 } from "./social.js";
 
 import { ACHIEVEMENTS } from "./achievements.js";
@@ -50,7 +59,6 @@ let currentState = {
   localNotifications: []
 };
 
-let authMode = "login";
 const baseOpenAccountArea = typeof window.openAccountArea === "function"
   ? window.openAccountArea.bind(window)
   : null;
@@ -67,6 +75,10 @@ const MAX_NOTIFICATION_HISTORY = 20;
 let notificationUndoStack = [];
 let notificationRedoStack = [];
 let notificationHistoryUserId = "";
+let viewedProfileLoadKey = "";
+let viewedProfileLoadVersion = 0;
+const directMessageReadInFlight = new Set();
+const directMessageReadRequested = new Set();
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -234,7 +246,9 @@ function formatNotificationBody(kind, value) {
 }
 
 function isVerifiedState(user, profile = null) {
-  return !!(user?.emailVerified || profile?.verified);
+  // Only Firebase's current Auth state is authoritative. Profile documents
+  // can lag behind a changed email or a refreshed verification link.
+  return user?.emailVerified === true;
 }
 
 function resolvedUser(state = currentState) {
@@ -320,6 +334,85 @@ function currentInfoTargetId() {
   const section = normalizeAccountSection(params.get("tab") || "info");
   const targetId = String(params.get("target") || "").trim();
   return section === "info" && targetId ? targetId : "";
+}
+
+function currentMessageSub() {
+  const params = new URLSearchParams(window.location.search);
+  return String(params.get("tab") || "").toLowerCase() === "messages"
+    ? String(params.get("sub") || "inbox").toLowerCase()
+    : "inbox";
+}
+
+function currentChatUid() {
+  return currentMessageSub() === "chat"
+    ? String(new URLSearchParams(window.location.search).get("target") || "").trim()
+    : "";
+}
+
+function setMessageView(view) {
+  const selected = view === "activity" ? "activity" : "inbox";
+  document.querySelectorAll("[data-message-view]").forEach((button) => {
+    const active = button.dataset.messageView === selected;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  document.querySelectorAll("[data-message-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.messagePanel !== selected;
+  });
+}
+
+function ensureViewedProfileLoaded(state) {
+  const user = resolvedUser(state);
+  const targetUid = currentInfoTargetId();
+  if (!user || !targetUid || targetUid === user.uid) {
+    viewedProfileLoadKey = "";
+    return;
+  }
+
+  const cachedProfile = state.friendProfiles?.[targetUid];
+  if (user.emailVerified !== true) {
+    viewedProfileLoadKey = "";
+    if (cachedProfile?.unavailableReason !== "verification-required") {
+      currentState.friendProfiles = {
+        ...(currentState.friendProfiles || {}),
+        [targetUid]: {
+          uid: targetUid,
+          username: "Player",
+          profileUnavailable: true,
+          unavailableReason: "verification-required"
+        }
+      };
+    }
+    return;
+  }
+
+  if (cachedProfile && cachedProfile.unavailableReason !== "verification-required") return;
+  if (cachedProfile?.unavailableReason === "verification-required") {
+    const nextProfiles = { ...(currentState.friendProfiles || {}) };
+    delete nextProfiles[targetUid];
+    currentState.friendProfiles = nextProfiles;
+  }
+
+  const key = `${user.uid}:${targetUid}`;
+  if (viewedProfileLoadKey === key) return;
+  viewedProfileLoadKey = key;
+  const version = ++viewedProfileLoadVersion;
+  loadAccountProfile(targetUid).then((profile) => {
+    if (version !== viewedProfileLoadVersion || currentInfoTargetId() !== targetUid) return;
+    currentState.friendProfiles = {
+      ...(currentState.friendProfiles || {}),
+      [targetUid]: profile || { uid: targetUid, username: "Player", profileUnavailable: true }
+    };
+    renderAll(currentState);
+  }).catch((error) => {
+    console.error("Could not load profile:", error);
+    if (version !== viewedProfileLoadVersion || currentInfoTargetId() !== targetUid) return;
+    currentState.friendProfiles = {
+      ...(currentState.friendProfiles || {}),
+      [targetUid]: { uid: targetUid, username: "Player", profileUnavailable: true }
+    };
+    renderAll(currentState);
+  });
 }
 
 function updateSidebarAvatar(profile, user) {
@@ -418,8 +511,8 @@ function syncMessagesTabBadge(state) {
   const unread = Number(state.unreadCount || 0) + (Array.isArray(state.localNotifications) ? state.localNotifications.filter((entry) => !entry.read).length : 0);
   const canUseMessages = isVerifiedState(resolvedUser(state), resolvedProfile(state));
   button.classList.toggle("has-dot", canUseMessages && unread > 0);
-  button.setAttribute("aria-label", canUseMessages && unread > 0 ? `Notifications (${unread} unread)` : "Notifications");
-  button.title = canUseMessages && unread > 0 ? `${unread} unread notification${unread === 1 ? "" : "s"}` : "Notifications";
+  button.setAttribute("aria-label", canUseMessages && unread > 0 ? `Messages and activity (${unread} unread)` : "Messages and activity");
+  button.title = canUseMessages && unread > 0 ? `${unread} unread item${unread === 1 ? "" : "s"}` : "Messages and activity";
 }
 
 function setVisible(id, visible) {
@@ -441,7 +534,7 @@ function updateLockedPanel(prefix, loggedIn, verified, restoring = false) {
   if (restoring) {
     if (title) {
       title.textContent = prefix === "messages"
-        ? "Loading your notifications"
+        ? "Loading your messages and activity"
         : prefix === "friends"
           ? "Loading your friends"
           : "Loading your account";
@@ -449,7 +542,7 @@ function updateLockedPanel(prefix, loggedIn, verified, restoring = false) {
 
     if (copy) {
       copy.textContent = prefix === "messages"
-        ? "Your friend activity, achievements, and streak updates are syncing now."
+        ? "Your conversations, friend activity, achievements, and streak updates are syncing now."
         : prefix === "friends"
           ? "Your friend list, requests, and blocks are syncing now."
           : "Your profile, settings, and account tools are syncing now.";
@@ -463,29 +556,29 @@ function updateLockedPanel(prefix, loggedIn, verified, restoring = false) {
   if (title) {
     title.textContent = !loggedIn
       ? (prefix === "messages"
-        ? "Log in to use notifications"
+        ? "Log in to use messages and activity"
         : prefix === "friends"
           ? "Log in to use the friends system"
           : "Log in to edit your settings")
       : (prefix === "messages"
-        ? "Verify your email to unlock notifications"
+        ? "Verify your email to unlock messaging"
         : prefix === "friends"
           ? "Verify your email to unlock friends"
-          : "Verify your email to unlock settings");
+          : "Log in to edit your settings");
   }
 
   if (copy) {
     copy.textContent = !loggedIn
       ? (prefix === "messages"
-        ? "Your notifications only load after you sign in."
+        ? "Your chats and activity only load after you sign in."
         : prefix === "friends"
           ? "Your friends, requests, and saved profiles only load after you sign in."
         : "Your profile, password, avatar, and account actions are available after you sign in.")
       : (prefix === "messages"
-        ? "Friend activity, achievements, and streak notifications unlock after your email is verified."
+        ? "Direct messages, friend activity, achievements, and streak updates unlock after your email is verified."
         : prefix === "friends"
           ? "Friend requests, blocked users, and your friends list unlock after your email is verified."
-        : "Profile edits, avatars, privacy settings, and account actions unlock after your email is verified.");
+        : "Sign in to manage your email, privacy, and account settings.");
   }
 
   setVisible(`${prefix}-locked-refresh-btn`, loggedIn && !verified);
@@ -501,7 +594,7 @@ async function handleVerificationRefresh() {
     refreshLocalNotifications(refreshed.user?.uid || "");
     renderAll(currentState);
     setStatus(isVerifiedState(refreshed.user, refreshed.profile)
-      ? "Email verified. Everything is unlocked now."
+      ? "Email verified. Friends, messages, and player profiles are now available."
       : "Your email still looks unverified. Check the inbox link, then try again.", isVerifiedState(refreshed.user, refreshed.profile) ? "success" : "info");
   } catch (error) {
     console.error(error);
@@ -517,31 +610,6 @@ async function handleVerificationResend() {
     console.error(error);
     setStatus(error?.message || "Could not resend verification email.", "error");
   }
-}
-
-function setAuthMode(mode = "login") {
-  authMode = mode === "signup" ? "signup" : "login";
-
-  const loginActive = authMode === "login";
-  $("auth-mode-login-btn")?.classList.toggle("active", loginActive);
-  $("auth-mode-signup-btn")?.classList.toggle("active", !loginActive);
-  document.querySelectorAll("[data-auth-panel]").forEach((panel) => {
-    panel.classList.toggle("active", panel.dataset.authPanel === authMode);
-  });
-
-  const heading = $("auth-mode-heading");
-  const copy = $("auth-mode-copy");
-  const switchCopy = $("auth-switch-copy");
-  const switchButton = $("auth-switch-btn");
-
-  if (heading) heading.textContent = loginActive ? "Log in" : "Create account";
-  if (copy) {
-    copy.textContent = loginActive
-      ? "Use your email and password or Google to sign in."
-      : "Create your account to unlock friends, notifications, and synced progress.";
-  }
-  if (switchCopy) switchCopy.textContent = loginActive ? "Don't have an account?" : "Already have an account?";
-  if (switchButton) switchButton.textContent = loginActive ? "Create one" : "Log in";
 }
 
 function syncQuery(section, sub = null, targetId = null) {
@@ -582,14 +650,14 @@ function applyAuthGuards() {
   const restoring = isAuthRestoring();
   const loggedIn = !!user;
   const verified = isVerifiedState(user, profile);
-  const unlocked = loggedIn && verified;
+  const socialUnlocked = loggedIn && verified;
 
-  setVisible("settings-locked", restoring || !unlocked);
-  setVisible("settings-content", !restoring && unlocked);
-  setVisible("friends-locked", restoring || !unlocked);
-  setVisible("friends-content", !restoring && unlocked);
-  setVisible("messages-locked", restoring || !unlocked);
-  setVisible("messages-content", !restoring && unlocked);
+  setVisible("settings-locked", restoring || !loggedIn);
+  setVisible("settings-content", !restoring && loggedIn);
+  setVisible("friends-locked", restoring || !socialUnlocked);
+  setVisible("friends-content", !restoring && socialUnlocked);
+  setVisible("messages-locked", restoring || !socialUnlocked);
+  setVisible("messages-content", !restoring && socialUnlocked);
   updateLockedPanel("settings", loggedIn, verified, restoring);
   updateLockedPanel("friends", loggedIn, verified, restoring);
   updateLockedPanel("messages", loggedIn, verified, restoring);
@@ -602,7 +670,7 @@ function applyAuthGuards() {
       ? "Log in to sync achievements and XP to your account."
       : (verified
         ? "Achievements and XP sync automatically while you explore the site."
-        : "Verify your email to fully unlock synced account features.");
+        : "Verify your email to unlock friends, messages, and other player profiles.");
   }
 }
 
@@ -641,7 +709,11 @@ window.openAccountArea = function openAccountArea(section = "info", sub = null, 
       finalSub = nextSub || "account";
       showSettingsSubsection(finalSub);
     } else if (nextSection === "messages") {
-      finalSub = null;
+      finalSub = ["chat", "activity"].includes(String(nextSub || "").toLowerCase())
+        ? String(nextSub).toLowerCase()
+        : "inbox";
+      setMessageView(finalSub === "activity" ? "activity" : "inbox");
+      if (finalSub !== "chat") targetId = null;
     }
 
     if (nextSection === "progress" && targetId) {
@@ -690,39 +762,31 @@ function renderAuth(state) {
 
   const targetId = currentInfoTargetId();
   const friendProfile = targetId && targetId !== user.uid ? (state.friendProfiles?.[targetId] || null) : null;
-  const viewingFriend = !!friendProfile;
+  const viewingOther = !!targetId && targetId !== user.uid;
+  const isFriend = viewingOther && (state.friends || []).includes(targetId);
 
-  if (cardTitle) cardTitle.textContent = viewingFriend ? "Friend profile" : "Your profile";
-  if (cardBadge) cardBadge.textContent = viewingFriend ? "Friends only" : "Signed in";
+  if (cardTitle) cardTitle.textContent = viewingOther ? "Player profile" : "Your profile";
+  if (cardBadge) cardBadge.textContent = viewingOther ? (isFriend ? "Friend" : "Community") : "Signed in";
 
-  if (targetId && targetId !== user.uid && !friendProfile) {
-    const stillLoading = state.ready === false;
-    if (cardTitle) cardTitle.textContent = stillLoading ? "Loading friend profile" : "Friend profile unavailable";
-    if (cardBadge) cardBadge.textContent = "Friends only";
+  if (viewingOther && (!friendProfile || friendProfile.profileUnavailable)) {
+    const stillLoading = viewedProfileLoadKey === `${user.uid}:${targetId}`;
+    const needsVerification = friendProfile?.unavailableReason === "verification-required";
+    if (cardTitle) cardTitle.textContent = stillLoading ? "Loading profile" : needsVerification ? "Verify your email" : "Profile unavailable";
+    if (cardBadge) cardBadge.textContent = "Player";
 
     info.innerHTML = `
       <div class="account-header">
-        ${avatarMarkup(
-          ownProfile.photoURL || getDefaultAvatarDataUrl(),
-          "Your avatar",
-          "account-avatar",
-          isVerifiedState(user, ownProfile)
-        )}
-        <div>
-          <p style="margin: 0;"><strong>${stillLoading ? "Friend profile" : "Profile unavailable"}</strong></p>
-          <p style="margin: 0; opacity: 0.8;">${stillLoading ? "Syncing your friend's info now." : "This profile is not available anymore."}</p>
-        </div>
+        ${avatarMarkup(getDefaultAvatarDataUrl(), "", "account-avatar", false)}
+        <div><p style="margin: 0;"><strong>${stillLoading ? "Loading player" : needsVerification ? "Verify your email" : "Profile unavailable"}</strong></p></div>
       </div>
-
       <div class="button-row" style="margin-bottom: 14px;">
         <button id="back-to-friends-btn" type="button" class="small">Back to friends</button>
       </div>
-
-      <div class="msg-empty">
-        ${stillLoading
-          ? "We are loading this friend's account info."
-          : "You may not be friends with this person anymore, or their profile is no longer available."}
-      </div>
+      <div class="msg-empty">${stillLoading
+        ? "Loading the profile…"
+        : needsVerification
+          ? "Verify your email in Account settings to view other player profiles."
+          : "This account could not be found, or its profile is not available."}</div>
     `;
 
     $("back-to-friends-btn")?.addEventListener("click", () => {
@@ -733,47 +797,68 @@ function renderAuth(state) {
     return;
   }
 
-  if (viewingFriend) {
+  if (viewingOther) {
     const username = friendProfile.username || "Player";
     const avatar = avatarMarkup(
       friendProfile.photoURL || getDefaultAvatarDataUrl(),
       `${username} avatar`,
       "account-avatar",
-      !!friendProfile.verified
+      friendProfile.verified === true
     );
-    const rank = friendProfile.currentRank || "Hidden";
-    const joined = friendProfile.createdAt ? formatDateOnly(friendProfile.createdAt) : "Hidden";
-    const siteAge = friendProfile.siteTimeMs == null ? "Hidden" : formatSiteTimeDuration(friendProfile.siteTimeMs, { includeSeconds: true });
-    const streak = friendProfile.streakCurrent == null ? "Hidden" : `${friendProfile.streakCurrent} day${friendProfile.streakCurrent === 1 ? "" : "s"}`;
-    const longest = friendProfile.streakLongest == null ? "Hidden" : `${friendProfile.streakLongest} day${friendProfile.streakLongest === 1 ? "" : "s"}`;
+    const profileVisible = friendProfile.canViewProfile !== false;
+    const rows = [];
+    if (friendProfile.verified != null) rows.push(["Verified", friendProfile.verified ? "Yes" : "No"]);
+    if (friendProfile.currentRank) rows.push(["Rank", friendProfile.currentRank]);
+    if (friendProfile.xp != null) rows.push(["XP", String(friendProfile.xp)]);
+    if (friendProfile.createdAt) rows.push(["Joined", formatDateOnly(friendProfile.createdAt)]);
+    if (friendProfile.siteTimeMs != null) rows.push(["On the site for", formatSiteTimeDuration(friendProfile.siteTimeMs, { includeSeconds: true })]);
+    if (friendProfile.streakCurrent != null) rows.push(["Current streak", `${friendProfile.streakCurrent} day${friendProfile.streakCurrent === 1 ? "" : "s"}`]);
+    if (friendProfile.streakLongest != null) rows.push(["Longest streak", `${friendProfile.streakLongest} day${friendProfile.streakLongest === 1 ? "" : "s"}`]);
+    const requestPending = (state.outgoingRequests || []).some((request) => request.toUid === targetId && request.status === "pending");
+    const incomingRequest = (state.incomingRequests || []).some((request) => request.fromUid === targetId && request.status === "pending");
+    const profileSubtitle = isFriend ? "Friend profile" : profileVisible ? "Panategwa player" : "Private profile";
 
     info.innerHTML = `
       <div class="account-header">
         ${avatar}
         <div>
           <p style="margin: 0;"><strong>${escapeHtml(username)}</strong></p>
-          <p style="margin: 0; opacity: 0.8;">Friend profile</p>
+          <p style="margin: 0; opacity: 0.8;">${profileSubtitle}</p>
         </div>
       </div>
 
       <div class="button-row" style="margin-bottom: 14px;">
         <button id="back-to-friends-btn" type="button" class="small">Back to friends</button>
+        ${isFriend && friendProfile.canMessage ? `<button id="player-message-btn" type="button" class="small">Message</button>` : ""}
+        ${!isFriend
+          ? (requestPending
+            ? `<button type="button" class="small" disabled>Request pending</button>`
+            : incomingRequest
+              ? `<button id="player-view-requests-btn" type="button" class="small">Review request</button>`
+              : `<button id="player-add-friend-btn" type="button" class="small">Add friend</button>`)
+          : ""}
       </div>
 
-      <div class="info-grid">
-        <div class="info-row"><span>Verified</span><strong>${friendProfile.verified ? "Yes" : "No"}</strong></div>
-        <div class="info-row"><span>Username</span><strong>${escapeHtml(username)}</strong></div>
-        <div class="info-row"><span>Account ID</span><strong>${escapeHtml(friendProfile.uid || "--")}</strong></div>
-        <div class="info-row"><span>Rank</span><strong>${escapeHtml(rank)}</strong></div>
-        <div class="info-row"><span>Joined</span><strong>${escapeHtml(joined)}</strong></div>
-        <div class="info-row"><span>On the site for</span><strong>${escapeHtml(siteAge)}</strong></div>
-        <div class="info-row"><span>Current streak</span><strong>${escapeHtml(streak)}</strong></div>
-        <div class="info-row"><span>Longest streak</span><strong>${escapeHtml(longest)}</strong></div>
-      </div>
+      ${profileVisible && rows.length ? `<div class="info-grid">${rows.map(([label, value]) => `<div class="info-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}</div>` : `<p class="section-note">${profileVisible ? "This player has kept their profile details private." : "Only this player's username is visible. Add them as a friend to connect."}</p>`}
     `;
 
     $("back-to-friends-btn")?.addEventListener("click", () => {
       window.openAccountArea("friends", "friends");
+    });
+    $("player-message-btn")?.addEventListener("click", () => openDirectConversation(targetId));
+    $("player-view-requests-btn")?.addEventListener("click", () => window.openAccountArea("friends", "requests"));
+    $("player-add-friend-btn")?.addEventListener("click", async () => {
+      const button = $("player-add-friend-btn");
+      if (button) button.disabled = true;
+      try {
+        await sendFriendRequestById(targetId);
+        setStatus("Friend request sent.", "success");
+        renderAll(currentState);
+      } catch (error) {
+        if (button) button.disabled = false;
+        setStatus(error?.message || "Could not send a friend request.", "error");
+        window.alert(error?.message || "Could not send a friend request.");
+      }
     });
 
     updateSidebarAvatar(ownProfile, user);
@@ -792,8 +877,8 @@ function renderAuth(state) {
   const copied = isUserIdCopied(user.uid);
   const verifyNotice = !isVerifiedState(user, ownProfile) ? `
     <div class="verify-callout">
-      <strong>Verify your email to unlock account features</strong>
-      <p>Friends, notifications, avatars, privacy controls, and the rest of your account tools open as soon as your email is verified.</p>
+      <strong>Verify your email to unlock social features</strong>
+      <p>Verify your email to use friends and messages or view other player profiles. You can manage your email and privacy settings now.</p>
       <div class="button-row">
         <button id="inline-refresh-verification-btn" type="button">I've verified my email</button>
         <button id="inline-resend-verification-btn" type="button">Resend verification email</button>
@@ -1001,7 +1086,7 @@ function renderPrivacyProfilePreview(state) {
   if (!user) {
     container.innerHTML = `
       <div class="friend-profile-card">
-        <div class="subsection-head"><h3>Friend view preview</h3></div>
+        <div class="subsection-head"><h3>Player view preview</h3></div>
         <div class="msg-empty">Log in to preview what friends can see.</div>
       </div>
     `;
@@ -1010,11 +1095,13 @@ function renderPrivacyProfilePreview(state) {
 
   const profile = resolvedProfile(state) || {};
   const username = profile.username || "Player";
-  const privacy = profile?.privacySettings || {};
-  const showRank = privacy.showRank !== false;
-  const showJoined = privacy.showJoined !== false;
-  const showStreaks = privacy.showStreaks !== false;
-  const showSiteAge = privacy.showSiteAge !== false;
+  const privacy = normalizePrivacySettings(profile?.privacySettings);
+  const showAvatar = privacy.showAvatar;
+  const showVerified = privacy.showVerified;
+  const showRank = privacy.showRank;
+  const showJoined = privacy.showJoined;
+  const showStreaks = privacy.showStreaks;
+  const showSiteAge = privacy.showSiteAge;
   const rank = showRank ? getRank(profile.xp || 0) : null;
   const streakCurrent = showStreaks ? (profile?.streak?.current || 0) : null;
   const streakLongest = showStreaks ? (profile?.longestStreak || profile?.streak?.longest || streakCurrent || 0) : null;
@@ -1034,42 +1121,46 @@ function renderPrivacyProfilePreview(state) {
       ${note ? `<small>${escapeHtml(note)}</small>` : ""}
     </div>
   `;
-  const avatar = avatarMarkup(
-    profile.photoURL || getDefaultAvatarDataUrl(),
-    `${username} avatar`,
-    "profile-avatar-large",
-    isVerifiedState(user, profile)
-  );
+  const avatar = showAvatar
+    ? avatarMarkup(
+      profile.photoURL || getDefaultAvatarDataUrl(),
+      `${username} avatar`,
+      "profile-avatar-large",
+      showVerified && isVerifiedState(user, profile)
+    )
+    : `<div class="profile-avatar-large privacy-avatar-hidden" aria-label="Profile picture hidden">?</div>`;
 
   container.innerHTML = `
     <div class="friend-profile-card">
       <div class="subsection-head">
-        <h3>Friend view preview</h3>
-        <span class="profile-badge">Friends only</span>
+        <h3>Player view preview</h3>
+        <span class="profile-badge">${privacy.preset === "private" ? "Username only" : "Visible to players"}</span>
       </div>
 
       <div class="profile-hero">
         ${avatar}
         <div>
           <div class="profile-name">${escapeHtml(username)}</div>
-          <div class="friend-entry-meta">ID: ${escapeHtml(profile.uid || "--")}</div>
+          <div class="friend-entry-meta">${privacy.preset === "private" ? "Only your username is visible" : "Your selected profile details are visible"}</div>
         </div>
       </div>
 
       <div class="profile-meta">
         <div><span>Username</span><strong>${escapeHtml(username)}</strong></div>
-        <div><span>Friends</span><strong>${escapeHtml(String((profile.friends || []).length || 0))}</strong></div>
+        <div><span>Visibility</span><strong>${escapeHtml(privacy.preset[0].toUpperCase() + privacy.preset.slice(1))}</strong></div>
       </div>
 
       <div class="privacy-preview-grid">
-        ${privacyCard("Rank", rank || "Hidden", showRank, "showRank", "Friends can see your rank and XP progress.")}
-        ${privacyCard("Joined", showJoined && profile.createdAt ? formatDateOnly(profile.createdAt) : "Hidden", showJoined, "showJoined", "Friends can see when your account was created.")}
+        ${privacyCard("Profile picture", showAvatar ? "Visible" : "Hidden", showAvatar, "showAvatar", "Players can see your avatar.")}
+        ${privacyCard("Verified badge", showVerified ? (isVerifiedState(user, profile) ? "Verified" : "Not verified") : "Hidden", showVerified, "showVerified", "Players can see your verification status.")}
+        ${privacyCard("Rank and XP", rank || "Hidden", showRank, "showRank", "Players can see your rank and XP progress.")}
+        ${privacyCard("Joined", showJoined && profile.createdAt ? formatDateOnly(profile.createdAt) : "Hidden", showJoined, "showJoined", "Players can see when your account was created.")}
         ${privacyCard("Current streak", streakCurrent == null ? "Hidden" : `${streakCurrent} day${streakCurrent === 1 ? "" : "s"}`, showStreaks, "showStreaks", "This also controls your longest streak.")}
-        ${privacyCard("Longest streak", streakLongest == null ? "Hidden" : `${streakLongest} day${streakLongest === 1 ? "" : "s"}`, showStreaks, "showStreaks", "This uses the same streak toggle.")}
-        ${privacyCard("On the site for", siteAge || "Hidden", showSiteAge, "showSiteAge", "Friends can see your total time spent on the site.")}
+        ${privacyCard("Longest streak", streakLongest == null ? "Hidden" : `${streakLongest} day${streakLongest === 1 ? "" : "s"}`, showStreaks, "showStreaks", "This uses the same streak setting.")}
+        ${privacyCard("Time on site", siteAge || "Hidden", showSiteAge, "showSiteAge", "Players can see your total time spent on the site.")}
       </div>
 
-      <div class="profile-body-note">Only friends can view your account. Use the small red hide/show buttons in each card to control what they can see.</div>
+      <div class="profile-body-note">Your email, password, friend list, and account controls are never shown. Use Hide and Show to change your custom profile.</div>
     </div>
   `;
 }
@@ -1149,7 +1240,7 @@ function renderFriends(state) {
             <span class="friend-entry-avatar">${profileAvatarMarkup(friend)}</span>
             <span class="friend-entry-text">
               <span class="friend-entry-name">${escapeHtml(friend.username || "Player")}</span>
-              <span class="friend-entry-meta">${escapeHtml(friend.uid || "")}</span>
+              <span class="friend-entry-meta">Friend</span>
             </span>
           </span>
         </button>
@@ -1157,6 +1248,7 @@ function renderFriends(state) {
         <details class="friend-entry-menu">
           <summary aria-label="Friend actions">&#8942;</summary>
           <div class="friend-entry-popover">
+            <button type="button" data-action="friend-message" data-uid="${escapeHtml(friend.uid)}">Message</button>
             <button type="button" data-action="friend-copy" data-uid="${escapeHtml(friend.uid)}">Copy ID</button>
             <button type="button" data-action="friend-remove" data-uid="${escapeHtml(friend.uid)}">Unfriend</button>
             <button type="button" data-action="friend-block" data-uid="${escapeHtml(friend.uid)}">Block</button>
@@ -1238,6 +1330,7 @@ function socialNotificationItems(state) {
 
   return (state.messages || [])
     .filter((message) => String(message?.toUid || "").trim() === user.uid)
+    .filter((message) => message.kind !== "direct-message")
     .filter((message) => message.kind !== "friend-request" || String(message.status || "pending") === "pending")
     .map((message) => ({
       id: `social:${message.id}`,
@@ -1252,6 +1345,153 @@ function socialNotificationItems(state) {
       uid: String(message.fromUid || message.targetId || "").trim(),
       message
     }));
+}
+
+function openDirectConversation(peerUid) {
+  const id = String(peerUid || "").trim();
+  if (!id) return;
+  window.openAccountArea("messages", "chat", id);
+  markDirectMessagesRead(currentState, id);
+}
+
+function markDirectMessagesRead(state, peerUid) {
+  const uid = resolvedUser(state)?.uid || "";
+  const peer = String(peerUid || "").trim();
+  if (!uid || !peer) return;
+  const unread = (state.messages || []).filter((message) => message.kind === "direct-message"
+    && String(message.fromUid || "") === peer
+    && String(message.toUid || "") === uid
+    && !(Array.isArray(message.readBy) ? message.readBy : []).includes(uid)
+    && !directMessageReadRequested.has(String(message.id || ""))
+    && !directMessageReadInFlight.has(String(message.id || "")));
+  unread.forEach((message) => directMessageReadInFlight.add(String(message.id || "")));
+  Promise.all(unread.map((message) => markMessageRead(message.id, true)))
+    .then(() => unread.forEach((message) => directMessageReadRequested.add(String(message.id || ""))))
+    .catch((error) => console.error("Could not mark chat as read:", error))
+    .finally(() => unread.forEach((message) => directMessageReadInFlight.delete(String(message.id || ""))));
+}
+
+function directMessageThreads(state) {
+  const uid = resolvedUser(state)?.uid;
+  if (!uid) return [];
+  const threads = new Map();
+  for (const message of state.messages || []) {
+    if (message.kind !== "direct-message") continue;
+    const fromUid = String(message.fromUid || "");
+    const toUid = String(message.toUid || "");
+    if (fromUid !== uid && toUid !== uid) continue;
+    const peerUid = fromUid === uid ? toUid : fromUid;
+    if (!peerUid) continue;
+    const previous = threads.get(peerUid) || { uid: peerUid, messages: [] };
+    previous.messages.push(message);
+    threads.set(peerUid, previous);
+  }
+
+  return [...threads.values()].map((thread) => {
+    thread.messages.sort((left, right) => toMs(left.createdAt) - toMs(right.createdAt));
+    const latest = thread.messages[thread.messages.length - 1];
+    const unread = thread.messages.filter((message) => String(message.toUid || "") === uid
+      && !(Array.isArray(message.readBy) ? message.readBy : []).includes(uid)).length;
+    const profile = state.friendProfiles?.[thread.uid] || {};
+    const messageName = latest?.fromUid === uid ? latest?.toName : latest?.fromName;
+    return {
+      ...thread,
+      latest,
+      unread,
+      username: profile.username && profile.username !== thread.uid ? profile.username : (messageName || "Player"),
+      photoURL: profile.photoURL || ""
+    };
+  }).sort((left, right) => toMs(right.latest?.createdAt) - toMs(left.latest?.createdAt));
+}
+
+function renderDirectMessages(state) {
+  const list = $("dm-thread-list");
+  const count = $("dm-thread-count");
+  const empty = $("dm-chat-empty");
+  const chatView = $("dm-chat-view");
+  const status = $("dm-status");
+  const header = $("dm-chat-header");
+  const messages = $("dm-chat-messages");
+  const form = $("dm-compose-form");
+  const input = $("dm-compose-input");
+  const uid = resolvedUser(state)?.uid || "";
+  if (!list || !chatView || !empty || !messages) return;
+
+  if (!uid) {
+    if (status) status.textContent = "Sign in and verify your email to chat with friends.";
+    list.innerHTML = `<div class="msg-empty">Sign in to see your chats.</div>`;
+    count && (count.textContent = "0");
+    empty.hidden = false;
+    chatView.hidden = true;
+    return;
+  }
+
+  const threads = directMessageThreads(state);
+  const selectedUid = currentChatUid();
+  if (count) count.textContent = String(threads.length);
+  if (status) status.textContent = `${threads.length} conversation${threads.length === 1 ? "" : "s"}. Messages are private between you and each friend.`;
+
+  list.innerHTML = threads.length ? threads.map((thread) => `
+    <button type="button" class="dm-thread-button ${thread.uid === selectedUid ? "active" : ""} ${thread.unread ? "unread" : ""}" data-dm-open="${escapeHtml(thread.uid)}" aria-current="${thread.uid === selectedUid ? "true" : "false"}">
+      <span class="dm-thread-avatar">${profileAvatarMarkup({ photoURL: thread.photoURL, verified: null })}</span>
+      <span class="dm-thread-copy">
+        <span class="dm-thread-name"><span>${escapeHtml(thread.username)}</span><time class="dm-thread-time">${escapeHtml(relativeTime(toMs(thread.latest?.createdAt)))}</time></span>
+        <span class="dm-thread-preview">${escapeHtml(thread.latest?.body || "Message")}</span>
+      </span>
+      ${thread.unread ? `<span class="dm-thread-unread" aria-hidden="true"></span><span class="sr-only">${thread.unread} unread messages</span>` : ""}
+    </button>
+  `).join("") : `<div class="msg-empty">No chats yet. Open a friend's profile to start a conversation.</div>`;
+
+  const knownFriend = (state.friends || []).includes(selectedUid);
+  const selectedProfile = state.friendProfiles?.[selectedUid] || {};
+  const thread = threads.find((entry) => entry.uid === selectedUid) || (selectedUid && knownFriend ? {
+    uid: selectedUid,
+    messages: [],
+    unread: 0,
+    username: selectedProfile.username || "Player",
+    photoURL: selectedProfile.photoURL || ""
+  } : null);
+  if (thread) markDirectMessagesRead(state, selectedUid);
+  if (!selectedUid || !thread) {
+    empty.hidden = false;
+    chatView.hidden = true;
+    if (selectedUid && status) status.textContent = "That conversation is unavailable. Start a chat from a friend's profile.";
+    return;
+  }
+
+  const canSend = (state.friends || []).includes(selectedUid) && !(state.blocked || []).includes(selectedUid);
+  empty.hidden = true;
+  chatView.hidden = false;
+  if (header) {
+    header.innerHTML = `
+      <div class="dm-thread-avatar">${profileAvatarMarkup({ photoURL: thread.photoURL, verified: null })}</div>
+      <div class="dm-chat-header-copy">
+        <strong>${escapeHtml(thread.username)}</strong><span>${canSend ? "Friend" : "Chat history"}</span>
+      </div>
+      <div class="dm-chat-actions">
+        <button type="button" class="small" data-dm-profile="${escapeHtml(selectedUid)}">View profile</button>
+      </div>
+    `;
+  }
+
+  messages.innerHTML = thread.messages.length ? thread.messages.map((message) => {
+    const sent = String(message.fromUid || "") === uid;
+    const stamp = toMs(message.createdAt);
+    const time = stamp ? new Date(stamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Sending…";
+    const seen = sent && (Array.isArray(message.readBy) ? message.readBy : []).includes(selectedUid);
+    return `<div class="dm-message-row ${sent ? "mine" : ""}"><div class="dm-message-bubble">${escapeHtml(message.body || "")}<time class="dm-message-time">${escapeHtml(time)}${seen ? " · Seen" : ""}</time></div></div>`;
+  }).join("") : `<div class="dm-conversation-empty">Say hello to ${escapeHtml(thread.username)}.</div>`;
+  if (canSend) {
+    form?.removeAttribute("hidden");
+    if (input) input.disabled = false;
+    $("dm-send-btn")?.removeAttribute("disabled");
+  } else {
+    form?.setAttribute("hidden", "");
+    if (input) input.disabled = true;
+    $("dm-send-btn")?.setAttribute("disabled", "");
+    if (status) status.textContent = "You need to be friends to send messages.";
+  }
+  messages.scrollTop = messages.scrollHeight;
 }
 
 function localNotificationItems(state) {
@@ -1416,10 +1656,10 @@ function renderNotifications(state) {
 
   const user = resolvedUser(state);
   if (!user) {
-    if (summary) summary.textContent = "Log in to see your notifications.";
+    if (summary) summary.textContent = "Log in to see your activity.";
     readAllBtn?.toggleAttribute("disabled", true);
     unreadAllBtn?.toggleAttribute("disabled", true);
-    root.innerHTML = `<div class="msg-empty">Log in to see your notifications.</div>`;
+    root.innerHTML = `<div class="msg-empty">Log in to see your activity.</div>`;
     syncNotificationHistoryButtons();
     return;
   }
@@ -1466,6 +1706,7 @@ function renderNotifications(state) {
 function renderAll(state) {
   const user = resolvedUser(state);
   const profile = resolvedProfile(state) || {};
+  ensureViewedProfileLoaded(state);
   const resolvedSiteTimeMs = resolvedOwnSiteTimeMs(profile, user);
   const authSignature = JSON.stringify({
     authHydrated,
@@ -1486,7 +1727,7 @@ function renderAll(state) {
       const id = currentInfoTargetId();
       const friend = id ? state.friendProfiles?.[id] : null;
       return friend
-        ? `${friend.uid || ""}:${friend.username || ""}:${friend.currentRank || ""}:${friend.streakCurrent ?? ""}:${friend.streakLongest ?? ""}:${friend.siteTimeMs ?? ""}:${formatDateOnly(friend.createdAt)}`
+        ? `${friend.uid || ""}:${friend.username || ""}:${friend.photoURL || ""}:${friend.canViewProfile !== false}:${friend.canMessage === true}:${friend.verified ?? ""}:${friend.currentRank || ""}:${friend.streakCurrent ?? ""}:${friend.streakLongest ?? ""}:${friend.siteTimeMs ?? ""}:${formatDateOnly(friend.createdAt)}`
         : "";
     })()
   });
@@ -1515,6 +1756,9 @@ function renderAll(state) {
     siteTimeMs: resolvedSiteTimeMs,
     streak: profile?.streak?.current || 0,
     longest: profile?.longestStreak || profile?.streak?.longest || 0,
+    privacyPreset: profile?.privacySettings?.preset || "private",
+    privacyShowAvatar: profile?.privacySettings?.showAvatar === true,
+    privacyShowVerified: profile?.privacySettings?.showVerified === true,
     privacyShowRank: profile?.privacySettings?.showRank !== false,
     privacyShowJoined: profile?.privacySettings?.showJoined !== false,
     privacyShowStreaks: profile?.privacySettings?.showStreaks !== false,
@@ -1550,6 +1794,26 @@ function renderAll(state) {
     renderAll.lastFriendsSignature = friendsSignature;
   }
 
+  const directMessagesSignature = JSON.stringify({
+    uid: user?.uid || "",
+    selected: currentChatUid(),
+    friends: [...new Set(state.friends || [])].sort(),
+    blocked: [...new Set(state.blocked || [])].sort(),
+    messages: (state.messages || []).filter((message) => message.kind === "direct-message").map((message) => [
+      message.id || "",
+      message.fromUid || "",
+      message.toUid || "",
+      message.body || "",
+      toMs(message.createdAt),
+      [...new Set(message.readBy || [])].sort().join(",")
+    ]),
+    profiles: Object.entries(state.friendProfiles || {}).map(([uid, info]) => [uid, info?.username || "", info?.photoURL || ""])
+  });
+  if (renderAll.lastDirectMessagesSignature !== directMessagesSignature) {
+    renderDirectMessages(state);
+    renderAll.lastDirectMessagesSignature = directMessagesSignature;
+  }
+
   const notificationsSignature = JSON.stringify({
     authHydrated,
     uid: user?.uid || "",
@@ -1560,6 +1824,7 @@ function renderAll(state) {
     redoDepth: notificationRedoStack.length,
     local: (state.localNotifications || []).map((entry) => `${entry.id || ""}:${entry.read ? "1" : "0"}:${entry.createdAt || 0}`),
     social: (state.messages || [])
+      .filter((message) => message.kind !== "direct-message")
       .filter((message) => String(message.kind || "") !== "friend-request" || String(message.status || "pending") === "pending")
       .map((message) => `${message.id || ""}:${(Array.isArray(message.readBy) ? message.readBy : []).includes(user?.uid || "") ? "1" : "0"}:${toMs(message.createdAt)}`)
   });
@@ -1576,6 +1841,7 @@ renderAll.lastProgressSignature = "";
 renderAll.lastSettingsSignature = "";
 renderAll.lastFriendsSignature = "";
 renderAll.lastNotificationsSignature = "";
+renderAll.lastDirectMessagesSignature = "";
 
 async function copyText(value) {
   try {
@@ -1593,7 +1859,7 @@ function bindNavigation() {
   // them with it. Named and unsubscribed, or every return to the account page
   // would add another copy and a single click would fire all of them.
   const onSectionClick = (event) => {
-    const sectionButton = event.target.closest("[data-target], [data-open-section], [data-auth-mode], [data-settings-subtab]");
+    const sectionButton = event.target.closest("[data-target], [data-open-section], [data-settings-subtab]");
     if (!sectionButton) return;
 
     if (sectionButton.dataset.target) {
@@ -1603,11 +1869,6 @@ function bindNavigation() {
 
     if (sectionButton.dataset.openSection) {
       window.openAccountArea(sectionButton.dataset.openSection);
-      return;
-    }
-
-    if (sectionButton.dataset.authMode) {
-      setAuthMode(sectionButton.dataset.authMode);
       return;
     }
 
@@ -1626,90 +1887,6 @@ function bindNavigation() {
   document.addEventListener("click", onDocumentClick);
   accountUnsubs.push(() => document.removeEventListener("click", onSectionClick));
   accountUnsubs.push(() => document.removeEventListener("click", onDocumentClick));
-}
-
-function bindAuthForms() {
-  $("auth-switch-btn")?.addEventListener("click", () => {
-    setAuthMode(authMode === "login" ? "signup" : "login");
-  });
-
-  $("login-form")?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    try {
-      setStatus("Logging in...", "info");
-      await login($("login-email")?.value || "", $("login-password")?.value || "");
-      setStatus("Logged in. Loading your account...", "success");
-    } catch (error) {
-      console.error(error);
-      setStatus(error?.message || "Login failed.", "error");
-      window.alert(error?.message || "Login failed.");
-    }
-  });
-
-  $("signup-form")?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const password = $("signup-password")?.value || "";
-    const confirmPassword = $("signup-password-confirm")?.value || "";
-
-    if (password !== confirmPassword) {
-      setStatus("Passwords do not match.", "error");
-      return;
-    }
-
-    try {
-      setStatus("Creating account...", "info");
-      await createAccount(
-        $("signup-email")?.value || "",
-        password,
-        $("signup-username")?.value || ""
-      );
-      setStatus("Account created. Check your inbox to verify your email.", "success");
-      setAuthMode("login");
-      if ($("login-email")) $("login-email").value = $("signup-email")?.value || "";
-      if ($("login-password")) $("login-password").value = "";
-    } catch (error) {
-      console.error(error);
-      setStatus(error?.message || "Could not create account.", "error");
-      window.alert(error?.message || "Could not create account.");
-    }
-  });
-
-  $("google-btn")?.addEventListener("click", async () => {
-    try {
-      setStatus("Opening Google sign-in...", "info");
-      await loginWithGoogle();
-      setStatus("Logged in with Google.", "success");
-    } catch (error) {
-      console.error(error);
-      setStatus(error?.message || "Google sign-in failed.", "error");
-      window.alert(error?.message || "Google sign-in failed.");
-    }
-  });
-
-  $("reset-password-btn")?.addEventListener("click", async () => {
-    const email = $("login-email")?.value || $("signup-email")?.value || "";
-    if (!email) {
-      setStatus("Type your email first.", "error");
-      return;
-    }
-
-    try {
-      setStatus("Sending reset email...", "info");
-      await requestPasswordReset(email);
-      setStatus("Password reset email sent.", "success");
-    } catch (error) {
-      console.error(error);
-      setStatus(error?.message || "Could not send reset email.", "error");
-      window.alert(error?.message || "Could not send reset email.");
-    }
-  });
-
-  $("settings-locked-refresh-btn")?.addEventListener("click", handleVerificationRefresh);
-  $("settings-locked-resend-btn")?.addEventListener("click", handleVerificationResend);
-  $("friends-locked-refresh-btn")?.addEventListener("click", handleVerificationRefresh);
-  $("friends-locked-resend-btn")?.addEventListener("click", handleVerificationResend);
-  $("messages-locked-refresh-btn")?.addEventListener("click", handleVerificationRefresh);
-  $("messages-locked-resend-btn")?.addEventListener("click", handleVerificationResend);
 }
 
 function bindFriends() {
@@ -1741,7 +1918,7 @@ function bindFriends() {
     }
   });
 
-  document.body.addEventListener("click", async (event) => {
+  const onFriendActionClick = async (event) => {
     const button = event.target.closest("[data-action]");
     if (!button) return;
 
@@ -1752,6 +1929,11 @@ function bindFriends() {
     try {
       if (action === "friend-view") {
         window.openAccountArea("info", null, uid);
+        return;
+      }
+
+      if (action === "friend-message") {
+        openDirectConversation(uid);
         return;
       }
 
@@ -1807,6 +1989,55 @@ function bindFriends() {
       console.error(error);
       window.alert(error?.message || "Action failed.");
     }
+  };
+  document.body.addEventListener("click", onFriendActionClick);
+  accountUnsubs.push(() => document.body.removeEventListener("click", onFriendActionClick));
+}
+
+function bindDirectMessages() {
+  const onMessageTabClick = (event) => {
+    const button = event.target.closest("[data-message-view]");
+    if (!button) return;
+    const view = button.dataset.messageView === "activity" ? "activity" : "inbox";
+    window.openAccountArea("messages", view === "activity" ? "activity" : "inbox");
+  };
+  const onThreadClick = (event) => {
+    const button = event.target.closest("[data-dm-open]");
+    if (!button) return;
+    openDirectConversation(button.dataset.dmOpen);
+  };
+  const onProfileClick = (event) => {
+    const button = event.target.closest("[data-dm-profile]");
+    if (!button) return;
+    window.openAccountArea("info", null, button.dataset.dmProfile);
+  };
+
+  document.body.addEventListener("click", onMessageTabClick);
+  document.body.addEventListener("click", onThreadClick);
+  document.body.addEventListener("click", onProfileClick);
+  accountUnsubs.push(() => document.body.removeEventListener("click", onMessageTabClick));
+  accountUnsubs.push(() => document.body.removeEventListener("click", onThreadClick));
+  accountUnsubs.push(() => document.body.removeEventListener("click", onProfileClick));
+
+  $("dm-compose-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const peerUid = currentChatUid();
+    const messageInput = $("dm-compose-input");
+    const sendButton = $("dm-send-btn");
+    const body = messageInput?.value || "";
+    if (!peerUid || !body.trim()) return;
+    if (sendButton) sendButton.disabled = true;
+    if ($("dm-status")) $("dm-status").textContent = "Sending message…";
+    try {
+      await sendDirectMessage(peerUid, body);
+      if (messageInput) messageInput.value = "";
+      if ($("dm-status")) $("dm-status").textContent = "Message sent.";
+      renderDirectMessages(currentState);
+    } catch (error) {
+      if ($("dm-status")) $("dm-status").textContent = error?.message || "Could not send your message.";
+    } finally {
+      if (sendButton) sendButton.disabled = false;
+    }
   });
 }
 
@@ -1815,7 +2046,7 @@ function refreshLocalNotifications(uid = resolvedUser(currentState)?.uid || "") 
 }
 
 function bindNotifications() {
-  document.body.addEventListener("click", async (event) => {
+  const onNotificationBulkClick = async (event) => {
     const button = event.target.closest("[id^='notifications-'][id$='-btn']");
     if (!button) return;
 
@@ -1856,9 +2087,11 @@ function bindNotifications() {
       console.error(error);
       window.alert(error?.message || "Action failed.");
     }
-  });
+  };
+  document.body.addEventListener("click", onNotificationBulkClick);
+  accountUnsubs.push(() => document.body.removeEventListener("click", onNotificationBulkClick));
 
-  document.body.addEventListener("click", async (event) => {
+  const onNotificationActionClick = async (event) => {
     const button = event.target.closest("[data-notification-action]");
     if (!button) return;
 
@@ -1931,7 +2164,255 @@ function bindNotifications() {
       console.error(error);
       window.alert(error?.message || "Action failed.");
     }
+  };
+  document.body.addEventListener("click", onNotificationActionClick);
+  accountUnsubs.push(() => document.body.removeEventListener("click", onNotificationActionClick));
+}
+
+function accountAddPrivacySettings() {
+  const preset = document.querySelector('input[name="account-add-privacy"]:checked')?.value;
+  if (!preset) return null;
+  const settings = { preset };
+  for (const input of document.querySelectorAll("[data-account-add-privacy-field]")) {
+    settings[input.dataset.accountAddPrivacyField] = input.checked === true;
+  }
+  return normalizePrivacySettings(settings);
+}
+
+function setAccountAddStatus(message = "", kind = "info") {
+  const status = $("account-add-status");
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.kind = kind;
+}
+
+function setAccountAddMode(mode = "login") {
+  const next = mode === "signup" ? "signup" : "login";
+  document.querySelectorAll("[data-account-add-mode]").forEach((button) => {
+    const selected = button.dataset.accountAddMode === next;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-selected", String(selected));
   });
+  document.querySelectorAll("[data-account-add-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.accountAddPanel !== next;
+  });
+}
+
+function bindAccountSwitcher() {
+  const list = $("account-switcher-list");
+  const addButton = $("account-add-btn");
+  const dialog = $("account-add-dialog");
+  if (!list || !addButton || !dialog) return () => {};
+
+  let live = true;
+  let originalSlotId = "";
+  let busy = false;
+  const removers = [];
+  const bind = (element, eventName, handler) => {
+    if (!element) return;
+    element.addEventListener(eventName, handler);
+    removers.push(() => element.removeEventListener(eventName, handler));
+  };
+
+  const setBusy = (value) => {
+    busy = value;
+    dialog.querySelectorAll("button").forEach((button) => { button.disabled = value; });
+  };
+
+  const render = (slots = []) => {
+    if (!live) return;
+    const signedIn = slots.filter((slot) => slot.signedIn);
+    const count = $("account-switcher-count");
+    if (count) count.textContent = `${signedIn.length} of 3`;
+    addButton.disabled = signedIn.length >= 3;
+    addButton.setAttribute("aria-disabled", String(signedIn.length >= 3));
+
+    if (!signedIn.length) {
+      list.innerHTML = '<div class="account-switcher-empty"><span class="account-switcher-empty-icon" aria-hidden="true">＋</span><div><strong>No saved accounts yet</strong><span>Sign in or create an account to keep it ready on this device.</span></div></div>';
+    } else {
+      list.innerHTML = signedIn.map((slot) => {
+        const name = escapeHtml(slot.displayName || "Player");
+        const email = escapeHtml(slot.email || "");
+        const photo = String(slot.photoURL || "");
+        const safePhoto = /^https:\/\//i.test(photo) || /^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(photo);
+        const avatar = safePhoto
+          ? `<img class="account-slot-avatar" src="${escapeHtml(photo)}" alt="" />`
+          : `<span class="account-slot-avatar account-slot-avatar-fallback" aria-hidden="true">${escapeHtml((slot.displayName || "P").trim().slice(0, 1).toUpperCase() || "P")}</span>`;
+        const current = slot.active;
+        return `<article class="account-slot${current ? " is-active" : ""}">
+          ${avatar}
+          <div class="account-slot-identity"><strong>${name}</strong><span>${email || "Signed-in account"}</span></div>
+          <span class="account-slot-state${current ? " is-current" : ""}">${current ? "Current" : "Ready"}</span>
+          <div class="account-slot-actions">
+            <button type="button" class="account-slot-switch" data-account-switch="${escapeHtml(slot.id)}" ${current ? "disabled aria-current=\"true\"" : ""}>${current ? "Selected" : "Switch"}</button>
+            <button type="button" class="account-slot-remove" data-account-remove="${escapeHtml(slot.id)}" aria-label="Remove ${name} from this device">Remove</button>
+          </div>
+        </article>`;
+      }).join("");
+    }
+
+    const status = $("account-switcher-status");
+    if (status) {
+      status.textContent = signedIn.length >= 3
+        ? "All three account spaces are in use. Remove one from this device to add another."
+        : "Each account stays signed in separately on this device.";
+      status.dataset.kind = signedIn.length >= 3 ? "info" : "";
+    }
+  };
+
+  const unsubscribe = subscribeAccountSlots(render);
+  bind(list, "click", async (event) => {
+    const switchButton = event.target.closest("[data-account-switch]");
+    const removeButton = event.target.closest("[data-account-remove]");
+    try {
+      if (switchButton) {
+        switchButton.disabled = true;
+        await activateAccountSlot(switchButton.dataset.accountSwitch);
+        setStatus("Switched account.", "success");
+      } else if (removeButton) {
+        const slots = await getAccountSlots();
+        const slot = slots.find((entry) => entry.id === removeButton.dataset.accountRemove);
+        if (!slot?.signedIn) return;
+        const label = slot.displayName || slot.email || "this account";
+        if (!window.confirm(`Remove ${label} from this device? This signs it out here but does not delete the account.`)) return;
+        removeButton.disabled = true;
+        await removeAccountSlot(slot.id);
+        setStatus(`${label} was signed out on this device.`, "info");
+      }
+    } catch (error) {
+      setStatus(error?.message || "That account action could not be completed.", "error");
+    }
+  });
+
+  bind(addButton, "click", async () => {
+    const slots = await getAccountSlots();
+    if (slots.filter((slot) => slot.signedIn).length >= 3) {
+      const status = $("account-switcher-status");
+      if (status) status.textContent = "Remove one saved account before adding another.";
+      return;
+    }
+    originalSlotId = getActiveAccountSlotId();
+    setAccountAddMode("login");
+    setAccountAddStatus("Your other signed-in accounts will stay ready to switch back to.");
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+    $("account-add-login-email")?.focus();
+  });
+
+  bind($("account-add-close"), "click", () => dialog.close());
+  bind(dialog, "cancel", (event) => { if (busy) event.preventDefault(); });
+  bind(dialog, "click", (event) => {
+    if (event.target === dialog && !busy) dialog.close();
+  });
+  bind(dialog, "close", async () => {
+    dialog.querySelectorAll('input[type="password"]').forEach((input) => { input.value = ""; });
+    if (busy || !originalSlotId) return;
+    try {
+      const slots = await getAccountSlots();
+      const original = slots.find((slot) => slot.id === originalSlotId);
+      const active = slots.find((slot) => slot.active);
+      if (original?.signedIn && active && !active.signedIn) await activateAccountSlot(originalSlotId);
+    } catch (error) {
+      console.warn("Could not restore the previous account after closing the add-account dialog:", error);
+    }
+  });
+
+  for (const tab of dialog.querySelectorAll("[data-account-add-mode]")) {
+    bind(tab, "click", () => setAccountAddMode(tab.dataset.accountAddMode));
+  }
+  for (const radio of dialog.querySelectorAll('input[name="account-add-privacy"]')) {
+    bind(radio, "change", () => {
+      const custom = $("account-add-custom-privacy");
+      if (custom) custom.hidden = radio.value !== "custom" || !radio.checked;
+    });
+  }
+
+  const runInEmptySlot = async (action) => {
+    if (busy) return;
+    const previousSlotId = getActiveAccountSlotId();
+    let targetSlotId = "";
+    setBusy(true);
+    try {
+      targetSlotId = await activateFirstEmptyAccountSlot();
+      const result = await action();
+      const addedUser = result?.user || result;
+      if (addedUser?.uid) {
+        const duplicate = (await getAccountSlots()).find((slot) => slot.signedIn && !slot.active && slot.uid === addedUser.uid);
+        if (duplicate) {
+          await removeAccountSlot(targetSlotId);
+          await activateAccountSlot(duplicate.id);
+          originalSlotId = "";
+          setStatus("That account is already saved on this device. Switched to it.", "info");
+          dialog.close();
+          return null;
+        }
+      }
+      setAccountAddStatus("Account added. You can switch to it any time.", "success");
+      originalSlotId = "";
+      dialog.close();
+      if (result?.needsPrivacySelection) {
+        setStatus("Your new Google profile starts private. Choose what to share in account settings.", "info");
+        window.openAccountArea?.("settings", "privacy");
+      }
+      return result;
+    } catch (error) {
+      try {
+        const slots = await getAccountSlots();
+        if (targetSlotId && slots.some((slot) => slot.id === targetSlotId && slot.signedIn)) {
+          await removeAccountSlot(targetSlotId);
+        }
+        const refreshedSlots = await getAccountSlots();
+        if (refreshedSlots.some((slot) => slot.id === previousSlotId && slot.signedIn)) await activateAccountSlot(previousSlotId);
+      } catch (restoreError) {
+        console.warn("Could not restore the previous active account:", restoreError);
+      }
+      setAccountAddStatus(error?.message || "We couldn't add that account. Check your details and try again.", "error");
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  bind($("account-add-login-form"), "submit", async (event) => {
+    event.preventDefault();
+    await runInEmptySlot(() => login($("account-add-login-email")?.value || "", $("account-add-login-password")?.value || ""));
+  });
+  bind($("account-add-signup-form"), "submit", async (event) => {
+    event.preventDefault();
+    const privacy = accountAddPrivacySettings();
+    const password = $("account-add-signup-password")?.value || "";
+    const confirmation = $("account-add-signup-confirm")?.value || "";
+    if (!privacy) {
+      setAccountAddStatus("Choose a privacy preset before creating your account.", "error");
+      return;
+    }
+    if (password !== confirmation) {
+      setAccountAddStatus("Those passwords don't match yet.", "error");
+      $("account-add-signup-confirm")?.focus();
+      return;
+    }
+    await runInEmptySlot(() => createAccount(
+      $("account-add-signup-email")?.value || "",
+      password,
+      $("account-add-username")?.value || "",
+      privacy
+    ));
+  });
+
+  const signInWithGoogle = (includePrivacy) => runInEmptySlot(async () => {
+    const privacy = includePrivacy ? accountAddPrivacySettings() : null;
+    if (includePrivacy && !privacy) throw new Error("Choose a privacy preset before continuing with Google.");
+    return loginWithGoogle(privacy);
+  });
+  bind($("account-add-google-login"), "click", () => signInWithGoogle(false));
+  bind($("account-add-google-signup"), "click", () => signInWithGoogle(true));
+
+  return () => {
+    live = false;
+    unsubscribe();
+    removers.forEach((remove) => remove());
+    if (dialog.open) dialog.close();
+  };
 }
 
 function disposeAccountModule() {
@@ -1956,10 +2437,11 @@ function start() {
   accountUnsubs = [];
 
   bindNavigation();
-  bindAuthForms();
+  accountUnsubs.push(initializeLoginUI());
+  accountUnsubs.push(bindAccountSwitcher());
   bindFriends();
+  bindDirectMessages();
   bindNotifications();
-  setAuthMode("login");
   showSettingsSubsection("account");
   refreshLocalNotifications();
   renderAll(currentState);
@@ -2025,7 +2507,7 @@ function start() {
 
     setStatus(isVerifiedState(user, currentState.profile)
       ? "Logged in and verified."
-      : "Logged in. Verify your email to unlock account features.", "success");
+      : "Logged in. Verify your email to unlock friends, messages, and player profiles.", "success");
   });
   if (typeof __watchAuthUnsub === "function") accountUnsubs.push(__watchAuthUnsub);
 

@@ -1,11 +1,24 @@
-import { auth, authReady, db, googleProvider } from "./firebase-config.js";
+import {
+  auth,
+  authReady,
+  db,
+  googleProvider,
+  observeActiveAuth,
+  getAccountSlots,
+  getActiveAccountSlotId,
+  activateAccountSlot,
+  activateFirstEmptyAccountSlot,
+  removeAccountSlot,
+  removeAllAccountSlots,
+  subscribeAccountSlots,
+  notifyActiveAuthObservers
+} from "./firebase-config.js";
 
 import {
   createUserWithEmailAndPassword,
+  getAdditionalUserInfo,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signOut,
-  onAuthStateChanged,
   sendEmailVerification,
   reload,
   updateProfile,
@@ -14,7 +27,7 @@ import {
   reauthenticateWithPopup,
   EmailAuthProvider,
   sendPasswordResetEmail,
-  updateEmail,
+  verifyBeforeUpdateEmail,
   updatePassword
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
@@ -30,20 +43,73 @@ import {
   query,
   where,
   serverTimestamp,
-  arrayUnion,
-  deleteField
+  arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 function userRef(uid) {
+  return doc(db, "privateUsers", uid);
+}
+
+function directoryRef(uid) {
   return doc(db, "users", uid);
+}
+
+function friendProfileRef(uid) {
+  return doc(db, "friendProfiles", uid);
+}
+
+let accountSetupGate = null;
+
+function beginAccountSetupGate() {
+  if (accountSetupGate) throw new Error("Another account setup is already in progress.");
+  let releasePromise;
+  const promise = new Promise((resolve) => { releasePromise = resolve; });
+  const gate = { promise, releasePromise };
+  accountSetupGate = gate;
+  return () => {
+    if (accountSetupGate === gate) accountSetupGate = null;
+    releasePromise();
+  };
+}
+
+async function waitForAccountSetup(gateIsOwner = false) {
+  const gate = accountSetupGate;
+  if (gate && !gateIsOwner) await gate.promise;
+}
+
+function cleanText(text) {
+  return String(text || "").trim();
 }
 
 function cleanEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
-function cleanText(text) {
-  return String(text || "").trim();
+function emailVerificationActionSettings(marker) {
+  if (typeof window === "undefined" || !["http:", "https:"].includes(window.location.protocol)) return undefined;
+  const continueUrl = new URL(window.location.href);
+  continueUrl.searchParams.set("tab", "settings");
+  continueUrl.searchParams.set("sub", "account");
+  continueUrl.searchParams.delete("target");
+  continueUrl.searchParams.delete("emailVerificationComplete");
+  continueUrl.searchParams.delete("emailChangeComplete");
+  continueUrl.searchParams.set(marker, "1");
+  return { url: continueUrl.href };
+}
+
+async function runEmailActionWithReturn(action, marker) {
+  const actionSettings = emailVerificationActionSettings(marker);
+  try {
+    await action(actionSettings);
+    return true;
+  } catch (error) {
+    const continueUrlError = ["auth/unauthorized-continue-uri", "auth/invalid-continue-uri"].includes(error?.code);
+    if (!actionSettings || !continueUrlError) throw error;
+    // Keep verification usable if this domain is not authorized yet; the user
+    // can return to the site and refresh their account status manually.
+    await action(undefined);
+    return false;
+  }
 }
 
 function uniqueStrings(value) {
@@ -51,13 +117,16 @@ function uniqueStrings(value) {
   return [...new Set(arr.map((item) => String(item || "").trim()).filter(Boolean))];
 }
 
-function normalizePrivacySettings(settings = {}) {
-  return {
-    showRank: settings.showRank !== false,
-    showJoined: settings.showJoined !== false,
-    showStreaks: settings.showStreaks !== false,
-    showSiteAge: settings.showSiteAge !== false
-  };
+export function normalizePrivacySettings(settings = {}) {
+  const preset = ["private", "public", "custom"].includes(String(settings.preset || "").toLowerCase())
+    ? String(settings.preset).toLowerCase()
+    : "private";
+  const fields = ["showAvatar", "showVerified", "showRank", "showJoined", "showStreaks", "showSiteAge"];
+  const normalized = { preset };
+  for (const field of fields) {
+    normalized[field] = preset === "public" || (preset === "custom" && settings[field] === true);
+  }
+  return normalized;
 }
 
 export function normalizeSiteTimeMs(value) {
@@ -582,10 +651,9 @@ function syncSidebarAvatar(photoURL) {
 function baseProfile(user) {
   return {
     uid: user.uid,
-    // No email is stored here. Any signed-in user can read a profile document
-    // (the friend-request flow has to read someone before they are a friend),
-    // so an address in here would be an address disclosure. Firebase Auth owns
-    // the canonical address; read it from `user.email` where it is needed.
+    // Email stays in Firebase Auth. Full profile data is stored in the
+    // owner-only privateUsers collection; users/{uid} is overwritten with a
+    // small directory entry after the one-time migration.
     username: user.displayName || defaultUsername(user),
     photoURL: getDefaultAvatarDataUrl(),
     avatarType: "default",
@@ -671,8 +739,9 @@ function friendlyAuthError(error) {
   if (code === "auth/operation-not-allowed") {
     return "This sign-in method is not enabled in Firebase Authentication yet.";
   }
-  if (code === "auth/popup-closed-by-user") return "The Google sign-in popup was closed before the login finished.";
-  if (code === "auth/popup-blocked") return "Your browser blocked the Google sign-in popup.";
+  if (code === "auth/popup-closed-by-user") return "The Google popup was closed before it finished.";
+  if (code === "auth/popup-blocked") return "Your browser blocked the Google popup.";
+  if (code === "auth/user-mismatch") return "Choose the same Google account that is linked to this Panategwa account.";
   if (code === "auth/unauthorized-domain") {
     return "This domain is not authorized in Firebase yet. Add it in Firebase Authentication -> Settings -> Authorized domains.";
   }
@@ -683,27 +752,80 @@ function friendlyAuthError(error) {
 export async function getProfile(uid = auth.currentUser?.uid) {
   if (!uid) return null;
   const snap = await getDoc(userRef(uid));
+  if (snap.exists()) return snap.data();
+
+  // Existing accounts are migrated by ensureUserProfile on their next sign-in.
+  // Keep this owner-only fallback for callers during that first bootstrap.
+  const legacy = await getDoc(directoryRef(uid));
+  return legacy.exists() && uid === auth.currentUser?.uid ? legacy.data() : null;
+}
+
+export async function getPublicUser(uid) {
+  const id = cleanText(uid);
+  if (!id) return null;
+  const snap = await getDoc(directoryRef(id));
   return snap.exists() ? snap.data() : null;
 }
 
-export async function ensureUserProfile(user) {
-  const ref = userRef(user.uid);
-  const snap = await getDoc(ref);
+export async function publishProfileDocuments(profile) {
+  const uid = cleanText(profile?.uid);
+  if (!uid || uid !== auth.currentUser?.uid) return false;
 
-  if (!snap.exists()) {
-    const data = baseProfile(user);
-    await setDoc(ref, data, { merge: true });
-    if ((user.photoURL || "") !== data.photoURL) {
-      try {
-        await updateProfile(user, { photoURL: data.photoURL });
-      } catch (error) {
-        console.warn("Could not sync default avatar to auth profile:", error);
-      }
-    }
-    return data;
+  const socialSettings = normalizeSocialSettings(profile.socialSettings);
+  const directory = {
+    uid,
+    username: cleanText(profile.username || "Player").slice(0, 32) || "Player",
+    socialSettings,
+    profileVisibility: normalizePrivacySettings(profile.privacySettings).preset === "private" ? "private" : "public"
+  };
+
+  const privacy = normalizePrivacySettings(profile.privacySettings);
+  const friendView = {
+    uid
+  };
+  if (privacy.preset === "private") {
+    await deleteDoc(friendProfileRef(uid));
+    await setDoc(directoryRef(uid), directory);
+    return true;
+  }
+  if (privacy.showAvatar) {
+    friendView.photoURL = String(profile.photoURL || getDefaultAvatarDataUrl()).slice(0, 300000);
+    friendView.avatarType = String(profile.avatarType || "default").slice(0, 32);
+    friendView.avatarPreset = String(profile.avatarPreset || "default").slice(0, 64);
+    friendView.avatarLetter = String(profile.avatarLetter || "").slice(0, 8);
+  }
+  if (privacy.showVerified) friendView.verified = auth.currentUser?.emailVerified === true;
+  if (privacy.showRank) {
+    friendView.xp = Math.max(0, Number(profile.xp || 0));
+  }
+  if (privacy.showJoined && profile.createdAt) friendView.createdAt = profile.createdAt;
+  if (privacy.showStreaks) {
+    friendView.streakCurrent = Math.max(0, Number(profile.streak?.current || 0));
+    friendView.streakLongest = Math.max(0, Number(profile.longestStreak || profile.streak?.longest || 0));
+  }
+  if (privacy.showSiteAge) friendView.siteTimeMs = normalizeSiteTimeMs(profile.siteTimeMs);
+
+  // The directory intentionally contains only identity and request preferences.
+  // The friend view is a separate document guarded by friendship and the owner's
+  // privacy switches in Firestore Rules.
+  await setDoc(directoryRef(uid), directory);
+  await setDoc(friendProfileRef(uid), friendView);
+  return true;
+}
+
+export async function ensureUserProfile(user, options = {}) {
+  await waitForAccountSetup(options?.duringAccountSetup === true);
+  const ref = userRef(user.uid);
+  let snap = await getDoc(ref);
+  let data = snap.exists() ? snap.data() || {} : null;
+  if (!data) {
+    // Read the old document as its owner, move all account data into the
+    // owner-only collection, then replace the old document with a safe
+    // directory projection. This also removes legacy email fields.
+    const legacy = await getDoc(directoryRef(user.uid));
+    data = legacy.exists() ? legacy.data() || {} : baseProfile(user);
   }
 
-  const data = snap.data() || {};
   const achievements = uniqueStrings(data.achievements);
   const visitedPages = uniqueStrings(data.visitedPages);
   const friends = uniqueStrings(data.friends);
@@ -716,7 +838,9 @@ export async function ensureUserProfile(user) {
 
   const merged = {
     uid: user.uid,
-    username: data.username || user.displayName || defaultUsername(user),
+    // Provider display names have no useful length limit. Keep imported and
+    // legacy names inside the 32-character Firestore directory/rules limit.
+    username: cleanText(data.username || user.displayName || defaultUsername(user)).slice(0, 32) || "Player",
     photoURL: normalizedAvatar.photoURL,
     avatarType: normalizedAvatar.avatarType,
     avatarPreset: normalizedAvatar.avatarPreset,
@@ -749,27 +873,18 @@ export async function ensureUserProfile(user) {
   };
 
   await setDoc(ref, merged, { merge: true });
+  snap = await getDoc(ref);
+  const savedProfile = snap.exists() ? snap.data() : merged;
+  await publishProfileDocuments({ ...savedProfile, uid: user.uid });
 
-  // Documents written before the profile stopped storing an email still carry
-  // one, and a merge will not remove it. Strip it once, on load, so the address
-  // is not left sitting in a document every signed-in user can now read.
-  // deleteField() is a no-op for a key that is already absent.
-  if (data.email !== undefined || data.emailLower !== undefined) {
+  if ((user.photoURL || "") !== savedProfile.photoURL) {
     try {
-      await updateDoc(ref, { email: deleteField(), emailLower: deleteField() });
-    } catch (error) {
-      console.warn("Could not remove the legacy email fields from the profile:", error);
-    }
-  }
-
-  if ((user.photoURL || "") !== merged.photoURL) {
-    try {
-      await updateProfile(user, { photoURL: merged.photoURL });
+      await updateProfile(user, { photoURL: savedProfile.photoURL });
     } catch (error) {
       console.warn("Could not sync stored avatar to auth profile:", error);
     }
   }
-  return merged;
+  return savedProfile;
 }
 
 export async function updatePrivacySettings(patch = {}) {
@@ -777,15 +892,18 @@ export async function updatePrivacySettings(patch = {}) {
   if (!user) throw new Error("Not logged in.");
 
   const current = await getProfile(user.uid);
+  const currentPrivacy = normalizePrivacySettings(current?.privacySettings);
   const merged = normalizePrivacySettings({
-    ...(current?.privacySettings || {}),
-    ...(patch || {})
+    ...currentPrivacy,
+    ...(patch || {}),
+    preset: patch?.preset || "custom"
   });
 
   await setDoc(userRef(user.uid), {
     privacySettings: merged,
     updatedAt: serverTimestamp()
   }, { merge: true });
+  await publishProfileDocuments({ ...current, privacySettings: merged });
 
   return merged;
 }
@@ -798,7 +916,7 @@ async function touchLastLoginOnce(user) {
   await setDoc(userRef(user.uid), { lastLoginAt: serverTimestamp() }, { merge: true });
 }
 
-export async function createAccount(email, password, username) {
+export async function createAccount(email, password, username, privacySettings) {
   await authReady;
   const cleanName = cleanText(username).slice(0, 20);
   const cleanMail = cleanEmail(email);
@@ -807,22 +925,33 @@ export async function createAccount(email, password, username) {
   if (!cleanName) throw new Error("Username is required.");
   if (!cleanMail) throw new Error("Email is required.");
   if (!cleanPass || cleanPass.length < 6) throw new Error("Password must be at least 6 characters.");
+  if (!["private", "public", "custom"].includes(String(privacySettings?.preset || "").toLowerCase())) {
+    throw new Error("Choose a privacy preset before creating your account.");
+  }
+  const selectedPrivacy = normalizePrivacySettings(privacySettings);
+  const releaseSetupGate = beginAccountSetupGate();
 
   try {
     const cred = await createUserWithEmailAndPassword(auth, cleanMail, cleanPass);
     await updateProfile(cred.user, { displayName: cleanName, photoURL: defaultAvatarDataUrl() });
-    await sendEmailVerification(cred.user);
-
     await setDoc(userRef(cred.user.uid), {
       ...baseProfile(cred.user),
       username: cleanName,
+      privacySettings: selectedPrivacy,
       verified: false
     });
+    await publishProfileDocuments({ ...baseProfile(cred.user), uid: cred.user.uid, username: cleanName, privacySettings: selectedPrivacy, verified: false });
+    await runEmailActionWithReturn(
+      (actionSettings) => sendEmailVerification(cred.user, actionSettings),
+      "emailVerificationComplete"
+    );
 
     localStorage.setItem("ptg_logged_in", "1");
     return cred.user;
   } catch (error) {
     throw new Error(friendlyAuthError(error));
+  } finally {
+    releaseSetupGate();
   }
 }
 
@@ -845,20 +974,38 @@ export async function login(email, password) {
   }
 }
 
-export async function loginWithGoogle() {
+export async function loginWithGoogle(privacySettings = null) {
   await authReady;
   if (window.location.protocol === "file:") {
     throw new Error("Google sign-in needs the site to run from localhost or a real domain, not directly as a file.");
   }
 
+  const releaseSetupGate = beginAccountSetupGate();
   try {
     const cred = await signInWithPopup(auth, googleProvider);
-    await ensureUserProfile(cred.user);
+    const isNewUser = getAdditionalUserInfo(cred)?.isNewUser === true;
+    await ensureUserProfile(cred.user, { duringAccountSetup: true });
+    if (isNewUser) {
+      const selectedPreset = String(privacySettings?.preset || "").toLowerCase();
+      if (!["private", "public", "custom"].includes(selectedPreset)) {
+        // A sign-in attempt can turn out to be a first-time Google account.
+        // Keep the newly created profile private until the player picks a
+        // preset from the account settings screen.
+        await updatePrivacySettings({ preset: "private" });
+      } else {
+        await updatePrivacySettings(privacySettings);
+      }
+    }
     await touchLastLoginOnce(cred.user);
     localStorage.setItem("ptg_logged_in", "1");
-    return cred.user;
+    return {
+      user: cred.user,
+      needsPrivacySelection: isNewUser && !["private", "public", "custom"].includes(String(privacySettings?.preset || "").toLowerCase())
+    };
   } catch (error) {
     throw new Error(friendlyAuthError(error));
+  } finally {
+    releaseSetupGate();
   }
 }
 
@@ -866,7 +1013,7 @@ export async function logout() {
   await authReady;
   localStorage.removeItem("ptg_logged_in");
   localStorage.removeItem("ptg_current_uid");
-  return signOut(auth);
+  return removeAccountSlot(getActiveAccountSlotId());
 }
 
 export async function saveUsername(username) {
@@ -882,6 +1029,8 @@ export async function saveUsername(username) {
     usernameUpdatedAt: Date.now(),
     updatedAt: serverTimestamp()
   }, { merge: true });
+  const profile = (await getProfile(user.uid)) || {};
+  await publishProfileDocuments({ ...profile, username: cleanName });
 
   return cleanName;
 }
@@ -908,6 +1057,7 @@ export async function setAvatarPreset(presetId) {
     avatarLetter: "",
     updatedAt: serverTimestamp()
   }, { merge: true });
+  await publishProfileDocuments({ ...profile, photoURL: dataUrl, avatarType: "preset", avatarPreset: id, avatarLetter: "" });
 
   syncSidebarAvatar(dataUrl);
   return dataUrl;
@@ -925,6 +1075,8 @@ export async function setAvatarLetter(letter) {
     avatarLetter: String(letter || "").trim().slice(0, 1).toUpperCase() || "P",
     updatedAt: serverTimestamp()
   }, { merge: true });
+  const profile = (await getProfile(user.uid)) || {};
+  await publishProfileDocuments({ ...profile, photoURL: dataUrl, avatarType: "letter", avatarLetter: String(letter || "").trim().slice(0, 1).toUpperCase() || "P" });
 
   syncSidebarAvatar(dataUrl);
   return dataUrl;
@@ -943,6 +1095,8 @@ export async function useDefaultProfilePicture() {
     avatarLetter: "",
     updatedAt: serverTimestamp()
   }, { merge: true });
+  const profile = (await getProfile(user.uid)) || {};
+  await publishProfileDocuments({ ...profile, photoURL: dataUrl, avatarType: "default", avatarPreset: "default", avatarLetter: "" });
 
   syncSidebarAvatar(dataUrl);
   return dataUrl;
@@ -953,20 +1107,37 @@ export async function changeEmail(newEmail, currentPassword) {
   if (!user) throw new Error("Not logged in.");
 
   const providers = new Set((user.providerData || []).map((provider) => provider.providerId));
-  if (!providers.has("password")) {
-    throw new Error("This account uses Google sign-in, so email changes are not available here.");
+  const hasPasswordProvider = providers.has("password");
+  const hasGoogleProvider = providers.has("google.com");
+  if (!hasPasswordProvider && !hasGoogleProvider) {
+    throw new Error("This account does not have a supported sign-in method for changing its email.");
   }
 
   const cleanMail = cleanEmail(newEmail);
   if (!cleanMail) throw new Error("New email is required.");
-  if (!currentPassword) throw new Error("Current password is required.");
-
+  if (cleanMail === cleanEmail(user.email)) throw new Error("That is already your current email address.");
   try {
-    const credential = EmailAuthProvider.credential(user.email, currentPassword);
-    await reauthenticateWithCredential(user, credential);
-    await updateEmail(user, cleanMail);
-    // updateEmail above is the only place the address is stored now; the profile
-    // document deliberately does not mirror it.
+    if (hasPasswordProvider && currentPassword) {
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+    } else if (hasGoogleProvider) {
+      if (window.location.protocol === "file:") {
+        throw new Error("Google accounts must be reauthenticated from localhost or a real domain, not directly as a file.");
+      }
+      await reauthenticateWithPopup(user, googleProvider);
+    } else {
+      throw new Error("Current password is required.");
+    }
+    if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+      await runEmailActionWithReturn(
+        (actionSettings) => verifyBeforeUpdateEmail(user, cleanMail, actionSettings),
+        "emailChangeComplete"
+      );
+    } else {
+      await verifyBeforeUpdateEmail(user, cleanMail);
+    }
+    // The address changes in Firebase only after the recipient follows its
+    // verification link. Profile documents deliberately do not mirror email.
     return cleanMail;
   } catch (error) {
     throw new Error(friendlyAuthError(error));
@@ -1001,7 +1172,10 @@ export async function resendVerificationEmail() {
   if (!user) throw new Error("Not logged in.");
   if (user.emailVerified) return false;
 
-  await sendEmailVerification(user);
+  await runEmailActionWithReturn(
+    (actionSettings) => sendEmailVerification(user, actionSettings),
+    "emailVerificationComplete"
+  );
   return true;
 }
 
@@ -1012,7 +1186,9 @@ export async function refreshCurrentUserSession() {
 
   await reload(user);
   const refreshedUser = auth.currentUser || user;
+  await refreshedUser.getIdToken(true);
   const profile = await ensureUserProfile(refreshedUser);
+  notifyActiveAuthObservers();
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("panategwa:achievement-sync"));
   }
@@ -1069,6 +1245,10 @@ export async function resetAccountData(mode = "progress") {
     ? String(mode || "").trim().toLowerCase()
     : "progress";
 
+  if ((nextMode === "friends" || nextMode === "all") && user.emailVerified !== true) {
+    throw new Error("Verify your email before resetting friends and social data.");
+  }
+
   const profile = (await getProfile(user.uid)) || {};
   const updates = {
     updatedAt: serverTimestamp()
@@ -1108,7 +1288,7 @@ export async function resetAccountData(mode = "progress") {
   if (nextMode === "friends" || nextMode === "all") {
     const friends = uniqueStrings(profile.friends);
     const blocked = uniqueStrings(profile.blocked);
-    const nextBlocked = nextMode === "all" ? [] : blocked;
+    const nextBlocked = [];
     const historyIds = new Set([...friends, ...blocked]);
 
     updates.friends = [];
@@ -1140,7 +1320,7 @@ export async function resetAccountData(mode = "progress") {
     }
 
     for (const friendUid of friends) {
-      const friendProfile = await getProfile(friendUid);
+      const friendProfile = await getPublicUser(friendUid);
       await sendRelationshipResetMessage(
         user,
         friendUid,
@@ -1153,7 +1333,7 @@ export async function resetAccountData(mode = "progress") {
 
     if (nextMode === "all") {
       for (const blockedUid of blocked) {
-        const blockedProfile = await getProfile(blockedUid);
+        const blockedProfile = await getPublicUser(blockedUid);
         await sendRelationshipResetMessage(
           user,
           blockedUid,
@@ -1167,6 +1347,7 @@ export async function resetAccountData(mode = "progress") {
   }
 
   await setDoc(userRef(user.uid), updates, { merge: true });
+  await publishProfileDocuments({ ...profile, ...updates });
 
   if (nextMode === "progress" || nextMode === "all") {
     try {
@@ -1200,48 +1381,51 @@ export async function deleteAccount(password) {
       await reauthenticateWithCredential(user, credential);
     }
 
-    await deleteDoc(userRef(user.uid));
+    await Promise.all([
+      deleteDoc(userRef(user.uid)),
+      deleteDoc(directoryRef(user.uid)),
+      deleteDoc(friendProfileRef(user.uid))
+    ]);
     localStorage.removeItem("ptg_logged_in");
     await deleteUser(user);
+    const duplicateSessions = (await getAccountSlots()).filter((slot) => slot.signedIn && slot.uid === user.uid);
+    await Promise.allSettled(duplicateSessions.map((slot) => removeAccountSlot(slot.id)));
+    const remaining = (await getAccountSlots()).find((slot) => slot.signedIn);
+    if (remaining) await activateAccountSlot(remaining.id);
   } catch (error) {
     throw new Error(friendlyAuthError(error));
   }
 }
 
 export function watchAuth(callback) {
-  let unsub = null;
-  let cancelled = false;
+  return observeActiveAuth(async (user) => {
+    if (!user) {
+      localStorage.removeItem("ptg_logged_in");
+      localStorage.removeItem("ptg_current_uid");
+      callback(null, null);
+      return;
+    }
 
-  authReady.then(() => {
-    if (cancelled) return;
-
-    unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        localStorage.removeItem("ptg_logged_in");
-        localStorage.removeItem("ptg_current_uid");
-        callback(null, null);
-        return;
-      }
-
-      try {
-        localStorage.setItem("ptg_logged_in", "1");
-        localStorage.setItem("ptg_current_uid", user.uid);
-        const profile = await ensureUserProfile(user);
-        await touchLastLoginOnce(user);
-        callback(user, profile);
-      } catch (error) {
-        console.error("Auth watch error:", error);
-        callback(user, null);
-      }
-    });
-  }).catch((error) => {
-    console.error("Auth bootstrap error:", error);
-    callback(null, null);
+    try {
+      localStorage.setItem("ptg_logged_in", "1");
+      localStorage.setItem("ptg_current_uid", user.uid);
+      const profile = await ensureUserProfile(user);
+      await touchLastLoginOnce(user);
+      callback(user, profile);
+    } catch (error) {
+      console.error("Auth watch error:", error);
+      callback(user, null);
+    }
   });
-
-  return () => {
-    cancelled = true;
-    if (unsub) unsub();
-  };
 }
+
+export {
+  getAccountSlots,
+  getActiveAccountSlotId,
+  activateAccountSlot,
+  activateFirstEmptyAccountSlot,
+  removeAccountSlot,
+  removeAllAccountSlots,
+  subscribeAccountSlots
+};
 

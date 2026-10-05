@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase-config.js";
-import { watchAuth, ensureUserProfile, getDefaultAvatarDataUrl, normalizeSiteTimeMs, getResolvedProfileSiteTime } from "./auth.js";
+import { watchAuth, ensureUserProfile, getDefaultAvatarDataUrl, normalizeSiteTimeMs, getResolvedProfileSiteTime, publishProfileDocuments } from "./auth.js";
 import { ensurePanategwaToast } from "./toast.js";
 
 import {
@@ -86,7 +86,7 @@ function activeUser() {
 }
 
 function isVerifiedUser(user = null, profile = null) {
-  return !!(user?.emailVerified || profile?.verified);
+  return user?.emailVerified === true;
 }
 
 async function requireSocialUser(feature = "this feature", options = {}) {
@@ -94,7 +94,8 @@ async function requireSocialUser(feature = "this feature", options = {}) {
   if (!user) throw new Error("Log in first.");
 
   const needsVerified = options.requireVerified !== false;
-  const profile = socialState.profile || await loadUser(user.uid) || await ensureUserProfile(user);
+  const cachedProfile = socialState.profile?.uid === user.uid ? socialState.profile : null;
+  const profile = cachedProfile || await loadUser(user.uid) || await ensureUserProfile(user);
   if (needsVerified && !isVerifiedUser(user, profile)) {
     throw new Error(`Verify your email before you use ${feature}.`);
   }
@@ -208,7 +209,15 @@ function buildAccountHref(section, sub = null, targetId = null) {
 }
 
 function userRef(uid) {
+  return doc(db, "privateUsers", uid);
+}
+
+function directoryRef(uid) {
   return doc(db, "users", uid);
+}
+
+function friendProfileRef(uid) {
+  return doc(db, "friendProfiles", uid);
 }
 
 function usernameOf(profile) {
@@ -248,11 +257,10 @@ function publicProfile(profile, viewerUid) {
   if (!profile) return null;
 
   const self = profile.uid === viewerUid;
-  const friends = unique(profile.friends);
-  const blocked = unique(profile.blocked);
-  const privacy = normalizePrivacySettings(profile.privacySettings);
-  const viewerIsFriend = !!viewerUid && friends.includes(viewerUid);
-  const canViewProfile = self || viewerIsFriend;
+  const friends = unique(socialState.profile?.friends);
+  const blocked = unique(socialState.profile?.blocked);
+  const viewerIsFriend = !!viewerUid && friends.includes(profile.uid) && !blocked.includes(profile.uid);
+  const canViewProfile = self || viewerIsFriend || ["public", "custom"].includes(profile.profileVisibility);
 
   if (!canViewProfile) {
     return {
@@ -265,40 +273,39 @@ function publicProfile(profile, viewerUid) {
       friends: [],
       blocked: [],
       socialSettings: { ...(profile.socialSettings || DEFAULT_SETTINGS) },
-      privacySettings: privacy,
+      privacySettings: normalizePrivacySettings(),
       stats: {},
       canViewProfile: false,
       friendsOnly: true,
       currentRank: null,
       streakCurrent: null,
       streakLongest: null,
-      siteTimeMs: null
+      siteTimeMs: null,
+      profileVisibility: profile.profileVisibility || "private",
+      canMessage: false
     };
   }
-
-  const canShowRank = self || privacy.showRank;
-  const canShowJoined = self || privacy.showJoined;
-  const canShowStreaks = self || privacy.showStreaks;
-  const canShowSiteAge = self || privacy.showSiteAge;
 
   return {
     uid: profile.uid,
     username: profile.username || "Player",
     photoURL: profile.photoURL || getDefaultAvatarDataUrl(),
-    xp: canShowRank ? Number(profile.xp || 0) : null,
-    verified: !!profile.verified,
-    createdAt: canShowJoined ? (profile.createdAt || null) : null,
-    friends,
-    blocked,
+    xp: profile.xp == null ? null : Number(profile.xp || 0),
+    verified: typeof profile.verified === "boolean" ? profile.verified : null,
+    createdAt: profile.createdAt || null,
+    friends: self ? friends : [],
+    blocked: self ? blocked : [],
     socialSettings: { ...(profile.socialSettings || DEFAULT_SETTINGS) },
-    privacySettings: privacy,
-    stats: profile.stats || {},
+    privacySettings: normalizePrivacySettings(),
+    stats: self ? (profile.stats || {}) : {},
     canViewProfile: true,
     friendsOnly: false,
-    currentRank: canShowRank ? rankFromXp(profile.xp || 0) : null,
-    streakCurrent: canShowStreaks ? currentStreakOf(profile) : null,
-    streakLongest: canShowStreaks ? longestStreakOf(profile) : null,
-    siteTimeMs: canShowSiteAge ? normalizeSiteTimeMs(profile.siteTimeMs) : null
+    currentRank: profile.xp == null ? null : rankFromXp(profile.xp || 0),
+    streakCurrent: profile.streakCurrent == null ? null : Number(profile.streakCurrent),
+    streakLongest: profile.streakLongest == null ? null : Number(profile.streakLongest),
+    siteTimeMs: profile.siteTimeMs == null ? null : normalizeSiteTimeMs(profile.siteTimeMs),
+    profileVisibility: profile.profileVisibility || "private",
+    canMessage: viewerIsFriend
   };
 }
 
@@ -313,15 +320,37 @@ function withResolvedOwnSiteTime(profile, uid) {
 async function loadUser(uid) {
   const id = cleanUid(uid);
   if (!id) return null;
-  const snap = await getDoc(userRef(id));
+  const currentUid = cleanUid(activeUser()?.uid);
+  const ref = id === currentUid ? userRef(id) : directoryRef(id);
+  const snap = await getDoc(ref);
   return snap.exists() ? snap.data() : null;
 }
 
 async function loadFriendProfiles(ids) {
   const idsUnique = unique(ids);
   const pairs = await Promise.all(idsUnique.map(async (uid) => {
-    const data = await loadUser(uid);
-    return [uid, data];
+    let data = null;
+    try {
+      data = await loadUser(uid);
+    } catch (error) {
+      if (error?.code !== "permission-denied") throw error;
+      // Old accounts publish their small directory entry the next time they
+      // sign in after the rules update. Preserve the friends list while that
+      // account completes its one-time migration.
+      data = { uid, username: uid, socialSettings: { ...DEFAULT_SETTINGS } };
+    }
+    const isFriend = unique(socialState.profile?.friends).includes(uid);
+    if (!data || !isFriend) return [uid, data];
+    try {
+      const sharedSnap = await getDoc(friendProfileRef(uid));
+      return [uid, sharedSnap.exists() ? { ...data, ...sharedSnap.data() } : data];
+    } catch (error) {
+      // A friendship can be one-sided briefly while the other account applies
+      // the acceptance signal. Keep the account list usable and retry when the
+      // next relationship event arrives.
+      if (error?.code !== "permission-denied") throw error;
+      return [uid, data];
+    }
   }));
 
   const map = {};
@@ -331,6 +360,32 @@ async function loadFriendProfiles(ids) {
 
   socialState.friendProfiles = map;
   emit();
+}
+
+export async function loadAccountProfile(uid) {
+  const id = cleanUid(uid);
+  const viewer = activeUser();
+  const viewerUid = cleanUid(viewer?.uid);
+  if (!id || !viewerUid) return null;
+  if (id !== viewerUid && viewer?.emailVerified !== true) {
+    throw new Error("Verify your email before viewing other player profiles.");
+  }
+  let data = await loadUser(id);
+  if (!data) return null;
+
+  const viewerProfile = socialState.profile?.uid === viewerUid ? socialState.profile : null;
+  const isFriend = unique(viewerProfile?.friends).includes(id)
+    && !unique(viewerProfile?.blocked).includes(id);
+  if (id === viewerUid) return data;
+  if (isFriend || ["public", "custom"].includes(data.profileVisibility)) {
+    try {
+      const sharedSnap = await getDoc(friendProfileRef(id));
+      if (sharedSnap.exists()) data = { ...data, ...sharedSnap.data() };
+    } catch (error) {
+      if (error?.code !== "permission-denied") throw error;
+    }
+  }
+  return publicProfile(data, viewerUid);
 }
 
 function applyLocalConnections(nextFriendsInput = [], nextBlockedInput = []) {
@@ -379,7 +434,7 @@ function firstListenerError() {
 }
 
 function permissionSetupMessage() {
-  return "Firestore rules are blocking part of the friends system. Allow signed-in users to access their own user document plus notification docs where their UID is in participants.";
+  return "Firestore is blocking part of the account system. Apply the current firestore.rules file in the Firebase Console, then sign in again to finish moving private profile data into its protected location.";
 }
 
 function friendlyBootstrapError(error) {
@@ -417,11 +472,9 @@ function setListenerError(key, scope, error, reset = null) {
 async function getCurrentUserMessages() {
   const currentUid = cleanUid(activeUser()?.uid);
   if (!currentUid) return [];
-
-  if (socialState.user?.uid === currentUid && Array.isArray(socialState.messages) && socialState.messages.length) {
-    return [...socialState.messages];
-  }
-
+  // Notifications can be hidden for one participant without resolving the
+  // underlying request. Read the source messages here so a hidden pending
+  // request still prevents a duplicate request from being sent.
   const qs = await getDocs(query(collection(db, "messages"), where("participants", "array-contains", currentUid)));
   return qs.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
 }
@@ -463,6 +516,14 @@ function shortenToastBody(value, max = 120) {
 
 function toastConfigForMessage(message) {
   if (!message) return null;
+
+  if (message.kind === "direct-message") {
+    return {
+      title: message.fromName || "New message",
+      body: shortenToastBody(message.body || "Sent you a message."),
+      href: buildAccountHref("messages", "chat", cleanUid(message.fromUid))
+    };
+  }
 
   if (message.kind === "friend-request") {
     return {
@@ -666,7 +727,15 @@ async function sendFriendRequestById(targetUid, note = "") {
     if (id === user.uid) throw new Error("You cannot send a request to yourself.");
 
     const me = await loadUser(user.uid);
-    const target = await loadUser(id);
+    let target;
+    try {
+      target = await loadUser(id);
+    } catch (error) {
+      if (error?.code === "permission-denied") {
+        throw new Error("That account needs to sign in once after the privacy update before it can receive a friend request.");
+      }
+      throw error;
+    }
     if (!target) throw new Error("That user was not found.");
 
     const meSettings = { ...DEFAULT_SETTINGS, ...(me?.socialSettings || {}) };
@@ -675,7 +744,7 @@ async function sendFriendRequestById(targetUid, note = "") {
     if (!meSettings.systemEnabled || !meSettings.requestsEnabled) throw new Error("Friend requests are turned off.");
     if (!targetSettings.systemEnabled || !targetSettings.requestsEnabled) throw new Error("That user is not accepting friend requests.");
     if (unique(me?.friends).includes(id)) throw new Error("You are already friends with that user.");
-    if (unique(me?.blocked).includes(id) || unique(target?.blocked).includes(user.uid)) {
+    if (unique(me?.blocked).includes(id)) {
       throw new Error("You cannot send a request to this user.");
     }
 
@@ -703,6 +772,36 @@ async function sendFriendRequestById(targetUid, note = "") {
     });
 
     return ref.id;
+  } catch (error) {
+    throw new Error(friendlyActionError(error));
+  }
+}
+
+export async function sendDirectMessage(targetUid, body) {
+  try {
+    const { user } = await requireSocialUser("direct messages");
+    const id = cleanUid(targetUid);
+    const text = String(body || "").trim();
+    if (!id || id === user.uid) throw new Error("Choose a friend to message.");
+    if (!text) throw new Error("Write a message first.");
+    if (text.length > 2000) throw new Error("Messages can be up to 2,000 characters.");
+    if (!unique(socialState.profile?.friends).includes(id)) throw new Error("You can message friends only.");
+    if (unique(socialState.profile?.blocked).includes(id)) throw new Error("Unblock this player before messaging them.");
+
+    const [sender, recipient] = await Promise.all([loadUser(user.uid), loadUser(id)]);
+    if (!recipient) throw new Error("That player could not be found.");
+    return (await createMessage({
+      fromUid: user.uid,
+      toUid: id,
+      participants: [user.uid, id],
+      fromName: usernameOf(sender),
+      toName: usernameOf(recipient),
+      kind: "direct-message",
+      status: "sent",
+      title: "Message",
+      body: text,
+      readBy: [user.uid]
+    })).id;
   } catch (error) {
     throw new Error(friendlyActionError(error));
   }
@@ -751,6 +850,7 @@ async function respondToFriendRequest(requestId, action) {
         targetSection: "messages",
         targetSubSection: "requests",
         targetId: user.uid,
+        requestId,
         readBy: [user.uid]
       });
       return;
@@ -775,6 +875,7 @@ async function respondToFriendRequest(requestId, action) {
         targetSection: "messages",
         targetSubSection: "requests",
         targetId: user.uid,
+        requestId,
         readBy: [user.uid]
       });
       return;
@@ -803,6 +904,7 @@ async function respondToFriendRequest(requestId, action) {
         targetSection: "messages",
         targetSubSection: "requests",
         targetId: user.uid,
+        requestId,
         readBy: [user.uid]
       });
       return;
@@ -999,6 +1101,24 @@ function startRealtime() {
       return;
     }
 
+    if (user.emailVerified !== true) {
+      listenerErrors.clear();
+      hydratedMessagesUserId = "";
+      socialState.ready = true;
+      socialState.user = user;
+      socialState.profile = null;
+      socialState.socialError = null;
+      socialState.friends = [];
+      socialState.blocked = [];
+      socialState.incomingRequests = [];
+      socialState.outgoingRequests = [];
+      socialState.messages = [];
+      socialState.unreadCount = 0;
+      socialState.friendProfiles = {};
+      emit();
+      return;
+    }
+
     listenerErrors.clear();
     hydratedMessagesUserId = "";
     socialState.ready = false;
@@ -1025,6 +1145,7 @@ function startRealtime() {
           socialState.profile = fresh;
           socialState.friends = unique(fresh?.friends);
           socialState.blocked = unique(fresh?.blocked);
+          if (fresh) await publishProfileDocuments(fresh);
           await loadFriendProfiles([...socialState.friends, ...socialState.blocked]);
         } catch (error) {
           console.error("Profile snapshot error:", error);
@@ -1058,14 +1179,18 @@ function startRealtime() {
             }
 
             socialState.messages = visible;
+            // Hiding a notification should hide it from Activity only. Keep
+            // pending requests in the Requests panel so they can still be
+            // accepted, ignored, declined, or cancelled after a reload.
             socialState.incomingRequests = sortNewestFirst(
-              visible.filter((message) => message.kind === "friend-request" && cleanUid(message.toUid) === user.uid && (message.status || "pending") === "pending")
+              sorted.filter((message) => message.kind === "friend-request" && cleanUid(message.toUid) === user.uid && (message.status || "pending") === "pending")
             );
             socialState.outgoingRequests = sortNewestFirst(
-              visible.filter((message) => message.kind === "friend-request" && cleanUid(message.fromUid) === user.uid && (message.status || "pending") === "pending")
+              sorted.filter((message) => message.kind === "friend-request" && cleanUid(message.fromUid) === user.uid && (message.status || "pending") === "pending")
             );
             syncUnreadCount();
             await syncRelationshipSignals(sorted);
+            await loadFriendProfiles([...socialState.friends, ...socialState.blocked]);
           } catch (error) {
             // See the note on the profile listener: an escaping error here
             // would skip the ready flag and strand the UI on its spinner.

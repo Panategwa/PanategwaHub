@@ -15,7 +15,8 @@ import {
   watchAuth,
   getProfile,
   logout,
-  requestPasswordReset
+  requestPasswordReset,
+  refreshCurrentUserSession
 } from "./auth.js";
 
 const $ = (id) => document.getElementById(id);
@@ -32,9 +33,30 @@ const DEFAULT_AVATAR_ENTRY = AVATAR_PICKER_ENTRIES.find((entry) => entry.isDefau
 const AVATAR_ENTRY_MAP = new Map(AVATAR_PICKER_ENTRIES.filter((entry) => !entry.isDefault).map((entry) => [entry.id, entry]));
 let currentUser = null;
 let currentProfile = null;
+let settingsSyncedUid = "";
 let settingsBound = false;
 let settingsUnsubs = [];
 let settingsWatchUnsub = null;
+let emailVerificationReturnReason = (() => {
+  try {
+    const params = new URL(window.location.href).searchParams;
+    if (params.get("emailChangeComplete") === "1") return "email-change";
+    if (params.get("emailVerificationComplete") === "1") return "email-verification";
+    return "";
+  } catch {
+    return "";
+  }
+})();
+
+function clearEmailVerificationReturnMarkers() {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("emailChangeComplete") && !url.searchParams.has("emailVerificationComplete")) return;
+    url.searchParams.delete("emailChangeComplete");
+    url.searchParams.delete("emailVerificationComplete");
+    window.history.replaceState({}, "", url.href);
+  } catch {}
+}
 const SETTING_STATUS_IDS = ["profile", "avatar", "email", "password", "actions", "danger", "privacy"];
 
 function escapeHtml(value) {
@@ -70,22 +92,51 @@ function clearScopedStatuses() {
 
 function syncForm(profile, user) {
   const usernameInput = $("profile-username");
-  const emailInput = $("change-email-input");
   const note = $("settings-provider-note");
 
   if (usernameInput && document.activeElement !== usernameInput) {
     usernameInput.value = profile?.username || user.displayName || "";
   }
 
-  if (emailInput && document.activeElement !== emailInput) {
-    emailInput.value = user.email || "";
+  const privacySelect = $("profile-privacy-preset");
+  if (privacySelect && document.activeElement !== privacySelect) {
+    const preset = String(profile?.privacySettings?.preset || "private");
+    privacySelect.value = ["private", "public", "custom"].includes(preset) ? preset : "private";
   }
 
   const providerIds = new Set((user.providerData || []).map((provider) => provider.providerId));
+  const hasPasswordProvider = providerIds.has("password");
+  const hasGoogleProvider = providerIds.has("google.com");
+  const emailVerified = user.emailVerified === true;
+  const verificationCard = $("settings-email-verification-card");
+  const verificationStatus = $("settings-email-verification-status");
+  const verificationBadge = $("settings-email-verification-badge");
+  const currentEmail = $("settings-email-current");
+  const resendButton = $("settings-email-resend-btn");
+  const refreshButton = $("settings-email-refresh-btn");
+  const changeEmailInput = $("change-email-input");
+  const changeEmailPassword = $("change-email-password");
+  const changeEmailButton = $("change-email-btn");
+
+  if (verificationCard) verificationCard.dataset.state = emailVerified ? "verified" : "unverified";
+  if (verificationStatus) verificationStatus.textContent = emailVerified ? "Email verified" : "Email not verified";
+  if (verificationBadge) verificationBadge.textContent = emailVerified ? "Verified" : "Action needed";
+  if (currentEmail) currentEmail.textContent = user.email || "No email address is attached to this account.";
+  if (resendButton) resendButton.classList.toggle("section-hidden", emailVerified);
+  if (refreshButton) refreshButton.classList.toggle("section-hidden", emailVerified);
+  if (changeEmailInput) changeEmailInput.disabled = !hasPasswordProvider && !hasGoogleProvider;
+  if (changeEmailPassword) changeEmailPassword.disabled = !hasPasswordProvider;
+  if (changeEmailPassword?.closest(".input-group")) {
+    changeEmailPassword.closest(".input-group").classList.toggle("section-hidden", !hasPasswordProvider);
+  }
+  if (changeEmailButton) changeEmailButton.disabled = !hasPasswordProvider && !hasGoogleProvider;
+
   if (note) {
-    note.textContent = providerIds.has("password")
-      ? "Email and password changes work for email/password accounts."
-      : "This account uses Google sign-in, so email/password changes are not available here.";
+    note.textContent = hasPasswordProvider
+      ? "Confirm with your Panategwa password, then follow the verification link sent to your new address."
+      : hasGoogleProvider
+        ? "You’ll confirm in a Google popup. Choose the Google account linked to this profile, then follow the verification link sent to your new address."
+        : "Link an email/password or Google sign-in method before changing this address.";
   }
 }
 
@@ -242,13 +293,36 @@ async function applyEmailChange() {
   const nextEmail = String($("change-email-input")?.value || "").trim();
   const currentPassword = String($("change-email-password")?.value || "");
 
+  if (nextEmail && nextEmail.toLowerCase() === String(currentUser?.email || "").toLowerCase()) {
+    setScopedStatus("email", "That is already your current email address.", "info");
+    return;
+  }
+
   try {
     await changeEmail(nextEmail, currentPassword);
-    await refreshSettingsProfileView();
-    setScopedStatus("email", "Email updated. Check the new inbox for verification if needed.", "success");
+    if ($("change-email-input")) $("change-email-input").value = "";
+    if ($("change-email-password")) $("change-email-password").value = "";
+    setScopedStatus("email", `A verification link was sent to ${nextEmail}. Open it to confirm the new address; your account email changes only after confirmation.`, "success");
   } catch (error) {
     console.error(error);
     setScopedStatus("email", error.message || "Could not change email.", "error");
+  }
+}
+
+async function refreshEmailVerificationStatus() {
+  try {
+    setScopedStatus("email", "Checking your email verification…", "info");
+    const refreshed = await refreshCurrentUserSession();
+    currentUser = refreshed.user;
+    currentProfile = refreshed.profile || currentProfile;
+    syncForm(currentProfile, currentUser);
+    syncAvatarPresetLocks(currentProfile);
+    setScopedStatus("email", currentUser.emailVerified === true
+      ? "Your email is verified. Friends, messages, and player profiles are now available."
+      : "We haven’t received confirmation yet. Open the verification link in your email, then check again.", currentUser.emailVerified === true ? "success" : "info");
+  } catch (error) {
+    console.error(error);
+    setScopedStatus("email", error.message || "Could not refresh email verification status.", "error");
   }
 }
 
@@ -275,6 +349,19 @@ async function applyPasswordChange() {
 }
 
 function bindButtons() {
+  $("profile-privacy-preset")?.addEventListener("change", async (event) => {
+    const preset = String(event.target.value || "private");
+    if (!["private", "public", "custom"].includes(preset)) return;
+    try {
+      await updatePrivacySettings({ preset });
+      await refreshSettingsProfileView();
+      setScopedStatus("privacy", `Your profile is now set to ${preset}.`, "success");
+    } catch (error) {
+      console.error(error);
+      await refreshSettingsProfileView();
+      setScopedStatus("privacy", error.message || "Could not change your privacy preset.", "error");
+    }
+  });
   $("save-username-btn")?.addEventListener("click", applyUsername);
   for (const presetId of PRESET_IDS) {
     $(`avatar-preset-${presetId}-btn`)?.addEventListener("click", () => applyAvatarPreset(presetId));
@@ -282,11 +369,23 @@ function bindButtons() {
   $("avatar-default-btn")?.addEventListener("click", applyDefaultAvatar);
 
   $("change-email-btn")?.addEventListener("click", applyEmailChange);
+  $("settings-email-refresh-btn")?.addEventListener("click", refreshEmailVerificationStatus);
+  $("settings-email-resend-btn")?.addEventListener("click", async () => {
+    try {
+      const sent = await resendVerificationEmail();
+      setScopedStatus("email", sent === false
+        ? "Your current email is already verified."
+        : `A verification link was sent to ${currentUser?.email || "your email address"}.`, sent === false ? "info" : "success");
+    } catch (error) {
+      console.error(error);
+      setScopedStatus("email", error.message || "Could not send a verification email.", "error");
+    }
+  });
   $("change-password-btn")?.addEventListener("click", applyPasswordChange);
   $("send-reset-email-btn")?.addEventListener("click", async () => {
-    const email = String($("change-email-input")?.value || "").trim();
+    const email = String(currentUser?.email || "").trim();
     if (!email) {
-      setScopedStatus("password", "Type an email first.", "error");
+      setScopedStatus("password", "There is no email address attached to this account.", "error");
       return;
     }
 
@@ -296,16 +395,6 @@ function bindButtons() {
     } catch (error) {
       console.error(error);
       setScopedStatus("password", error.message || "Could not send reset email.", "error");
-    }
-  });
-
-  $("resend-verification-btn")?.addEventListener("click", async () => {
-    try {
-      const sent = await resendVerificationEmail();
-      setScopedStatus("actions", sent === false ? "Your email is already verified." : "Verification email sent.", sent === false ? "info" : "success");
-    } catch (error) {
-      console.error(error);
-      setScopedStatus("actions", error.message || "Could not resend verification email.", "error");
     }
   });
 
@@ -390,6 +479,13 @@ function start() {
   syncAvatarPresetLocks({});
 
   settingsWatchUnsub = watchAuth(async (user, profile) => {
+    if (settingsSyncedUid && settingsSyncedUid !== user?.uid) {
+      ["change-email-input", "change-email-password", "current-password", "new-password", "confirm-password", "delete-password"].forEach((id) => {
+        const input = $(id);
+        if (input) input.value = "";
+      });
+    }
+    settingsSyncedUid = user?.uid || "";
     currentUser = user || null;
     clearScopedStatuses();
     if (!user) {
@@ -402,7 +498,32 @@ function start() {
     currentProfile = nextProfile;
     syncForm(nextProfile, user);
     syncAvatarPresetLocks(nextProfile);
-    setStatus(user.emailVerified ? "Settings ready." : "Verify your email to unlock settings.", "info");
+    setStatus(user.emailVerified === true
+      ? "Settings ready. Your email is verified."
+      : "Settings ready. Verify your email to unlock friends, messages, and player profiles.", "info");
+
+    if (emailVerificationReturnReason) {
+      const returnReason = emailVerificationReturnReason;
+      emailVerificationReturnReason = "";
+      try {
+        const refreshed = await refreshCurrentUserSession();
+        currentUser = refreshed.user;
+        currentProfile = refreshed.profile;
+        syncForm(refreshed.profile, refreshed.user);
+        clearEmailVerificationReturnMarkers();
+        if (refreshed.user.emailVerified === true) {
+          setScopedStatus("email", returnReason === "email-change"
+            ? "Your new email address is verified and active."
+            : "Your email is verified. Friends, messages, and player profiles are now available.", "success");
+        } else {
+          setScopedStatus("email", "The site reopened from the email link, but verification is not active yet. Try the link again or check your email status.", "info");
+        }
+      } catch (error) {
+        console.error("Could not refresh the account after email verification:", error);
+        emailVerificationReturnReason = returnReason;
+        setScopedStatus("email", "The email link opened. Sign in to refresh your email status here.", "info");
+      }
+    }
   });
   if (typeof settingsWatchUnsub === "function") settingsUnsubs.push(settingsWatchUnsub);
 }

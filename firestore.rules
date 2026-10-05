@@ -1,9 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
     function signedIn() {
       return request.auth != null;
+    }
+
+    function verified() {
+      return signedIn() && request.auth.token.email_verified == true;
     }
 
     function isUser(uid) {
@@ -11,31 +14,62 @@ service cloud.firestore {
     }
 
     function isParticipant(participants) {
-      return signedIn() && request.auth.uid in participants;
+      return signedIn() && participants is list && request.auth.uid in participants;
     }
 
-    // ======================================================================
-    // users/{userId}
-    // ======================================================================
-    //
-    // Any signed-in user may read a profile. The friend-request flow has to
-    // read someone *before* they are a friend, so gating this on friendship
-    // would make it impossible to ever send the first request.
-    //
-    // That is only safe because the document no longer stores an email
-    // address. The canonical one lives in Firebase Auth (the owner reads it
-    // from there), and everything the UI is willing to show about someone else
-    // is already filtered through publicProfile() in auth/social.js.
-    //
-    // Writes are bounded by type and size rather than by a key allowlist. A
-    // strict allowlist was tried here first and it silently broke the entire
-    // social system: the moment the client added a field, every write was
-    // rejected outright, and because the client writes with `merge`, the
-    // offending key could not even be removed without a bespoke cleanup. Type
-    // and length bounds are what actually matter here, because they stop a
-    // client parking a megabyte of text, or a string where a number belongs,
-    // in its own document.
-    function boundedProfile(d, uid) {
+    function directoryPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function privateProfilePath(uid) {
+      return /databases/$(database)/documents/privateUsers/$(uid);
+    }
+
+    function accountVerified(uid) {
+      let path = privateProfilePath(uid);
+      return exists(path)
+        && ("verified" in get(path).data)
+        && get(path).data.verified == true;
+    }
+
+    function messagePath(messageId) {
+      return /databases/$(database)/documents/messages/$(messageId);
+    }
+
+    function validDirectory(d, uid) {
+      return d.keys().hasOnly(["uid", "username", "socialSettings", "profileVisibility"])
+        && d.uid == uid
+        && d.username is string && d.username.size() <= 32
+        && d.socialSettings is map
+        && d.socialSettings.keys().hasOnly(["systemEnabled", "requestsEnabled"])
+        && d.socialSettings.systemEnabled is bool
+        && d.socialSettings.requestsEnabled is bool
+        && d.profileVisibility in ["private", "public"];
+    }
+
+    function privacySettingsAreValid(settings) {
+      return settings is map
+        && settings.keys().hasOnly([
+          "preset", "showAvatar", "showVerified", "showRank", "showJoined", "showStreaks", "showSiteAge"
+        ])
+        && settings.preset in ["private", "public", "custom"]
+        && settings.showAvatar is bool
+        && settings.showVerified is bool
+        && settings.showRank is bool
+        && settings.showJoined is bool
+        && settings.showStreaks is bool
+        && settings.showSiteAge is bool
+        && (settings.preset != "private" || (
+          settings.showAvatar == false && settings.showVerified == false && settings.showRank == false
+          && settings.showJoined == false && settings.showStreaks == false && settings.showSiteAge == false
+        ))
+        && (settings.preset != "public" || (
+          settings.showAvatar == true && settings.showVerified == true && settings.showRank == true
+          && settings.showJoined == true && settings.showStreaks == true && settings.showSiteAge == true
+        ));
+    }
+
+    function boundedPrivateProfile(d, uid) {
       return (!("uid" in d) || d.uid == uid)
         && (!("username" in d) || (d.username is string && d.username.size() <= 32))
         && (!("photoURL" in d) || (d.photoURL is string && d.photoURL.size() <= 300000))
@@ -45,80 +79,269 @@ service cloud.firestore {
         && (!("xp" in d) || (d.xp is number && d.xp >= 0 && d.xp <= 1000000))
         && (!("siteTimeMs" in d) || (d.siteTimeMs is number && d.siteTimeMs >= 0))
         && (!("longestStreak" in d) || (d.longestStreak is number && d.longestStreak >= 0))
-        && (!("verified" in d) || d.verified is bool)
+        && (!("verified" in d) || d.verified == (request.auth.token.email_verified == true))
         && (!("achievements" in d) || (d.achievements is list && d.achievements.size() <= 500))
         && (!("achievementRewardSnapshot" in d) || d.achievementRewardSnapshot is map)
         && (!("visitedPages" in d) || (d.visitedPages is list && d.visitedPages.size() <= 500))
-        && (!("streakHistory" in d) || (d.streakHistory is list && d.streakHistory.size() <= 4000))
+        && (!("streakHistory" in d) || (d.streakHistory is map && d.streakHistory.size() <= 4000))
         && (!("friends" in d) || (d.friends is list && d.friends.size() <= 5000))
         && (!("blocked" in d) || (d.blocked is list && d.blocked.size() <= 5000))
-        && (!("socialSettings" in d) || d.socialSettings is map)
+        && (!("socialSettings" in d) || (d.socialSettings is map
+            && d.socialSettings.keys().hasOnly(["systemEnabled", "requestsEnabled"])
+            && d.socialSettings.systemEnabled is bool
+            && d.socialSettings.requestsEnabled is bool))
         && (!("socialBackup" in d) || d.socialBackup is map)
-        && (!("privacySettings" in d) || d.privacySettings is map)
+        && (!("privacySettings" in d) || privacySettingsAreValid(d.privacySettings))
         && (!("progressBaseline" in d) || d.progressBaseline is map)
         && (!("stats" in d) || d.stats is map)
         && (!("streak" in d) || d.streak is map);
     }
 
-    match /users/{userId} {
-      allow read: if signedIn();
-      allow create, update: if isUser(userId) && boundedProfile(request.resource.data, userId);
-      allow delete: if isUser(userId);
+    function ownerAllowsShare(uid, setting) {
+      let privatePath = privateProfilePath(uid);
+      return exists(privatePath)
+        && ("privacySettings" in get(privatePath).data)
+        && get(privatePath).data.privacySettings is map
+        && setting in get(privatePath).data.privacySettings
+        && get(privatePath).data.privacySettings[setting] == true;
     }
 
-    // ======================================================================
-    // messages/{messageId}
-    // ======================================================================
-    //
-    // Every field a create always writes is pinned against later updates.
-    // Without this, any participant could rewrite fromUid/toUid to impersonate
-    // the other party, flip `kind` to forge a notification type, or rewrite
-    // `body` in the recipient's own inbox.
-    //
-    // Only the per-recipient bookkeeping is meant to change: status, readBy,
-    // readAt, deletedFor and updatedAt.
-    function routingUnchanged(d, old) {
+    function profileVisibleToCommunity(uid) {
+      let privatePath = privateProfilePath(uid);
+      return exists(privatePath)
+        && ("privacySettings" in get(privatePath).data)
+        && get(privatePath).data.privacySettings is map
+        && get(privatePath).data.privacySettings.preset in ["public", "custom"];
+    }
+
+    function profilePartiesNotBlocked(ownerUid, viewerUid) {
+      let owner = get(privateProfilePath(ownerUid)).data;
+      let viewer = get(privateProfilePath(viewerUid)).data;
+      return (!("blocked" in owner) || !(viewerUid in owner.blocked))
+        && (!("blocked" in viewer) || !(ownerUid in viewer.blocked));
+    }
+
+    function friendProfileFieldsMatchPrivacy(d, uid) {
+      return exists(privateProfilePath(uid))
+        && d.keys().hasOnly([
+          "uid", "photoURL", "avatarType", "avatarPreset", "avatarLetter",
+          "xp", "verified", "createdAt", "streakCurrent", "streakLongest", "siteTimeMs"
+        ])
+        && d.uid == uid
+        && (!("photoURL" in d) || (ownerAllowsShare(uid, "showAvatar")
+          && d.photoURL is string && d.photoURL.size() <= 300000))
+        && (!("avatarType" in d) || (ownerAllowsShare(uid, "showAvatar")
+          && d.avatarType is string && d.avatarType.size() <= 32))
+        && (!("avatarPreset" in d) || (ownerAllowsShare(uid, "showAvatar")
+          && d.avatarPreset is string && d.avatarPreset.size() <= 64))
+        && (!("avatarLetter" in d) || (ownerAllowsShare(uid, "showAvatar")
+          && d.avatarLetter is string && d.avatarLetter.size() <= 8))
+        && (!("xp" in d) || (ownerAllowsShare(uid, "showRank")
+          && d.xp is number && d.xp >= 0 && d.xp <= 1000000))
+        && (!("verified" in d) || (ownerAllowsShare(uid, "showVerified") && d.verified is bool))
+        && (!("createdAt" in d) || (ownerAllowsShare(uid, "showJoined") && d.createdAt is timestamp))
+        && (!("streakCurrent" in d) || (ownerAllowsShare(uid, "showStreaks")
+          && d.streakCurrent is number && d.streakCurrent >= 0))
+        && (!("streakLongest" in d) || (ownerAllowsShare(uid, "showStreaks")
+          && d.streakLongest is number && d.streakLongest >= 0))
+        && (!("siteTimeMs" in d) || (ownerAllowsShare(uid, "showSiteAge")
+          && d.siteTimeMs is number && d.siteTimeMs >= 0));
+    }
+
+    function validFriendProfile(d, uid) {
+      return friendProfileFieldsMatchPrivacy(d, uid)
+        && (!("verified" in d) || d.verified == (request.auth.token.email_verified == true));
+    }
+
+    function messageRoutingUnchanged(d, old) {
       return d.participants == old.participants
         && d.fromUid == old.fromUid
         && d.toUid == old.toUid
         && d.kind == old.kind
         && d.title == old.title
         && d.body == old.body
-        && d.requestId == old.requestId
-        && d.targetId == old.targetId
-        && d.targetSection == old.targetSection
-        && d.targetSubSection == old.targetSubSection
+        && d.get("fromName", "") == old.get("fromName", "")
+        && d.get("toName", "") == old.get("toName", "")
+        && d.get("requestId", null) == old.get("requestId", null)
+        && d.get("targetId", null) == old.get("targetId", null)
+        && d.get("targetSection", null) == old.get("targetSection", null)
+        && d.get("targetSubSection", null) == old.get("targetSubSection", null)
         && d.createdAt == old.createdAt;
     }
 
+    function privateProfile(uid) {
+      return get(privateProfilePath(uid)).data;
+    }
+
+    function messageHasPair(d) {
+      return d.fromUid is string
+        && d.toUid is string
+        && d.fromUid != d.toUid
+        && d.participants is list
+        && d.participants.size() == 2
+        && d.participants.hasAll([d.fromUid, d.toUid])
+        && request.auth.uid == d.fromUid;
+    }
+
+    function requestIsAllowed(d) {
+      let sender = privateProfile(d.fromUid);
+      let target = privateProfile(d.toUid);
+      let senderDirectory = get(directoryPath(d.fromUid)).data;
+      let targetDirectory = get(directoryPath(d.toUid)).data;
+      return d.kind == "friend-request"
+        && accountVerified(d.fromUid)
+        && accountVerified(d.toUid)
+        && d.status == "pending"
+        && d.requestId == null
+        && senderDirectory.socialSettings.systemEnabled == true
+        && targetDirectory.socialSettings.systemEnabled == true
+        && targetDirectory.socialSettings.requestsEnabled == true
+        && (!("friends" in sender) || !(d.toUid in sender.friends))
+        && (!("friends" in target) || !(d.fromUid in target.friends))
+        && (!("blocked" in sender) || !(d.toUid in sender.blocked))
+        && (!("blocked" in target) || !(d.fromUid in target.blocked));
+    }
+
+    function directMessageIsAllowed(d) {
+      let sender = privateProfile(d.fromUid);
+      let recipient = privateProfile(d.toUid);
+      return d.kind == "direct-message"
+        && accountVerified(d.fromUid)
+        && accountVerified(d.toUid)
+        && d.get("status", "") == "sent"
+        && d.get("requestId", null) == null
+        && d.get("targetId", null) == null
+        && d.get("targetSection", null) == null
+        && d.get("targetSubSection", null) == null
+        && ("friends" in sender) && d.toUid in sender.friends
+        && ("friends" in recipient) && d.fromUid in recipient.friends
+        && (!("blocked" in sender) || !(d.toUid in sender.blocked))
+        && (!("blocked" in recipient) || !(d.fromUid in recipient.blocked));
+    }
+
+    function responseMatchesRequest(d, expectedStatus) {
+      return d.get("requestId", null) is string
+        && d.requestId.size() > 0
+        && exists(messagePath(d.requestId))
+        && get(messagePath(d.requestId)).data.kind == "friend-request"
+        && get(messagePath(d.requestId)).data.status == expectedStatus
+        && get(messagePath(d.requestId)).data.fromUid == d.toUid
+        && get(messagePath(d.requestId)).data.toUid == d.fromUid;
+    }
+
+    function systemMessageIsAllowed(d) {
+      return (d.kind == "friend-accepted" && responseMatchesRequest(d, "accepted"))
+        || (d.kind == "friend-declined" && responseMatchesRequest(d, "declined"))
+        || (d.kind == "friend-blocked" && (
+          responseMatchesRequest(d, "blocked")
+          || d.toUid in privateProfile(d.fromUid).blocked
+        ))
+        || (d.kind == "friend-removed"
+          && d.fromUid in privateProfile(d.toUid).friends);
+    }
+
+    function validMessageCreate(d) {
+      return verified()
+        && d.keys().hasOnly([
+          "participants", "fromUid", "toUid", "fromName", "toName", "kind",
+          "status", "title", "body", "requestId", "targetId", "targetSection",
+          "targetSubSection", "readBy", "createdAt", "updatedAt"
+        ])
+        && messageHasPair(d)
+        && d.toUid is string && d.toUid.size() > 0 && d.toUid.size() <= 128
+        && exists(directoryPath(d.fromUid))
+        && exists(directoryPath(d.toUid))
+        && d.fromName == get(directoryPath(d.fromUid)).data.username
+        && d.toName == get(directoryPath(d.toUid)).data.username
+        && d.kind is string && d.kind.size() <= 64
+        && d.title is string && d.title.size() <= 200
+        && d.body is string && d.body.size() <= 2000
+        && d.readBy is list && d.readBy.size() == 1 && d.readBy[0] == request.auth.uid
+        && d.createdAt is timestamp
+        && d.updatedAt is timestamp
+        && (d.kind == "friend-request"
+          ? requestIsAllowed(d)
+          : (d.kind == "direct-message" ? directMessageIsAllowed(d) : systemMessageIsAllowed(d)));
+    }
+
+    function listContainsOnlyParticipants(value, d) {
+      return value is list
+        && value.size() <= 2
+        && (value.size() == 0 || value[0] in d.participants)
+        && (value.size() < 2 || value[1] in d.participants);
+    }
+
+    function otherParticipant(d, uid) {
+      return d.fromUid == uid ? d.toUid : d.fromUid;
+    }
+
+    function ownMembershipOnly(oldValue, newValue, d) {
+      let otherUid = otherParticipant(d, request.auth.uid);
+      let oldList = oldValue is list ? oldValue : [];
+      let newList = newValue is list ? newValue : [];
+      return listContainsOnlyParticipants(oldList, d)
+        && listContainsOnlyParticipants(newList, d)
+        && ((otherUid in oldList) == (otherUid in newList));
+    }
+
+    function validMessageUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let old = resource.data;
+      let next = request.resource.data;
+      return verified()
+        && isParticipant(old.participants)
+        && messageRoutingUnchanged(next, old)
+        && changed.hasOnly(["status", "readBy", "readAt", "deletedFor", "updatedAt"])
+        && (!changed.hasAny(["status"]) || (
+          old.kind == "friend-request"
+          && ((request.auth.uid == old.toUid
+              && old.get("status", "pending") == "pending"
+              && next.status in ["accepted", "declined", "ignored", "blocked"])
+            || (request.auth.uid == old.fromUid
+              && old.get("status", "pending") == "pending"
+              && next.status == "cancelled"))
+        ))
+        && (!changed.hasAny(["readBy"]) || ownMembershipOnly(
+          old.get("readBy", []), next.get("readBy", []), old
+        ))
+        && (!changed.hasAny(["deletedFor"]) || ownMembershipOnly(
+          old.get("deletedFor", []), next.get("deletedFor", []), old
+        ))
+        && (!changed.hasAny(["readAt"]) || (request.auth.uid == old.toUid
+          && (next.readAt == null || next.readAt is timestamp)))
+        && (!changed.hasAny(["updatedAt"]) || next.updatedAt is timestamp);
+    }
+
+    match /users/{userId} {
+      // New documents are a deliberately small directory. Older full profiles
+      // remain readable only by their owner until sign-in migrates them.
+      allow read: if isUser(userId)
+        || (verified() && accountVerified(userId) && validDirectory(resource.data, userId));
+      allow create, update: if isUser(userId) && validDirectory(request.resource.data, userId);
+      allow delete: if isUser(userId);
+    }
+
+    match /privateUsers/{userId} {
+      allow read: if isUser(userId);
+      allow create, update: if isUser(userId)
+        && boundedPrivateProfile(request.resource.data, userId);
+      allow delete: if isUser(userId);
+    }
+
+    match /friendProfiles/{userId} {
+      allow read: if isUser(userId) || (verified() && accountVerified(userId)
+        && profileVisibleToCommunity(userId)
+        && profilePartiesNotBlocked(userId, request.auth.uid)
+        && friendProfileFieldsMatchPrivacy(resource.data, userId));
+      allow create, update: if isUser(userId)
+        && validFriendProfile(request.resource.data, userId);
+      allow delete: if isUser(userId);
+    }
+
     match /messages/{messageId} {
-      allow read: if isParticipant(resource.data.participants);
-
-      allow create: if isParticipant(request.resource.data.participants)
-        && request.resource.data.fromUid == request.auth.uid
-        && request.resource.data.fromUid is string
-        && request.resource.data.toUid is string
-        && request.resource.data.toUid.size() > 0
-        && request.resource.data.toUid.size() <= 128
-        && request.resource.data.kind is string
-        && request.resource.data.kind.size() <= 64
-        && request.resource.data.title is string
-        && request.resource.data.title.size() <= 200
-        && request.resource.data.body is string
-        && request.resource.data.body.size() <= 2000
-        && (!("fromName" in request.resource.data)
-            || (request.resource.data.fromName is string
-                && request.resource.data.fromName.size() <= 64))
-        && (!("toName" in request.resource.data)
-            || (request.resource.data.toName is string
-                && request.resource.data.toName.size() <= 64));
-
-      allow update: if isParticipant(resource.data.participants)
-        && routingUnchanged(request.resource.data, resource.data);
-
-      // The client soft-deletes with the deletedFor array, so a hard delete is
-      // never used - and allowing one would let either participant destroy the
-      // message for both of them.
+      allow read: if verified() && isParticipant(resource.data.participants);
+      allow create: if validMessageCreate(request.resource.data);
+      allow update: if validMessageUpdate();
       allow delete: if false;
     }
   }

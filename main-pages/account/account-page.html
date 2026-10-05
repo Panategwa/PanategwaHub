@@ -86,41 +86,8 @@
         syncAccountUrl(nextSection, nextSub || null, targetId || null);
       };
 
-      window.PanategwaSetAuthMode = function (mode) {
-        var nextMode = mode === "signup" ? "signup" : "login";
-        document.body.dataset.authMode = nextMode;
-
-        document.querySelectorAll("[data-auth-mode]").forEach(function (button) {
-          button.classList.toggle("active", button.dataset.authMode === nextMode);
-        });
-
-        document.querySelectorAll("[data-auth-panel]").forEach(function (panel) {
-          panel.classList.toggle("active", panel.dataset.authPanel === nextMode);
-        });
-
-        var heading = document.getElementById("auth-mode-heading");
-        var copy = document.getElementById("auth-mode-copy");
-        var switchCopy = document.getElementById("auth-switch-copy");
-        var switchButton = document.getElementById("auth-switch-btn");
-
-        if (heading) heading.textContent = nextMode === "login" ? "Log in" : "Create account";
-        if (copy) {
-          copy.textContent = nextMode === "login"
-            ? "Use your email and password or Google to sign in."
-            : "Create your account to unlock friends, notifications, and synced progress.";
-        }
-        if (switchCopy) switchCopy.textContent = nextMode === "login" ? "Don't have an account?" : "Already have an account?";
-        if (switchButton) switchButton.textContent = nextMode === "login" ? "Create one" : "Log in";
-      };
-
-      window.PanategwaToggleAuthMode = function () {
-        var currentMode = document.body.dataset.authMode === "signup" ? "signup" : "login";
-        window.PanategwaSetAuthMode(currentMode === "login" ? "signup" : "login");
-      };
-
       document.addEventListener("DOMContentLoaded", function () {
         var params = new URLSearchParams(window.location.search);
-        window.PanategwaSetAuthMode("login");
         window.openAccountArea(
           String(params.get("tab") || "info").toLowerCase(),
           String(params.get("sub") || "").trim() || null,
@@ -136,17 +103,95 @@
 <div class="account-wrap">
     <div class="page-head">
       <h1>Account</h1>
-      <p class="page-subtitle">Profile, friends, progress, and notifications all in one place.</p>
+      <p class="page-subtitle">Profile, friends, progress, chats, and player activity in one place.</p>
     </div>
 
     <p id="auth-status" class="status" data-kind="info">Checking account...</p>
+
+    <section id="account-switcher" class="account-switcher card" aria-labelledby="account-switcher-title">
+      <div class="account-switcher-heading">
+        <div>
+          <p class="eyebrow">This device</p>
+          <h2 id="account-switcher-title">Your accounts</h2>
+          <p class="account-switcher-subtitle">Switch between up to three signed-in accounts.</p>
+        </div>
+        <span id="account-switcher-count" class="account-switcher-count">0 of 3</span>
+      </div>
+      <div id="account-switcher-list" class="account-switcher-list" aria-live="polite">
+        <div class="account-switcher-loading">Loading saved accounts…</div>
+      </div>
+      <div class="account-switcher-footer">
+        <p id="account-switcher-status" class="account-switcher-status" aria-live="polite">Saved sessions are stored securely by Firebase on this device.</p>
+        <button id="account-add-btn" type="button" class="account-add-button">
+          <span aria-hidden="true">＋</span> Add account
+        </button>
+      </div>
+    </section>
+
+    <dialog id="account-add-dialog" class="account-add-dialog" aria-labelledby="account-add-title">
+      <div class="account-add-dialog-inner">
+        <div class="account-add-dialog-heading">
+          <div>
+            <p class="eyebrow">Account switcher</p>
+            <h2 id="account-add-title">Add an account</h2>
+            <p class="account-switcher-subtitle">Your current account stays signed in.</p>
+          </div>
+          <button id="account-add-close" type="button" class="account-dialog-close" aria-label="Close">×</button>
+        </div>
+
+        <div class="account-add-mode" role="tablist" aria-label="Choose account action">
+          <button type="button" class="active" data-account-add-mode="login" role="tab" aria-selected="true">Sign in</button>
+          <button type="button" data-account-add-mode="signup" role="tab" aria-selected="false">Create account</button>
+        </div>
+
+        <p id="account-add-status" class="account-add-status" aria-live="polite"></p>
+
+        <form id="account-add-login-form" class="account-add-form" data-account-add-panel="login">
+          <label class="input-group"><span>Email</span><input id="account-add-login-email" type="email" autocomplete="email" required /></label>
+          <label class="input-group"><span>Password</span><input id="account-add-login-password" type="password" autocomplete="current-password" required /></label>
+          <div class="account-add-actions">
+            <button type="submit" class="account-add-primary" id="account-add-login-submit">Sign in to account</button>
+            <button type="button" class="account-add-google" id="account-add-google-login">Continue with Google</button>
+          </div>
+        </form>
+
+        <form id="account-add-signup-form" class="account-add-form" data-account-add-panel="signup" hidden>
+          <label class="input-group"><span>Username</span><input id="account-add-username" type="text" maxlength="20" autocomplete="nickname" required /></label>
+          <label class="input-group"><span>Email</span><input id="account-add-signup-email" type="email" autocomplete="email" required /></label>
+          <div class="account-add-field-row">
+            <label class="input-group"><span>Password</span><input id="account-add-signup-password" type="password" minlength="6" autocomplete="new-password" required /></label>
+            <label class="input-group"><span>Confirm password</span><input id="account-add-signup-confirm" type="password" minlength="6" autocomplete="new-password" required /></label>
+          </div>
+          <fieldset class="account-add-privacy">
+            <legend>Choose profile privacy</legend>
+            <div class="account-add-privacy-options">
+              <label><input type="radio" name="account-add-privacy" value="private" required /><span><strong>Private</strong><small>Name only</small></span></label>
+              <label><input type="radio" name="account-add-privacy" value="public" required /><span><strong>Public</strong><small>All profile details</small></span></label>
+              <label><input type="radio" name="account-add-privacy" value="custom" required /><span><strong>Custom</strong><small>Choose details</small></span></label>
+            </div>
+            <div id="account-add-custom-privacy" class="account-add-custom-privacy" hidden>
+              <label><input type="checkbox" data-account-add-privacy-field="showAvatar" /> Profile picture</label>
+              <label><input type="checkbox" data-account-add-privacy-field="showVerified" /> Verified badge</label>
+              <label><input type="checkbox" data-account-add-privacy-field="showRank" /> XP and rank</label>
+              <label><input type="checkbox" data-account-add-privacy-field="showJoined" /> Join date</label>
+              <label><input type="checkbox" data-account-add-privacy-field="showStreaks" /> Streaks</label>
+              <label><input type="checkbox" data-account-add-privacy-field="showSiteAge" /> Time on site</label>
+            </div>
+          </fieldset>
+          <div class="account-add-actions">
+            <button type="submit" class="account-add-primary" id="account-add-signup-submit">Create account</button>
+            <button type="button" class="account-add-google" id="account-add-google-signup">Continue with Google</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
 
     <div class="tab-bar">
       <button type="button" class="tab-button active" id="tab-info" data-target="info" onclick="window.openAccountArea('info')">Profile</button>
       <button type="button" class="tab-button" id="tab-settings" data-target="settings" onclick="window.openAccountArea('settings')">Account settings</button>
       <button type="button" class="tab-button" id="tab-progress" data-target="progress" onclick="window.openAccountArea('progress')">Progress</button>
       <button type="button" class="tab-button" id="tab-friends" data-target="friends" onclick="window.openAccountArea('friends', 'friends')">Friends</button>
-      <button type="button" class="tab-button" id="tab-messages" data-target="messages" onclick="window.openAccountArea('messages')">Notifications</button>
+      <button type="button" class="tab-button" id="tab-messages" data-target="messages" onclick="window.openAccountArea('messages')">Messages</button>
     </div>
 
     <section class="account-section active" data-section="info">
@@ -159,8 +204,8 @@
           </div>
 
           <div class="auth-toggle">
-            <button id="auth-mode-login-btn" type="button" class="tab-chip active" data-auth-mode="login" onclick="window.PanategwaSetAuthMode('login')">Log in</button>
-            <button id="auth-mode-signup-btn" type="button" class="tab-chip" data-auth-mode="signup" onclick="window.PanategwaSetAuthMode('signup')">Create account</button>
+            <button id="auth-mode-login-btn" type="button" class="tab-chip active" data-auth-mode="login">Log in</button>
+            <button id="auth-mode-signup-btn" type="button" class="tab-chip" data-auth-mode="signup">Create account</button>
           </div>
         </div>
 
@@ -170,11 +215,11 @@
               <div class="field-row">
                 <label class="input-group">
                   <span>Email</span>
-                  <input id="login-email" type="email" placeholder="you@example.com" autocomplete="email" />
+                  <input id="login-email" type="email" placeholder="you@example.com" autocomplete="email" required />
                 </label>
                 <label class="input-group">
                   <span>Password</span>
-                  <input id="login-password" type="password" placeholder="Your password" autocomplete="current-password" />
+                  <input id="login-password" type="password" placeholder="Your password" autocomplete="current-password" required />
                 </label>
               </div>
 
@@ -184,25 +229,67 @@
               </div>
             </form>
 
-            <form id="signup-form" class="auth-panel" data-auth-panel="signup">
+            <form id="signup-form" class="auth-panel" data-auth-panel="signup" hidden>
               <div class="field-row">
                 <label class="input-group">
                   <span>Username</span>
-                  <input id="signup-username" type="text" maxlength="20" placeholder="Choose a username" autocomplete="nickname" />
+                  <input id="signup-username" type="text" maxlength="20" placeholder="Choose a username" autocomplete="nickname" required />
                 </label>
                 <label class="input-group">
                   <span>Email</span>
-                  <input id="signup-email" type="email" placeholder="you@example.com" autocomplete="email" />
+                  <input id="signup-email" type="email" placeholder="you@example.com" autocomplete="email" required />
                 </label>
                 <label class="input-group">
                   <span>Password</span>
-                  <input id="signup-password" type="password" placeholder="Create a password" autocomplete="new-password" />
+                  <input id="signup-password" type="password" placeholder="Create a password" autocomplete="new-password" minlength="6" required />
                 </label>
                 <label class="input-group">
                   <span>Confirm password</span>
-                  <input id="signup-password-confirm" type="password" placeholder="Repeat your password" autocomplete="new-password" />
+                  <input id="signup-password-confirm" type="password" placeholder="Repeat your password" autocomplete="new-password" minlength="6" required />
                 </label>
               </div>
+
+                  <fieldset class="signup-privacy" id="signup-privacy-choices" tabindex="-1">
+                <legend>Choose your profile privacy <span aria-hidden="true">*</span></legend>
+                <p class="signup-privacy-intro">Your email, password, and account controls are always private. Profile visibility applies to signed-in Panategwa Hub players.</p>
+                <div class="privacy-preset-grid">
+                  <label class="privacy-preset-card" data-privacy-preset-card="private">
+                    <input id="signup-privacy-private" type="radio" name="signup-privacy-preset" value="private" required />
+                    <span class="privacy-preset-content">
+                      <span class="privacy-preset-title">Private</span>
+                      <span class="privacy-preset-copy">Only your username is visible. Your avatar and game details stay hidden.</span>
+                      <span class="privacy-preset-tag">Most private</span>
+                    </span>
+                  </label>
+                  <label class="privacy-preset-card" data-privacy-preset-card="public">
+                    <input id="signup-privacy-public" type="radio" name="signup-privacy-preset" value="public" required />
+                    <span class="privacy-preset-content">
+                      <span class="privacy-preset-title">Public</span>
+                      <span class="privacy-preset-copy">Players can see your avatar, verification badge, rank, join date, streaks, and site time.</span>
+                      <span class="privacy-preset-tag">All profile details</span>
+                    </span>
+                  </label>
+                  <label class="privacy-preset-card" data-privacy-preset-card="custom">
+                    <input id="signup-privacy-custom" type="radio" name="signup-privacy-preset" value="custom" required />
+                    <span class="privacy-preset-content">
+                      <span class="privacy-preset-title">Custom</span>
+                      <span class="privacy-preset-copy">Choose exactly which profile details players can see.</span>
+                      <span class="privacy-preset-tag">Your choice</span>
+                    </span>
+                  </label>
+                </div>
+                <div id="signup-custom-privacy" class="signup-custom-privacy" hidden>
+                  <p class="signup-custom-title">Visible to signed-in players</p>
+                  <div class="signup-custom-grid">
+                    <label><input id="signup-showAvatar" type="checkbox" /> Profile picture</label>
+                    <label><input id="signup-showVerified" type="checkbox" /> Verified badge</label>
+                    <label><input id="signup-showRank" type="checkbox" /> XP and rank</label>
+                    <label><input id="signup-showJoined" type="checkbox" /> Join date</label>
+                    <label><input id="signup-showStreaks" type="checkbox" /> Streaks</label>
+                    <label><input id="signup-showSiteAge" type="checkbox" /> Time on site</label>
+                  </div>
+                </div>
+              </fieldset>
 
               <div class="button-row">
                 <button id="signup-btn" class="auth-primary" type="submit">Create account</button>
@@ -211,7 +298,7 @@
 
             <div class="auth-switch-line">
               <span id="auth-switch-copy">Don't have an account?</span>
-              <button id="auth-switch-btn" type="button" class="link-button" onclick="window.PanategwaToggleAuthMode()">Create one</button>
+              <button id="auth-switch-btn" type="button" class="link-button">Create account</button>
             </div>
 
             <div class="auth-provider-separator">
@@ -312,11 +399,28 @@
 
               <div class="setting-card">
                 <div class="setting-title">Email</div>
-                <p id="settings-provider-note" class="setting-desc">Email and password changes work for email/password accounts.</p>
-                <div class="field-row">
-                  <input id="change-email-input" type="email" placeholder="New email" aria-label="New email" />
-                  <input id="change-email-password" type="password" placeholder="Current password" aria-label="Current password" />
+                <p id="settings-provider-note" class="setting-desc">Confirm it’s you, then follow the verification link sent to your new address.</p>
+                <div id="settings-email-verification-card" class="email-verification-card" data-state="unverified" aria-live="polite">
+                  <span class="email-verification-icon" aria-hidden="true"></span>
+                  <div class="email-verification-copy">
+                    <div class="email-verification-heading">
+                      <strong id="settings-email-verification-status">Email not verified</strong>
+                      <span id="settings-email-verification-badge" class="email-verification-badge">Action needed</span>
+                    </div>
+                    <p class="email-current-label">Current email</p>
+                    <p id="settings-email-current" class="email-current-value">Sign in to view your email address.</p>
+                    <p class="setting-desc">Email verification unlocks friends, messages, and viewing other player profiles.</p>
+                  </div>
                 </div>
+                <div class="button-row">
+                  <button id="settings-email-resend-btn" type="button">Send verification email</button>
+                  <button id="settings-email-refresh-btn" type="button" class="button-ghost">I’ve verified my email</button>
+                </div>
+                <div class="field-row">
+                  <label class="input-group"><span>New email address</span><input id="change-email-input" type="email" placeholder="you@example.com" autocomplete="off" required /></label>
+                  <label class="input-group"><span>Current password</span><input id="change-email-password" type="password" placeholder="Confirm it’s you" autocomplete="current-password" required /></label>
+                </div>
+                <p class="setting-desc">We’ll send a verification link to the new address. It won’t change until you confirm it.</p>
                 <div class="button-row">
                   <button id="change-email-btn" type="button">Change email</button>
                 </div>
@@ -340,7 +444,6 @@
               <div class="setting-card">
                 <div class="setting-title">Account actions</div>
                 <div class="button-row">
-                  <button id="resend-verification-btn" type="button">Resend verification email</button>
                   <button id="logout-btn" type="button">Logout</button>
                 </div>
                 <p id="settings-actions-status" class="setting-status section-hidden" aria-live="polite"></p>
@@ -371,23 +474,31 @@
           <div class="settings-panel" data-settings-subpanel="privacy">
             <div class="settings-grid">
               <div class="setting-card">
-                <div class="setting-title">Profile access</div>
-                <p class="setting-desc">Only friends are able to view your account. This stays on for everyone.</p>
+                <div class="setting-title">Profile visibility</div>
+                <p class="setting-desc">Choose whether players can see only your name, your full profile, or just the details you select. Your email and security information always stay private.</p>
+                <label class="input-group" for="profile-privacy-preset">
+                  <span>Privacy preset</span>
+                  <select id="profile-privacy-preset">
+                    <option value="private">Private — username only</option>
+                    <option value="public">Public — show all profile details</option>
+                    <option value="custom">Custom — choose details below</option>
+                  </select>
+                </label>
                 <div class="privacy-note-card">
-                  <strong>Friends only</strong>
-                  <span>People need to be in your friends list before they can open your profile details, rank, streaks, and account info.</span>
+                  <strong>Public profiles are limited to signed-in players</strong>
+                  <span>Private profiles show only your username. Custom profiles show the details you turn on below.</span>
                 </div>
               </div>
 
               <div class="setting-card">
-                <div class="setting-title">Visible to friends</div>
-                <p class="setting-desc">Use the small red hide/show buttons in the preview cards below to control what your friends can see.</p>
+                <div class="setting-title">Custom profile details</div>
+                <p class="setting-desc">Use Hide and Show in the preview to choose what signed-in players can see. Changing a detail switches your profile to Custom.</p>
                 <p id="settings-privacy-status" class="setting-status section-hidden" aria-live="polite"></p>
               </div>
 
               <div class="setting-card privacy-preview-host">
-                <div class="setting-title">Friend view preview</div>
-                <p class="setting-desc">This is how your profile looks to people in your friends list.</p>
+                <div class="setting-title">Player view preview</div>
+                <p class="setting-desc">This is what signed-in players can see on your profile. Your username is always visible.</p>
                 <div id="privacy-profile-preview"></div>
               </div>
             </div>
@@ -503,14 +614,14 @@
       <div class="card">
         <div class="subsection-head">
           <div>
-            <h2>Notifications</h2>
-            <p class="section-note">Friend activity, achievements, and streak updates appear here.</p>
+            <h2>Messages & activity</h2>
+            <p class="section-note">Chat with friends or catch up on account activity.</p>
           </div>
         </div>
 
         <div id="messages-locked" class="locked-state">
-          <h3 id="messages-locked-title">Log in to use notifications</h3>
-          <p id="messages-locked-copy">Your account notifications load after you sign in.</p>
+          <h3 id="messages-locked-title">Log in to use messages and activity</h3>
+          <p id="messages-locked-copy">Your chats and account activity load after you sign in.</p>
           <div class="button-row">
             <button type="button" class="tab-chip" data-open-section="info" onclick="window.openAccountArea('info')">Go to login</button>
             <button id="messages-locked-refresh-btn" type="button" class="tab-chip section-hidden">I've verified my email</button>
@@ -519,16 +630,53 @@
         </div>
 
         <div id="messages-content">
-          <div class="notifications-toolbar">
-            <div id="notifications-summary" class="notifications-summary">No notifications yet.</div>
-            <div class="notification-bulk-actions">
-              <button id="notifications-read-all-btn" type="button" class="tab-chip">Read all</button>
-              <button id="notifications-unread-all-btn" type="button" class="tab-chip">Unread all</button>
-              <button id="notifications-undo-btn" type="button" class="tab-chip" disabled>Undo</button>
-              <button id="notifications-redo-btn" type="button" class="tab-chip" disabled>Redo</button>
+          <div class="messages-subtabs" role="tablist" aria-label="Messages and account activity">
+            <button id="dm-view-tab" class="tab-chip active" type="button" data-message-view="inbox" role="tab" aria-selected="true">Chats</button>
+            <button id="activity-view-tab" class="tab-chip" type="button" data-message-view="activity" role="tab" aria-selected="false">Activity</button>
+          </div>
+
+          <div id="dm-inbox-view" class="dm-inbox-view" data-message-panel="inbox" role="tabpanel" aria-labelledby="dm-view-tab">
+            <div id="dm-status" class="section-note" aria-live="polite"></div>
+            <div class="dm-layout">
+              <aside class="dm-inbox-panel" aria-label="Conversations">
+                <div class="dm-inbox-heading">
+                  <h3>Chats</h3>
+                  <span id="dm-thread-count" class="profile-badge">0</span>
+                </div>
+                <div id="dm-thread-list" class="dm-thread-list"></div>
+              </aside>
+              <section class="dm-conversation-panel" aria-label="Conversation">
+                <div id="dm-chat-empty" class="dm-chat-empty">
+                  <span class="dm-empty-icon" aria-hidden="true">✉</span>
+                  <h3>Your messages</h3>
+                  <p>Choose a friend to open a conversation. You can also start a chat from their profile.</p>
+                </div>
+                <div id="dm-chat-view" class="dm-chat-view" hidden>
+                  <header id="dm-chat-header" class="dm-chat-header"></header>
+                  <div id="dm-chat-messages" class="dm-chat-messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
+                  <form id="dm-compose-form" class="dm-compose-form">
+                    <label class="sr-only" for="dm-compose-input">Write a message</label>
+                    <textarea id="dm-compose-input" maxlength="2000" rows="1" placeholder="Write a message…" required></textarea>
+                    <button id="dm-send-btn" type="submit" aria-label="Send message">Send</button>
+                  </form>
+                  <p class="dm-safety-note">Messages can only be sent between friends. Blocking someone stops new chats.</p>
+                </div>
+              </section>
             </div>
           </div>
-          <div id="notifications-root"></div>
+
+          <div id="activity-view" class="activity-view" data-message-panel="activity" role="tabpanel" aria-labelledby="activity-view-tab" hidden>
+            <div class="notifications-toolbar">
+              <div id="notifications-summary" class="notifications-summary">No notifications yet.</div>
+              <div class="notification-bulk-actions">
+                <button id="notifications-read-all-btn" type="button" class="tab-chip">Read all</button>
+                <button id="notifications-unread-all-btn" type="button" class="tab-chip">Unread all</button>
+                <button id="notifications-undo-btn" type="button" class="tab-chip" disabled>Undo</button>
+                <button id="notifications-redo-btn" type="button" class="tab-chip" disabled>Redo</button>
+              </div>
+            </div>
+            <div id="notifications-root"></div>
+          </div>
         </div>
       </div>
     </section>

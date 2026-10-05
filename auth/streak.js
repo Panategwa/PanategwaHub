@@ -26,7 +26,7 @@ let streakTimers = [];
 let claimingStreak = false;
 
 function userRef(uid) {
-  return doc(db, "users", uid);
+  return doc(db, "privateUsers", uid);
 }
 
 function streakKey(uid) {

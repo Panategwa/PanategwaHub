@@ -1042,10 +1042,9 @@ function scheduleAchievementSync(delay = 0, force = false) {
 
 function startAccountWatcher() {
   watchAuth((user, profile) => {
-    pauseSiteTimeTracking();
-    flushPendingSiteTime(true);
-
     if (!user) {
+      pauseSiteTimeTracking();
+      flushPendingSiteTime(true);
       trackedUser = null;
       trackedProfile = null;
       siteTimePendingMs = 0;
@@ -1056,6 +1055,12 @@ function startAccountWatcher() {
 
     trackedUser = user;
     trackedProfile = profile || trackedProfile;
+
+    // Pause any in-flight tracking and flush this tab's unspent time to
+    // Firestore before adopting the new profile, so the sidebar clock never
+    // broadcasts a stale or zero base while the profile is still loading.
+    pauseSiteTimeTracking();
+    flushPendingSiteTime(true);
     siteTimePendingMs = loadPendingSiteTime(user.uid);
     resumeSiteTimeTracking();
     scheduleAchievementSync(0, true);

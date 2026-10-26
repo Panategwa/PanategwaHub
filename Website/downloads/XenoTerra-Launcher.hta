@@ -15,325 +15,687 @@
     WINDOWSTATE="normal"
   />
   <style>
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #0b1424;
-      color: #e7edf7;
-      margin: 0;
-      padding: 0;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
+      background: #050a14;
+      color: #e2e8f0;
+      height: 100vh;
+      overflow: hidden;
     }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
     .header {
-      background: linear-gradient(135deg, #121a2c 0%, #0b1424 100%);
-      border-bottom: 2px solid #60a5fa;
-      padding: 24px 32px;
+      background: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+      border-bottom: 1px solid #1e293b;
+      padding: 32px 40px;
       text-align: center;
     }
-    .header h1 {
-      margin: 0;
+
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      border-radius: 14px;
       font-size: 28px;
-      color: #60a5fa;
-      letter-spacing: 2px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
     }
-    .header p {
-      margin: 8px 0 0;
-      font-size: 14px;
+
+    .header h1 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin: 0 0 8px;
+      background: linear-gradient(to right, #fff 0%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 15px;
       color: #94a3b8;
     }
-    .content {
-      padding: 32px;
-      max-width: 520px;
-      margin: 0 auto;
+
+    /* Main */
+    .main {
+      flex: 1;
+      padding: 40px;
+      overflow-y: auto;
     }
-    .status-card {
-      background: #121a2c;
-      border: 1px solid #94a3b8;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 24px;
+
+    /* Cards */
+    .card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
     }
-    .status-card h2 {
-      margin: 0 0 16px;
+
+    .card h2 {
       font-size: 18px;
-      color: #e7edf7;
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
-    .status-row {
+
+    .card h2::before {
+      content: '';
+      width: 4px;
+      height: 18px;
+      background: #3b82f6;
+      border-radius: 2px;
+    }
+
+    /* Status items */
+    .status-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .status-item {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid #94a3b8;
-      font-size: 14px;
+      align-items: baseline;
+      padding: 10px 0;
+      border-bottom: 1px solid #1e293b;
     }
-    .status-row:last-child { border-bottom: none; }
-    .status-label { color: #94a3b8; }
-    .status-value { color: #e7edf7; font-weight: 600; }
+
+    .status-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .status-label {
+      font-size: 14px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    .status-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e2e8f0;
+      font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+    }
+
     .status-ok { color: #22c55e; }
-    .status-missing { color: #ef4444; }
-    .status-unknown { color: #f59e0b; }
+    .status-warn { color: #f59e0b; }
+    .status-error { color: #ef4444; }
+    .status-info { color: #3b82f6; }
+
+    /* Buttons */
     .button-group {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
     }
-    button {
-      background: #60a5fa;
-      color: #0b1424;
+
+    .btn {
+      width: 100%;
+      padding: 16px 24px;
       border: none;
-      border-radius: 8px;
-      padding: 14px 24px;
+      border-radius: 12px;
       font-size: 15px;
       font-weight: 600;
       font-family: inherit;
       cursor: pointer;
-      transition: all 0.14s ease;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
     }
-    button:hover { background: #93c5fd; transform: translateY(-1px); }
-    button:active { background: #3b82f6; transform: translateY(0); }
-    button:disabled {
-      background: #475569;
+
+    .btn:active { transform: translateY(1px); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-primary:hover { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); }
+    .btn-primary:disabled { background: #475569; box-shadow: none; cursor: not-allowed; }
+
+    .btn-success {
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(34, 197, 94, 0.3);
+    }
+
+    .btn-success:hover { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); }
+    .btn-success:disabled { background: #475569; box-shadow: none; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid #334155;
+    }
+
+    .btn-secondary:hover { background: #334155; border-color: #475569; }
+
+    .btn-ghost {
+      background: transparent;
       color: #94a3b8;
-      cursor: not-allowed;
-      transform: none;
+      border: 1px solid #334155;
     }
-    button.secondary { background: #1e293b; color: #e7edf7; border: 1px solid #94a3b8; }
-    button.secondary:hover { background: #334155; border-color: #cbd5e1; }
-    .log {
-      background: #0b1424;
-      border: 1px solid #94a3b8;
-      border-radius: 8px;
-      padding: 12px;
-      font-family: 'Consolas', monospace;
+
+    .btn-ghost:hover { background: #1e293b; border-color: #64748b; color: #e2e8f0; }
+
+    .btn-update {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+    }
+
+    .btn-update:hover { background: linear-gradient(135deg, #d97706 0%, #b45309 100%); }
+
+    /* Log */
+    .log-container {
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 16px;
+      font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
       font-size: 12px;
-      color: #94a3b8;
-      max-height: 140px;
+      max-height: 200px;
       overflow-y: auto;
-      margin-top: 20px;
+      color: #94a3b8;
     }
-    .log-entry { margin: 4px 0; }
+
+    .log-entry {
+      padding: 6px 0;
+      border-bottom: 1px solid #0f172a;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .log-entry:last-child { border-bottom: none; }
+
     .log-success { color: #22c55e; }
     .log-error { color: #ef4444; }
-    .log-info { color: #60a5fa; }
-    .footer {
-      margin-top: 24px;
-      font-size: 12px;
-      color: #64748b;
-      text-align: center;
+    .log-info { color: #3b82f6; }
+    .log-warn { color: #f59e0b; }
+
+    /* Update banner */
+    .update-banner {
+      background: #1e1b4b;
+      border: 1px solid #4338ca;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 20px;
+      display: none;
     }
+
+    .update-banner-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .update-text {
+      flex: 1;
+      font-size: 14px;
+      color: #e2e8f0;
+    }
+
+    .update-text strong { color: #818cf8; }
+
+    /* Footer */
+    .footer {
+      background: #020617;
+      border-top: 1px solid #1e293b;
+      padding: 20px 40px;
+      text-align: center;
+      color: #64748b;
+      font-size: 12px;
+    }
+
+    .footer .divider { margin: 0 6px; }
+
+    /* Scrollbar */
+    .log-container::-webkit-scrollbar { width: 8px; }
+    .log-container::-webkit-scrollbar-track { background: #020617; }
+    .log-container::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .log-container::-webkit-scrollbar-thumb:hover { background: #475569; }
   </style>
+</head>
+<body onload="init()">
+
+  <div class="container">
+    <div class="header">
+      <div class="logo-badge">&#9650;</div>
+      <h1>XenoTerra</h1>
+      <div class="subtitle">Launcher &#8226; Panategwa d Survival Game</div>
+    </div>
+
+    <div class="main">
+      <div class="update-banner" id="updateBanner">
+        <div class="update-banner-content">
+          <span class="update-text">A new launcher version is available. Click below to update.</span>
+          <button class="btn btn-update" style="width:auto;padding:10px 20px;font-size:13px;" onclick="applyUpdate()">Update Now</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>&#128204; System Status</h2>
+        <div class="status-list">
+          <div class="status-item">
+            <span class="status-label">Launcher Version</span>
+            <span id="launcherVersion" class="status-value">—</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Game Status</span>
+            <span id="gameStatus" class="status-value">—</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Install Path</span>
+            <span id="gamePath" class="status-value">—</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Update Status</span>
+            <span id="updateStatus" class="status-value">—</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Game Version</span>
+            <span id="gameVersion" class="status-value">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>&#9998; Actions</h2>
+        <div class="button-group">
+          <button id="btnInstall" class="btn btn-primary" onclick="installGame()">Install Game</button>
+          <button id="btnLaunch" class="btn btn-success" onclick="launchGame()">Launch Game</button>
+          <button id="btnFolder" class="btn btn-secondary" onclick="openFolder()">Open Game Folder</button>
+          <button id="btnCheckUpdate" class="btn btn-ghost" onclick="checkForUpdates()">Check for Updates</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>&#128221; Activity Log</h2>
+        <div id="logContainer" class="log-container">
+          <div class="log-entry log-info">[system] XenoTerra Launcher ready.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span id="footerVersion">v1.0.0</span>
+      <span class="divider">&#8226;</span>
+      <span>Runs natively on Windows</span>
+      <span class="divider">&#8226;</span>
+      <span>Auto-updates from GitHub</span>
+    </div>
+  </div>
+
   <script type="text/javascript">
     // ================================================================
-    // XenoTerra Launcher — HTA Application
-    // Runs natively on Windows via mshta.exe, no code signing needed
+    // XenoTerra Launcher — Configuration
     // ================================================================
-    var VERSION = "0.0.3-alpha";
-    var fso = new ActiveXObject("Scripting.FileSystemObject");
-    var shell = new ActiveXObject("WScript.Shell");
+    var LOCAL_VERSION = "1.0.0";
+    var GAME_VERSION = "1.0.0";
+    var MANIFEST_URL = "https://panategwa.github.io/PanategwaHub/downloads/manifest.json";
+    var CHECK_INTERVAL_MS = 30000;
 
-    var launcherDir = getLauncherDir();
-    var gameDir = launcherDir + "XenoTerra\\";
-    var gameZip = launcherDir + "XenoTerra-Game.zip";
-    var gameExe = gameDir + "XenoTerra.exe";
-
-    window.onload = function() {
-      document.getElementById("launcherVersion").textContent = "Launcher v" + VERSION;
-      refreshStatus();
-    };
-
+    // ================================================================
+    // Paths
+    // ================================================================
     function getLauncherDir() {
-      var path = window.location.href;
-      // Convert file:/// URL to local path
-      if (path.indexOf("file:///") === 0) {
-        var localPath = path.slice(8);
-        // Remove trailing filename
-        var lastSlash = localPath.lastIndexOf("/");
-        if (lastSlash >= 0) localPath = localPath.slice(0, lastSlash + 1);
-        // Convert / to \ and handle drive letter
-        localPath = localPath.replace(/\//g, "\\");
-        return localPath;
-      }
-      // Fallback: use script's own path via WSH
-      var scriptFullName = WScript.ScriptFullName;
-      var lastBackslash = scriptFullName.lastIndexOf("\\");
-      if (lastBackslash >= 0) return scriptFullName.slice(0, lastBackslash + 1);
-      return "";
-    }
-
-    function log(message, type) {
-      var logEl = document.getElementById("log");
-      var entry = document.createElement("div");
-      entry.className = "log-entry";
-      if (type === "success") entry.className += " log-success";
-      else if (type === "error") entry.className += " log-error";
-      else if (type === "info") entry.className += " log-info";
-      var now = new Date();
-      var timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      entry.textContent = "[" + timeStr + "] " + message;
-      logEl.appendChild(entry);
-      logEl.scrollTop = logEl.scrollHeight;
-    }
-
-    function refreshStatus() {
-      // Launcher version
-      document.getElementById("launcherVersion").textContent = "Launcher v" + VERSION;
-
-      // Game status
-      var gameInstalled = fso.FolderExists(gameDir);
-      var gameExeExists = fso.FileExists(gameExe);
-      var gameZipExists = fso.FileExists(gameZip);
-      var gameStatusEl = document.getElementById("gameStatus");
-      var gameValueEl = document.getElementById("gameValue");
-      var installBtn = document.getElementById("installBtn");
-      var launchBtn = document.getElementById("launchBtn");
-
-      if (gameExeExists) {
-        gameStatusEl.textContent = "Installed";
-        gameStatusEl.className = "status-value status-ok";
-        gameValueEl.textContent = gameDir;
-        gameValueEl.className = "status-value status-ok";
-        installBtn.disabled = true;
-        installBtn.textContent = "Already Installed";
-        launchBtn.disabled = false;
-        log("Game is installed at " + gameDir, "success");
-      } else if (gameZipExists) {
-        gameStatusEl.textContent = "Ready to Install";
-        gameStatusEl.className = "status-value status-unknown";
-        gameValueEl.textContent = "Package found: XenoTerra-Game.zip";
-        gameValueEl.className = "status-value status-unknown";
-        installBtn.disabled = false;
-        installBtn.textContent = "Install Game";
-        launchBtn.disabled = true;
-        log("Game package found. Click Install to extract.", "info");
-      } else {
-        gameStatusEl.textContent = "Not Installed";
-        gameStatusEl.className = "status-value status-missing";
-        gameValueEl.textContent = "No game package found";
-        gameValueEl.className = "status-value status-missing";
-        installBtn.disabled = true;
-        installBtn.textContent = "No Package Found";
-        launchBtn.disabled = true;
-        log("No game package found. Place XenoTerra-Game.zip next to this launcher.", "error");
-      }
-
-      // Update check
-      checkForUpdates();
-    }
-
-    function checkForUpdates() {
-      var updateStatusEl = document.getElementById("updateStatus");
-      var updateValueEl = document.getElementById("updateValue");
-      var updateBtn = document.getElementById("updateBtn");
-
-      // In a real scenario this would check a remote manifest.
-      // For now we report the current version as up to date.
-      updateStatusEl.textContent = "Up to Date";
-      updateStatusEl.className = "status-value status-ok";
-      updateValueEl.textContent = "Launcher v" + VERSION;
-      updateValueEl.className = "status-value status-ok";
-      updateBtn.disabled = true;
-      updateBtn.textContent = "No Updates";
-    }
-
-    function installGame() {
-      if (!fso.FileExists(gameZip)) {
-        log("Cannot install: XenoTerra-Game.zip not found.", "error");
-        return;
-      }
-      var installBtn = document.getElementById("installBtn");
-      installBtn.disabled = true;
-      installBtn.textContent = "Installing...";
-      log("Extracting " + gameZip + " to " + gameDir, "info");
-
       try {
-        if (!fso.FolderExists(gameDir)) fso.CreateFolder(gameDir);
+        var href = window.location.href;
+        if (typeof href === "string" && href.indexOf("file:///") === 0) {
+          var localPath = href.slice(8);
+          // HTA on Windows: file:///C:/path/to/file.hta -> C:\path\to\
+          var lastSlash = localPath.lastIndexOf("/");
+          if (lastSlash >= 0) localPath = localPath.slice(0, lastSlash + 1);
+          return localPath.replace(/\//g, "\\");
+        }
+        // Fallback via WSH
+        try {
+          var wshTmp = new ActiveXObject("WScript.Shell");
+          var full = wshTmp.ScriptFullName || "";
+          var idx = full.lastIndexOf("\\");
+          return idx >= 0 ? full.slice(0, idx + 1) : "";
+        } catch (e) {
+          return "";
+        }
+      } catch (e) {
+        return "";
+      }
+    }
+
+    var LAUNCHER_DIR = getLauncherDir();
+    var GAME_DIR = LAUNCHER_DIR + "XenoTerra\\";
+    var GAME_ZIP = LAUNCHER_DIR + "XenoTerra-Game.zip";
+    var GAME_EXE = GAME_DIR + "XenoTerra.exe";
+    var LAUNCHER_FILE = LAUNCHER_DIR + "XenoTerra-Launcher.hta";
+
+    // ================================================================
+    // ActiveX helpers
+    // ================================================================
+    var fso = null;
+    var shell = null;
+
+    function initActiveX() {
+      try {
+        fso = new ActiveXObject("Scripting.FileSystemObject");
+        shell = new ActiveXObject("WScript.Shell");
+        return true;
+      } catch (e) {
+        log("Cannot access file system: " + (e.message || e), "error");
+        return false;
+      }
+    }
+
+    // ================================================================
+    // Logging
+    // ================================================================
+    function log(message, type) {
+      try {
+        var container = document.getElementById("logContainer");
+        if (!container) return;
+        var entry = document.createElement("div");
+        entry.className = "log-entry";
+        if (type === "success") entry.className += " log-success";
+        else if (type === "error") entry.className += " log-error";
+        else if (type === "warn") entry.className += " log-warn";
+        else entry.className += " log-info";
+
+        var now = new Date();
+        var timeStr = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        entry.textContent = "[" + timeStr + "] " + message;
+        container.appendChild(entry);
+        container.scrollTop = container.scrollHeight;
+      } catch (e) {
+        // silent fail
+      }
+    }
+
+    // ================================================================
+    // Element helpers (safe access)
+    // ================================================================
+    function $el(id) {
+      try { return document.getElementById(id); } catch (e) { return null; }
+    }
+
+    function setText(id, text, cls) {
+      var el = $el(id);
+      if (!el) return;
+      el.textContent = text;
+      if (cls) el.className = "status-value " + cls;
+    }
+
+    function setBtnDisabled(id, disabled) {
+      var el = $el(id);
+      if (!el) return;
+      el.disabled = disabled;
+    }
+
+    function setBtnText(id, text) {
+      var el = $el(id);
+      if (!el) return;
+      el.textContent = text;
+    }
+
+    // ================================================================
+    // Initialization
+    // ================================================================
+    function init() {
+      try {
+        setText("footerVersion", "v" + LOCAL_VERSION);
+        log("XenoTerra Launcher v" + LOCAL_VERSION + " starting…", "info");
+        log("Launcher directory: " + LAUNCHER_DIR, "info");
+
+        if (!initActiveX()) {
+          log("Critical: Cannot access file system.", "error");
+        }
+
+        refreshStatus();
+        checkForUpdates();
+
+        setInterval(checkForUpdates, CHECK_INTERVAL_MS);
+      } catch (e) {
+        log("Initialization error: " + (e.message || e), "error");
+      }
+    }
+
+    // ================================================================
+    // Status refresh
+    // ================================================================
+    function refreshStatus() {
+      try {
+        setText("launcherVersion", "v" + LOCAL_VERSION);
+
+        var gameInstalled = fso && fso.FolderExists(GAME_DIR);
+        var gameExeExists = fso && fso.FileExists(GAME_EXE);
+        var gameZipExists = fso && fso.FileExists(GAME_ZIP);
+
+        var btnInstall = $el("btnInstall");
+        var btnLaunch = $el("btnLaunch");
+
+        if (gameExeExists) {
+          setText("gameStatus", "Installed", "status-ok");
+          setText("gamePath", GAME_DIR, "status-ok");
+          setText("gameVersion", GAME_VERSION, "status-ok");
+          if (btnInstall) { btnInstall.disabled = true; btnInstall.textContent = "Already Installed"; }
+          if (btnLaunch) { btnLaunch.disabled = false; btnLaunch.textContent = "Launch Game"; }
+          log("Game is installed at " + GAME_DIR, "success");
+        } else if (gameZipExists) {
+          setText("gameStatus", "Ready to Install", "status-warn");
+          setText("gamePath", GAME_ZIP, "status-warn");
+          setText("gameVersion", GAME_VERSION, "status-info");
+          if (btnInstall) { btnInstall.disabled = false; btnInstall.textContent = "Install Game"; }
+          if (btnLaunch) { btnLaunch.disabled = true; btnLaunch.textContent = "Install First"; }
+          log("Game package found. Click Install Game.", "info");
+        } else {
+          setText("gameStatus", "Not Installed", "status-error");
+          setText("gamePath", "No package found", "status-error");
+          setText("gameVersion", "—", "status-info");
+          if (btnInstall) { btnInstall.disabled = true; btnInstall.textContent = "No Package Found"; }
+          if (btnLaunch) { btnLaunch.disabled = true; btnLaunch.textContent = "Install First"; }
+          log("Place XenoTerra-Game.zip next to this launcher.", "error");
+        }
+
+        setText("updateStatus", "Checked", "status-info");
+      } catch (e) {
+        log("Status refresh error: " + (e.message || e), "error");
+      }
+    }
+
+    // ================================================================
+    // Actions
+    // ================================================================
+    function installGame() {
+      try {
+        if (!fso || !fso.FileExists(GAME_ZIP)) {
+          log("Cannot install: XenoTerra-Game.zip not found.", "error");
+          return;
+        }
+
+        setBtnDisabled("btnInstall", true);
+        setBtnText("btnInstall", "Installing…");
+        log("Extracting " + GAME_ZIP, "info");
+
+        if (!fso.FolderExists(GAME_DIR)) {
+          fso.CreateFolder(GAME_DIR);
+        }
+
         var shellApp = new ActiveXObject("Shell.Application");
-        var zipFile = shellApp.NameSpace(gameZip);
-        var destFolder = shellApp.NameSpace(gameDir);
-        destFolder.CopyHere(zipFile.Items(), 4); // 4 = don't display progress dialog
+        var zipFile = shellApp.NameSpace(GAME_ZIP);
+        var destFolder = shellApp.NameSpace(GAME_DIR);
+        destFolder.CopyHere(zipFile.Items(), 4); // 4 = no progress dialog
+
         log("Game installed successfully.", "success");
         refreshStatus();
       } catch (e) {
-        log("Install failed: " + e.message, "error");
-        installBtn.disabled = false;
-        installBtn.textContent = "Install Game";
+        log("Install failed: " + (e.message || e), "error");
+        setBtnDisabled("btnInstall", false);
+        setBtnText("btnInstall", "Install Game");
       }
     }
 
     function launchGame() {
-      if (!fso.FileExists(gameExe)) {
-        log("Cannot launch: XenoTerra.exe not found.", "error");
-        return;
-      }
-      log("Launching XenoTerra...", "info");
       try {
-        shell.Run("\"" + gameExe + "\"", 1, false);
+        if (!fso || !fso.FileExists(GAME_EXE)) {
+          log("Cannot launch: XenoTerra.exe not found.", "error");
+          return;
+        }
+
+        log("Launching XenoTerra v" + GAME_VERSION + "…", "info");
+        shell.Run("\"" + GAME_EXE + "\"", 1, false);
         window.close();
       } catch (e) {
-        log("Launch failed: " + e.message, "error");
+        log("Launch failed: " + (e.message || e), "error");
       }
     }
 
     function openFolder() {
-      if (fso.FolderExists(gameDir)) {
-        shell.Run("explorer \"" + gameDir + "\"", 1, false);
-      } else {
-        log("Game folder does not exist yet.", "error");
+      try {
+        if (fso && fso.FolderExists(GAME_DIR)) {
+          shell.Run("explorer \"" + GAME_DIR + "\"", 1, false);
+        } else {
+          log("Game folder does not exist yet.", "error");
+        }
+      } catch (e) {
+        log("Open folder failed: " + (e.message || e), "error");
       }
     }
 
-    function checkLauncherUpdate() {
-      log("Checking for launcher updates...", "info");
-      // Placeholder for remote update check
-      log("Launcher is up to date (v" + VERSION + ").", "success");
-      refreshStatus();
+    // ================================================================
+    // Auto-update via GitHub manifest
+    // ================================================================
+    function checkForUpdates() {
+      try {
+        log("Checking for launcher updates…", "info");
+        setText("updateStatus", "Checking…", "status-info");
+
+        var xhr = new ActiveXObject("MSXML2.XMLHTTP");
+        xhr.open("GET", MANIFEST_URL, false);
+        xhr.send();
+
+        if (xhr.Status === 200) {
+          var manifest = JSON.parse(xhr.responseText);
+          var remoteVersion = manifest.launcherVersion || "0.0.0";
+          var remoteUrl = manifest.launcherUrl || "";
+
+          log("Remote version: " + remoteVersion + " | Local: " + LOCAL_VERSION, "info");
+
+          if (compareVersions(remoteVersion, LOCAL_VERSION) > 0) {
+            log("Update available: v" + remoteVersion, "warn");
+            setText("updateStatus", "Update Available", "status-warn");
+            var banner = $el("updateBanner");
+            if (banner) banner.style.display = "block";
+            window._remoteVersion = remoteVersion;
+            window._remoteUrl = remoteUrl;
+          } else {
+            log("Launcher is up to date.", "success");
+            setText("updateStatus", "Up to Date", "status-ok");
+            var banner = $el("updateBanner");
+            if (banner) banner.style.display = "none";
+          }
+        } else {
+          log("Update check failed: HTTP " + xhr.Status, "error");
+          setText("updateStatus", "Check Failed", "status-error");
+        }
+      } catch (e) {
+        log("Update check error: " + (e.message || e), "error");
+        setText("updateStatus", "Check Failed", "status-error");
+      }
+    }
+
+    function compareVersions(a, b) {
+      var pa = String(a || "0.0.0").split(".");
+      var pb = String(b || "0.0.0").split(".");
+      for (var i = 0; i < Math.max(pa.length, pb.length); i++) {
+        var va = Number(pa[i] || 0);
+        var vb = Number(pb[i] || 0);
+        if (va > vb) return 1;
+        if (va < vb) return -1;
+      }
+      return 0;
+    }
+
+    function applyUpdate() {
+      try {
+        var remoteUrl = window._remoteUrl;
+        var remoteVersion = window._remoteVersion;
+        if (!remoteUrl) {
+          log("No update URL available.", "error");
+          return;
+        }
+
+        log("Downloading launcher v" + remoteVersion + "…", "info");
+        setBtnDisabled("btnCheckUpdate", true);
+        setBtnText("btnCheckUpdate", "Downloading…");
+
+        var xhr = new ActiveXObject("MSXML2.XMLHTTP");
+        xhr.open("GET", remoteUrl, false);
+        xhr.send();
+
+        if (xhr.Status !== 200) {
+          log("Download failed: HTTP " + xhr.Status, "error");
+          setBtnDisabled("btnCheckUpdate", false);
+          setBtnText("btnCheckUpdate", "Check for Updates");
+          return;
+        }
+
+        var tempFile = LAUNCHER_DIR + "XenoTerra-Launcher.new.hta";
+        var stream = new ActiveXObject("ADODB.Stream");
+        stream.Type = 1;
+        stream.Open();
+        stream.Write(xhr.responseBody);
+        stream.SaveToFile(tempFile, 2);
+        stream.Close();
+
+        log("Update downloaded.", "success");
+
+        var batContent =
+          '@echo off\r\n' +
+          'timeout /t 2 /nobreak >nul\r\n' +
+          'copy /Y "' + tempFile + '" "' + LAUNCHER_FILE + '"\r\n' +
+          'del "' + tempFile + '"\r\n' +
+          'start "" "' + LAUNCHER_FILE + '"\r\n';
+
+        var batFile = LAUNCHER_DIR + "XenoTerra-Update.bat";
+        var batStream = new ActiveXObject("ADODB.Stream");
+        batStream.Type = 2;
+        batStream.Mode = 3;
+        batStream.Charset = "utf-8";
+        batStream.Open();
+        batStream.WriteText(batContent);
+        batStream.SaveToFile(batFile, 2);
+        batStream.Close();
+
+        log("Applying update and restarting…", "info");
+        shell.Run("\"" + batFile + "\"", 0, false);
+        window.close();
+      } catch (e) {
+        log("Update failed: " + (e.message || e), "error");
+        setBtnDisabled("btnCheckUpdate", false);
+        setBtnText("btnCheckUpdate", "Check for Updates");
+      }
     }
   </script>
-</head>
-<body>
-  <div class="header">
-    <h1>XenoTerra Launcher</h1>
-    <p>A survival game set on Panategwa d</p>
-  </div>
-
-  <div class="content">
-    <div class="status-card">
-      <h2>Status</h2>
-      <div class="status-row">
-        <span class="status-label">Launcher</span>
-        <span id="launcherVersion" class="status-value">Loading…</span>
-      </div>
-      <div class="status-row">
-        <span class="status-label">Game</span>
-        <span id="gameStatus" class="status-value">Checking…</span>
-      </div>
-      <div class="status-row">
-        <span class="status-label">Path</span>
-        <span id="gameValue" class="status-value">—</span>
-      </div>
-      <div class="status-row">
-        <span class="status-label">Updates</span>
-        <span id="updateStatus" class="status-value">Checking…</span>
-      </div>
-      <div class="status-row">
-        <span class="status-label">Version</span>
-        <span id="updateValue" class="status-value">—</span>
-      </div>
-    </div>
-
-    <div class="button-group">
-      <button id="installBtn" type="button" onclick="installGame()">Install Game</button>
-      <button id="launchBtn" type="button" onclick="launchGame()">Launch XenoTerra</button>
-      <button type="button" onclick="openFolder()">Open Game Folder</button>
-      <button class="secondary" type="button" onclick="checkLauncherUpdate()">Check for Updates</button>
-    </div>
-
-    <div class="log" id="log">
-      <div class="log-entry log-info">XenoTerra Launcher v<span id="logVersion">0.0.3-alpha</span> ready.</div>
-    </div>
-
-    <div class="footer">
-      XenoTerra Launcher &middot; Runs natively on Windows &middot; No code signing required
-    </div>
-  </div>
 </body>
 </html>

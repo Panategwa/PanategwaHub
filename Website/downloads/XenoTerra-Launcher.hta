@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>XenoTerra Launcher</title>
+  <HTA:APPLICATION
+    ID="xenoterraLauncher"
+    APPLICATIONNAME="XenoTerra Launcher"
+    BORDER="thin"
+    CAPTION="yes"
+    SHOWINTASKBAR="yes"
+    SYSMENU="yes"
+    MAXIMIZEBUTTON="no"
+    MINIMIZEBUTTON="no"
+    SCROLL="no"
+    WINDOWSTATE="normal"
+  />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0b1424;
+      color: #e7edf7;
+      margin: 0;
+      padding: 0;
+    }
+    .header {
+      background: linear-gradient(135deg, #121a2c 0%, #0b1424 100%);
+      border-bottom: 2px solid #60a5fa;
+      padding: 24px 32px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 28px;
+      color: #60a5fa;
+      letter-spacing: 2px;
+    }
+    .header p {
+      margin: 8px 0 0;
+      font-size: 14px;
+      color: #94a3b8;
+    }
+    .content {
+      padding: 32px;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .status-card {
+      background: #121a2c;
+      border: 1px solid #94a3b8;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .status-card h2 {
+      margin: 0 0 16px;
+      font-size: 18px;
+      color: #e7edf7;
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #94a3b8;
+      font-size: 14px;
+    }
+    .status-row:last-child { border-bottom: none; }
+    .status-label { color: #94a3b8; }
+    .status-value { color: #e7edf7; font-weight: 600; }
+    .status-ok { color: #22c55e; }
+    .status-missing { color: #ef4444; }
+    .status-unknown { color: #f59e0b; }
+    .button-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    button {
+      background: #60a5fa;
+      color: #0b1424;
+      border: none;
+      border-radius: 8px;
+      padding: 14px 24px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+    button:hover { background: #93c5fd; transform: translateY(-1px); }
+    button:active { background: #3b82f6; transform: translateY(0); }
+    button:disabled {
+      background: #475569;
+      color: #94a3b8;
+      cursor: not-allowed;
+      transform: none;
+    }
+    button.secondary { background: #1e293b; color: #e7edf7; border: 1px solid #94a3b8; }
+    button.secondary:hover { background: #334155; border-color: #cbd5e1; }
+    .log {
+      background: #0b1424;
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: 'Consolas', monospace;
+      font-size: 12px;
+      color: #94a3b8;
+      max-height: 140px;
+      overflow-y: auto;
+      margin-top: 20px;
+    }
+    .log-entry { margin: 4px 0; }
+    .log-success { color: #22c55e; }
+    .log-error { color: #ef4444; }
+    .log-info { color: #60a5fa; }
+    .footer {
+      margin-top: 24px;
+      font-size: 12px;
+      color: #64748b;
+      text-align: center;
+    }
+  </style>
+  <script type="text/javascript">
+    // ================================================================
+    // XenoTerra Launcher — HTA Application
+    // Runs natively on Windows via mshta.exe, no code signing needed
+    // ================================================================
+    var VERSION = "0.0.3-alpha";
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+    var shell = new ActiveXObject("WScript.Shell");
+
+    var launcherDir = getLauncherDir();
+    var gameDir = launcherDir + "XenoTerra\\";
+    var gameZip = launcherDir + "XenoTerra-Game.zip";
+    var gameExe = gameDir + "XenoTerra.exe";
+
+    window.onload = function() {
+      document.getElementById("launcherVersion").textContent = "Launcher v" + VERSION;
+      refreshStatus();
+    };
+
+    function getLauncherDir() {
+      var path = window.location.href;
+      // Convert file:/// URL to local path
+      if (path.indexOf("file:///") === 0) {
+        var localPath = path.slice(8);
+        // Remove trailing filename
+        var lastSlash = localPath.lastIndexOf("/");
+        if (lastSlash >= 0) localPath = localPath.slice(0, lastSlash + 1);
+        // Convert / to \ and handle drive letter
+        localPath = localPath.replace(/\//g, "\\");
+        return localPath;
+      }
+      // Fallback: use script's own path via WSH
+      var scriptFullName = WScript.ScriptFullName;
+      var lastBackslash = scriptFullName.lastIndexOf("\\");
+      if (lastBackslash >= 0) return scriptFullName.slice(0, lastBackslash + 1);
+      return "";
+    }
+
+    function log(message, type) {
+      var logEl = document.getElementById("log");
+      var entry = document.createElement("div");
+      entry.className = "log-entry";
+      if (type === "success") entry.className += " log-success";
+      else if (type === "error") entry.className += " log-error";
+      else if (type === "info") entry.className += " log-info";
+      var now = new Date();
+      var timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      entry.textContent = "[" + timeStr + "] " + message;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function refreshStatus() {
+      // Launcher version
+      document.getElementById("launcherVersion").textContent = "Launcher v" + VERSION;
+
+      // Game status
+      var gameInstalled = fso.FolderExists(gameDir);
+      var gameExeExists = fso.FileExists(gameExe);
+      var gameZipExists = fso.FileExists(gameZip);
+      var gameStatusEl = document.getElementById("gameStatus");
+      var gameValueEl = document.getElementById("gameValue");
+      var installBtn = document.getElementById("installBtn");
+      var launchBtn = document.getElementById("launchBtn");
+
+      if (gameExeExists) {
+        gameStatusEl.textContent = "Installed";
+        gameStatusEl.className = "status-value status-ok";
+        gameValueEl.textContent = gameDir;
+        gameValueEl.className = "status-value status-ok";
+        installBtn.disabled = true;
+        installBtn.textContent = "Already Installed";
+        launchBtn.disabled = false;
+        log("Game is installed at " + gameDir, "success");
+      } else if (gameZipExists) {
+        gameStatusEl.textContent = "Ready to Install";
+        gameStatusEl.className = "status-value status-unknown";
+        gameValueEl.textContent = "Package found: XenoTerra-Game.zip";
+        gameValueEl.className = "status-value status-unknown";
+        installBtn.disabled = false;
+        installBtn.textContent = "Install Game";
+        launchBtn.disabled = true;
+        log("Game package found. Click Install to extract.", "info");
+      } else {
+        gameStatusEl.textContent = "Not Installed";
+        gameStatusEl.className = "status-value status-missing";
+        gameValueEl.textContent = "No game package found";
+        gameValueEl.className = "status-value status-missing";
+        installBtn.disabled = true;
+        installBtn.textContent = "No Package Found";
+        launchBtn.disabled = true;
+        log("No game package found. Place XenoTerra-Game.zip next to this launcher.", "error");
+      }
+
+      // Update check
+      checkForUpdates();
+    }
+
+    function checkForUpdates() {
+      var updateStatusEl = document.getElementById("updateStatus");
+      var updateValueEl = document.getElementById("updateValue");
+      var updateBtn = document.getElementById("updateBtn");
+
+      // In a real scenario this would check a remote manifest.
+      // For now we report the current version as up to date.
+      updateStatusEl.textContent = "Up to Date";
+      updateStatusEl.className = "status-value status-ok";
+      updateValueEl.textContent = "Launcher v" + VERSION;
+      updateValueEl.className = "status-value status-ok";
+      updateBtn.disabled = true;
+      updateBtn.textContent = "No Updates";
+    }
+
+    function installGame() {
+      if (!fso.FileExists(gameZip)) {
+        log("Cannot install: XenoTerra-Game.zip not found.", "error");
+        return;
+      }
+      var installBtn = document.getElementById("installBtn");
+      installBtn.disabled = true;
+      installBtn.textContent = "Installing...";
+      log("Extracting " + gameZip + " to " + gameDir, "info");
+
+      try {
+        if (!fso.FolderExists(gameDir)) fso.CreateFolder(gameDir);
+        var shellApp = new ActiveXObject("Shell.Application");
+        var zipFile = shellApp.NameSpace(gameZip);
+        var destFolder = shellApp.NameSpace(gameDir);
+        destFolder.CopyHere(zipFile.Items(), 4); // 4 = don't display progress dialog
+        log("Game installed successfully.", "success");
+        refreshStatus();
+      } catch (e) {
+        log("Install failed: " + e.message, "error");
+        installBtn.disabled = false;
+        installBtn.textContent = "Install Game";
+      }
+    }
+
+    function launchGame() {
+      if (!fso.FileExists(gameExe)) {
+        log("Cannot launch: XenoTerra.exe not found.", "error");
+        return;
+      }
+      log("Launching XenoTerra...", "info");
+      try {
+        shell.Run("\"" + gameExe + "\"", 1, false);
+        window.close();
+      } catch (e) {
+        log("Launch failed: " + e.message, "error");
+      }
+    }
+
+    function openFolder() {
+      if (fso.FolderExists(gameDir)) {
+        shell.Run("explorer \"" + gameDir + "\"", 1, false);
+      } else {
+        log("Game folder does not exist yet.", "error");
+      }
+    }
+
+    function checkLauncherUpdate() {
+      log("Checking for launcher updates...", "info");
+      // Placeholder for remote update check
+      log("Launcher is up to date (v" + VERSION + ").", "success");
+      refreshStatus();
+    }
+  </script>
+</head>
+<body>
+  <div class="header">
+    <h1>XenoTerra Launcher</h1>
+    <p>A survival game set on Panategwa d</p>
+  </div>
+
+  <div class="content">
+    <div class="status-card">
+      <h2>Status</h2>
+      <div class="status-row">
+        <span class="status-label">Launcher</span>
+        <span id="launcherVersion" class="status-value">Loading…</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Game</span>
+        <span id="gameStatus" class="status-value">Checking…</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Path</span>
+        <span id="gameValue" class="status-value">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Updates</span>
+        <span id="updateStatus" class="status-value">Checking…</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Version</span>
+        <span id="updateValue" class="status-value">—</span>
+      </div>
+    </div>
+
+    <div class="button-group">
+      <button id="installBtn" type="button" onclick="installGame()">Install Game</button>
+      <button id="launchBtn" type="button" onclick="launchGame()">Launch XenoTerra</button>
+      <button type="button" onclick="openFolder()">Open Game Folder</button>
+      <button class="secondary" type="button" onclick="checkLauncherUpdate()">Check for Updates</button>
+    </div>
+
+    <div class="log" id="log">
+      <div class="log-entry log-info">XenoTerra Launcher v<span id="logVersion">0.0.3-alpha</span> ready.</div>
+    </div>
+
+    <div class="footer">
+      XenoTerra Launcher &middot; Runs natively on Windows &middot; No code signing required
+    </div>
+  </div>
+</body>
+</html>

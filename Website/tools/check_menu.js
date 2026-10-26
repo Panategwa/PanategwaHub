@@ -114,8 +114,8 @@ for (const test of cases) {
     failures++;
   }
 
-  if (pageAnchors.length !== 9) {
-    console.log("FAIL expected 9 menu links, got", pageAnchors.length, "at", test.path);
+  if (pageAnchors.length !== 10) {
+    console.log("FAIL expected 10 menu links, got", pageAnchors.length, "at", test.path);
     failures++;
   }
 
@@ -123,8 +123,9 @@ for (const test of cases) {
     const target = el.getAttribute("data-target-page");
     // The site is served from https://panategwa.github.io/PanategwaHub/, so
     // every link must be absolute and keep the /PanategwaHub/ prefix. A
-    // "../../"-style relative link would climb out of the repo.
-    if (!target.startsWith(root) || !target.includes("main-pages/")) {
+    // "../../"-style relative link would climb out of the repo. Placeholders
+    // live under /placeholder/ rather than /main-pages/.
+    if (!target.startsWith(root) || (!target.includes("main-pages/") && !target.includes("/placeholder/"))) {
       console.log("FAIL link not rooted at the site root:", target, "at", test.path);
       failures++;
       break;

@@ -441,3 +441,48 @@ split stays a pure move.
   font-weight: 700;
   font-size: 0.92rem;
 }
+
+/* =========================
+   CIVILISATION BUTTON
+   The Anthropoi civilis "Civilization" link on the D life page is a
+   destination, not an aside, so it gets a real, noticeable button rather
+   than a plain inline link. Theme tokens keep it in step with the rest of
+   the site. ========================= */
+
+.civilisation-button {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  margin: 1.25rem auto 0;
+  padding: 1rem 1.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 16px;
+  background: var(--btn-bg);
+  color: var(--button-text);
+  border: 1px solid var(--btn-border);
+  box-shadow: var(--btn-shadow);
+  font-family: 'Rubik', sans-serif;
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease,
+    box-shadow 0.14s ease,
+    transform 0.09s ease;
+}
+
+.civilisation-button:hover {
+  background-color: var(--btn-bg-hover);
+  border-color: var(--btn-border-hover);
+  color: var(--btn-text-hover);
+}
+
+.civilisation-button:active {
+  background-color: var(--btn-bg-active);
+  border-color: var(--btn-border-active);
+  transform: translateY(1px);
+  box-shadow: var(--btn-shadow-pressed);
+  transition-duration: 0.04s;
+}

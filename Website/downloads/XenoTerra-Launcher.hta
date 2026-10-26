@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8" />
   <title>XenoTerra Launcher</title>
   <HTA:APPLICATION
     ID="xenoterraLauncher"
@@ -9,349 +10,438 @@
     CAPTION="yes"
     SHOWINTASKBAR="yes"
     SYSMENU="yes"
-    MAXIMIZEBUTTON="no"
-    MINIMIZEBUTTON="no"
+    MAXIMIZEBUTTON="yes"
+    MINIMIZEBUTTON="yes"
     SCROLL="no"
     WINDOWSTATE="normal"
   />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
+    html, body {
+      height: 100%;
+      background: #0f0f0f;
+      color: #e0e0e0;
       font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
-      background: #050a14;
-      color: #e2e8f0;
-      height: 100vh;
       overflow: hidden;
     }
 
-    .container {
-      max-width: 720px;
-      margin: 0 auto;
-      height: 100vh;
+    /* Minecraft-style header */
+    .mc-header {
+      background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+      border-bottom: 2px solid #333;
+      padding: 16px 24px;
       display: flex;
-      flex-direction: column;
+      align-items: center;
+      gap: 16px;
     }
 
-    /* Header */
-    .header {
-      background: linear-gradient(135deg, #0f172a 0%, #020617 100%);
-      border-bottom: 1px solid #1e293b;
-      padding: 32px 40px;
-      text-align: center;
-    }
-
-    .logo-badge {
-      display: inline-flex;
+    .mc-logo {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+      border: 2px solid #fff;
+      border-radius: 4px;
+      display: flex;
       align-items: center;
       justify-content: center;
-      width: 56px;
-      height: 56px;
-      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-      border-radius: 14px;
-      font-size: 28px;
-      margin-bottom: 16px;
-      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+      font-size: 24px;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
 
-    .header h1 {
-      font-size: 32px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-      margin: 0 0 8px;
-      background: linear-gradient(to right, #fff 0%, #94a3b8 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .subtitle {
-      font-size: 15px;
-      color: #94a3b8;
-    }
-
-    /* Main */
-    .main {
+    .mc-title {
       flex: 1;
-      padding: 40px;
+    }
+
+    .mc-title h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+      margin: 0 0 4px;
+      letter-spacing: -0.5px;
+    }
+
+    .mc-title p {
+      font-size: 13px;
+      color: #999;
+      margin: 0;
+    }
+
+    .mc-version-badge {
+      font-size: 12px;
+      background: #2d2d2d;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 4px 10px;
+      color: #aaa;
+    }
+
+    /* Main layout */
+    .mc-main {
+      display: flex;
+      height: calc(100vh - 80px);
+      overflow: hidden;
+    }
+
+    /* Left sidebar */
+    .mc-sidebar {
+      width: 320px;
+      background: #171717;
+      border-right: 1px solid #2d2d2d;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-section {
+      padding: 20px;
+      border-bottom: 1px solid #2d2d2d;
+      flex: 1;
       overflow-y: auto;
     }
 
-    /* Cards */
-    .card {
-      background: #0f172a;
-      border: 1px solid #1e293b;
-      border-radius: 16px;
-      padding: 28px;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-    }
-
-    .card h2 {
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 20px;
+    .sidebar-section h3 {
+      font-size: 16px;
       color: #fff;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      margin-bottom: 16px;
+      font-weight: 600;
     }
 
-    .card h2::before {
-      content: '';
-      width: 4px;
-      height: 18px;
-      background: #3b82f6;
-      border-radius: 2px;
+    .news-item {
+      background: #222;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 14px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
     }
 
-    /* Status items */
-    .status-list {
+    .news-item:hover {
+      border-color: #4a90e2;
+      background: #2a2a2a;
+    }
+
+    .news-item h4 {
+      font-size: 14px;
+      color: #fff;
+      margin: 0 0 6px;
+      font-weight: 600;
+    }
+
+    .news-item p {
+      font-size: 12px;
+      color: #aaa;
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    .news-date {
+      font-size: 11px;
+      color: #666;
+      margin-top: 6px;
+      display: block;
+    }
+
+    /* Main content */
+    .mc-content {
+      flex: 1;
+      background: #0f0f0f;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      overflow: hidden;
+      padding: 32px 40px;
     }
 
-    .status-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 10px 0;
-      border-bottom: 1px solid #1e293b;
+    /* Status grid */
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
     }
 
-    .status-item:last-child {
-      border-bottom: none;
-      padding-bottom: 0;
+    .status-card {
+      background: #171717;
+      border: 1px solid #2d2d2d;
+      border-radius: 8px;
+      padding: 20px;
+      transition: all 0.2s;
     }
 
-    .status-label {
-      font-size: 14px;
-      color: #94a3b8;
+    .status-card:hover {
+      border-color: #4a90e2;
+    }
+
+    .status-card h4 {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 10px;
       font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .status-value {
-      font-size: 14px;
+      font-size: 18px;
       font-weight: 600;
-      color: #e2e8f0;
-      font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+      color: #fff;
+      font-family: 'Consolas', 'Monaco', monospace;
+      word-break: break-all;
     }
 
-    .status-ok { color: #22c55e; }
-    .status-warn { color: #f59e0b; }
-    .status-error { color: #ef4444; }
-    .status-info { color: #3b82f6; }
+    .status-ok { color: #4caf50; }
+    .status-warn { color: #ff9800; }
+    .status-error { color: #f44336; }
+    .status-info { color: #2196f3; }
 
-    /* Buttons */
-    .button-group {
-      display: flex;
-      flex-direction: column;
+    /* Action buttons */
+    .actions-panel {
+      background: #171717;
+      border: 1px solid #2d2d2d;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 32px;
+    }
+
+    .actions-panel h3 {
+      font-size: 16px;
+      color: #fff;
+      margin-bottom: 20px;
+      font-weight: 600;
+    }
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
       gap: 12px;
     }
 
-    .btn {
+    .mc-btn {
       width: 100%;
-      padding: 16px 24px;
+      padding: 18px 24px;
       border: none;
-      border-radius: 12px;
+      border-radius: 6px;
       font-size: 15px;
       font-weight: 600;
       font-family: inherit;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: all 0.15s;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
     }
 
-    .btn:active { transform: translateY(1px); }
+    .mc-btn:active { transform: translateY(1px); }
 
-    .btn-primary {
-      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    .mc-btn-primary {
+      background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
       color: #fff;
-      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+      box-shadow: 0 4px 14px rgba(74, 144, 226, 0.3);
     }
 
-    .btn-primary:hover { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); }
-    .btn-primary:disabled { background: #475569; box-shadow: none; cursor: not-allowed; }
+    .mc-btn-primary:hover { background: linear-gradient(135deg, #357abd 0%, #2e6da4 100%); }
+    .mc-btn-primary:disabled { background: #444; box-shadow: none; cursor: not-allowed; color: #888; }
 
-    .btn-success {
-      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    .mc-btn-success {
+      background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
       color: #fff;
-      box-shadow: 0 4px 14px rgba(34, 197, 94, 0.3);
+      box-shadow: 0 4px 14px rgba(76, 175, 80, 0.3);
     }
 
-    .btn-success:hover { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); }
-    .btn-success:disabled { background: #475569; box-shadow: none; cursor: not-allowed; }
+    .mc-btn-success:hover { background: linear-gradient(135deg, #388e3c 0%, #2e7d32 100%); }
+    .mc-btn-success:disabled { background: #444; box-shadow: none; cursor: not-allowed; color: #888; }
 
-    .btn-secondary {
-      background: #1e293b;
-      color: #e2e8f0;
-      border: 1px solid #334155;
+    .mc-btn-secondary {
+      background: #2d2d2d;
+      color: #e0e0e0;
+      border: 1px solid #444;
     }
 
-    .btn-secondary:hover { background: #334155; border-color: #475569; }
+    .mc-btn-secondary:hover { background: #3a3a3a; border-color: #555; }
 
-    .btn-ghost {
-      background: transparent;
-      color: #94a3b8;
-      border: 1px solid #334155;
-    }
-
-    .btn-ghost:hover { background: #1e293b; border-color: #64748b; color: #e2e8f0; }
-
-    .btn-update {
-      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    .mc-btn-warning {
+      background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
       color: #fff;
-      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+      box-shadow: 0 4px 14px rgba(255, 152, 0, 0.3);
     }
 
-    .btn-update:hover { background: linear-gradient(135deg, #d97706 0%, #b45309 100%); }
+    .mc-btn-warning:hover { background: linear-gradient(135deg, #f57c00 0%, #ef6c00 100%); }
 
-    /* Log */
+    /* Log panel */
+    .log-panel {
+      background: #171717;
+      border: 1px solid #2d2d2d;
+      border-radius: 8px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .log-panel h3 {
+      font-size: 16px;
+      color: #fff;
+      margin: 0 0 16px;
+      font-weight: 600;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #2d2d2d;
+    }
+
     .log-container {
-      background: #020617;
-      border: 1px solid #1e293b;
-      border-radius: 10px;
+      flex: 1;
+      background: #0a0a0a;
+      border-radius: 0 0 6px 6px;
       padding: 16px;
-      font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+      font-family: 'Consolas', 'Monaco', monospace;
       font-size: 12px;
-      max-height: 200px;
+      color: #aaa;
       overflow-y: auto;
-      color: #94a3b8;
     }
 
     .log-entry {
       padding: 6px 0;
-      border-bottom: 1px solid #0f172a;
+      border-bottom: 1px solid #1a1a1a;
       white-space: pre-wrap;
       word-break: break-all;
     }
 
     .log-entry:last-child { border-bottom: none; }
 
-    .log-success { color: #22c55e; }
-    .log-error { color: #ef4444; }
-    .log-info { color: #3b82f6; }
-    .log-warn { color: #f59e0b; }
-
-    /* Update banner */
-    .update-banner {
-      background: #1e1b4b;
-      border: 1px solid #4338ca;
-      border-radius: 10px;
-      padding: 16px;
-      margin-bottom: 20px;
-      display: none;
-    }
-
-    .update-banner-content {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .update-text {
-      flex: 1;
-      font-size: 14px;
-      color: #e2e8f0;
-    }
-
-    .update-text strong { color: #818cf8; }
+    .log-success { color: #4caf50; }
+    .log-error { color: #f44336; }
+    .log-info { color: #2196f3; }
+    .log-warn { color: #ff9800; }
 
     /* Footer */
-    .footer {
-      background: #020617;
-      border-top: 1px solid #1e293b;
-      padding: 20px 40px;
-      text-align: center;
-      color: #64748b;
+    .mc-footer {
+      background: #0a0a0a;
+      border-top: 1px solid #2d2d2d;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       font-size: 12px;
+      color: #666;
     }
 
-    .footer .divider { margin: 0 6px; }
+    .fullscreen-hint {
+      font-size: 11px;
+      color: #888;
+    }
 
     /* Scrollbar */
-    .log-container::-webkit-scrollbar { width: 8px; }
-    .log-container::-webkit-scrollbar-track { background: #020617; }
-    .log-container::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-    .log-container::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .log-container::-webkit-scrollbar { width: 10px; }
+    .log-container::-webkit-scrollbar-track { background: #0a0a0a; }
+    .log-container::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+    .log-container::-webkit-scrollbar-thumb:hover { background: #444; }
+
+    .sidebar-section::-webkit-scrollbar { width: 8px; }
+    .sidebar-section::-webkit-scrollbar-track { background: #171717; }
+    .sidebar-section::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
   </style>
 </head>
 <body onload="init()">
 
-  <div class="container">
-    <div class="header">
-      <div class="logo-badge">&#9650;</div>
+  <div class="mc-header">
+    <div class="mc-logo">&#9650;</div>
+    <div class="mc-title">
       <h1>XenoTerra</h1>
-      <div class="subtitle">Launcher &#8226; Panategwa d Survival Game</div>
+      <p>Panategwa d Survival Game</p>
+    </div>
+    <div class="mc-version-badge" id="headerVersion">Launcher v1.0.0</div>
+  </div>
+
+  <div class="mc-main">
+    <div class="mc-sidebar">
+      <div class="sidebar-section">
+        <h3>News &amp; Updates</h3>
+        <div id="newsList">
+          <div class="news-item">
+            <h4>Launcher v1.0.0 Released</h4>
+            <p>Auto-update support added. The launcher now checks for updates automatically and can download new versions from GitHub.</p>
+            <span class="news-date">Today</span>
+          </div>
+          <div class="news-item">
+            <h4>XenoTerra Game v1.0.0</h4>
+            <p>Place XenoTerra-Game.zip next to this launcher to install the game. Click Install Game to extract and play.</p>
+            <span class="news-date">Today</span>
+          </div>
+        </div>
+      </div>
+      <div class="sidebar-section" style="flex: 0; border-bottom: none;">
+        <h3>Quick Info</h3>
+        <div style="font-size: 12px; color: #888; line-height: 1.6;">
+          <div style="margin-bottom: 12px;"><strong>Launcher:</strong> v1.0.0</div>
+          <div style="margin-bottom: 12px;"><strong>Game:</strong> v1.0.0</div>
+          <div style="margin-bottom: 12px;"><strong>Platform:</strong> Windows</div>
+          <div style="margin-bottom: 12px;"><strong>Signing:</strong> None required</div>
+        </div>
+        <button class="mc-btn mc-btn-secondary" style="width:100%;margin-top:16px;" onclick="checkForUpdates()">Check for Updates</button>
+      </div>
     </div>
 
-    <div class="main">
-      <div class="update-banner" id="updateBanner">
-        <div class="update-banner-content">
-          <span class="update-text">A new launcher version is available. Click below to update.</span>
-          <button class="btn btn-update" style="width:auto;padding:10px 20px;font-size:13px;" onclick="applyUpdate()">Update Now</button>
+    <div class="mc-content">
+      <div class="status-grid">
+        <div class="status-card">
+          <h4>Launcher</h4>
+          <div id="statusLauncher" class="status-value">Loading…</div>
+        </div>
+        <div class="status-card">
+          <h4>Game Status</h4>
+          <div id="statusGame" class="status-value">Loading…</div>
+        </div>
+        <div class="status-card">
+          <h4>Update</h4>
+          <div id="statusUpdate" class="status-value">Loading…</div>
         </div>
       </div>
 
-      <div class="card">
-        <h2>&#128204; System Status</h2>
-        <div class="status-list">
-          <div class="status-item">
-            <span class="status-label">Launcher Version</span>
-            <span id="launcherVersion" class="status-value">—</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Game Status</span>
-            <span id="gameStatus" class="status-value">—</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Install Path</span>
-            <span id="gamePath" class="status-value">—</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Update Status</span>
-            <span id="updateStatus" class="status-value">—</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Game Version</span>
-            <span id="gameVersion" class="status-value">—</span>
-          </div>
+      <div class="status-grid">
+        <div class="status-card">
+          <h4>Install Path</h4>
+          <div id="statusPath" class="status-value" style="font-size: 14px;">—</div>
+        </div>
+        <div class="status-card">
+          <h4>Game Version</h4>
+          <div id="statusGameVer" class="status-value">—</div>
+        </div>
+        <div class="status-card">
+          <h4>Launcher Version</h4>
+          <div id="statusLauncherVer" class="status-value">—</div>
         </div>
       </div>
 
-      <div class="card">
-        <h2>&#9998; Actions</h2>
-        <div class="button-group">
-          <button id="btnInstall" class="btn btn-primary" onclick="installGame()">Install Game</button>
-          <button id="btnLaunch" class="btn btn-success" onclick="launchGame()">Launch Game</button>
-          <button id="btnFolder" class="btn btn-secondary" onclick="openFolder()">Open Game Folder</button>
-          <button id="btnCheckUpdate" class="btn btn-ghost" onclick="checkForUpdates()">Check for Updates</button>
+      <div class="actions-panel">
+        <h3>Actions</h3>
+        <div class="action-grid">
+          <button id="btnInstall" class="mc-btn mc-btn-primary" onclick="installGame()">Install Game</button>
+          <button id="btnLaunch" class="mc-btn mc-btn-success" onclick="launchGame()">Launch Game</button>
+          <button id="btnFolder" class="mc-btn mc-btn-secondary" onclick="openFolder()">Open Game Folder</button>
+          <button id="btnUpdate" class="mc-btn mc-btn-warning" onclick="checkForUpdates()">Check for Updates</button>
         </div>
       </div>
 
-      <div class="card">
-        <h2>&#128221; Activity Log</h2>
+      <div class="log-panel">
+        <h3>Activity Log</h3>
         <div id="logContainer" class="log-container">
-          <div class="log-entry log-info">[system] XenoTerra Launcher ready.</div>
+          <div class="log-entry log-info">[system] XenoTerra Launcher v1.0.0 ready.</div>
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="footer">
-      <span id="footerVersion">v1.0.0</span>
-      <span class="divider">&#8226;</span>
-      <span>Runs natively on Windows</span>
-      <span class="divider">&#8226;</span>
-      <span>Auto-updates from GitHub</span>
-    </div>
+  <div class="mc-footer">
+    <span id="footerVersion">Launcher v1.0.0 &bull; Game v1.0.0</span>
+    <span class="fullscreen-hint">Press F11 for fullscreen &bull; Auto-updates from GitHub</span>
   </div>
 
   <script type="text/javascript">
     // ================================================================
-    // XenoTerra Launcher — Configuration
+    // XenoTerra Launcher — v1.0.0
+    // Bulletproof Windows HTA launcher
     // ================================================================
     var LOCAL_VERSION = "1.0.0";
     var GAME_VERSION = "1.0.0";
@@ -359,30 +449,54 @@
     var CHECK_INTERVAL_MS = 30000;
 
     // ================================================================
-    // Paths
+    // Path detection — robust across all Windows scenarios
     // ================================================================
     function getLauncherDir() {
+      var candidates = [];
+
+      // Candidate 1: window.location.href (HTA file:// URL)
       try {
         var href = window.location.href;
-        if (typeof href === "string" && href.indexOf("file:///") === 0) {
-          var localPath = href.slice(8);
-          // HTA on Windows: file:///C:/path/to/file.hta -> C:\path\to\
-          var lastSlash = localPath.lastIndexOf("/");
-          if (lastSlash >= 0) localPath = localPath.slice(0, lastSlash + 1);
-          return localPath.replace(/\//g, "\\");
+        if (typeof href === "string" && href.length > 0) {
+          if (href.indexOf("file:///") === 0) {
+            var localPath = href.slice(8); // remove "file:///"
+            var lastSlash = localPath.lastIndexOf("/");
+            if (lastSlash >= 0) {
+              candidates.push(localPath.slice(0, lastSlash + 1).replace(/\//g, "\\"));
+            }
+          } else if (href.indexOf("file://") === 0) {
+            var localPath2 = href.slice(7);
+            var lastSlash2 = localPath2.lastIndexOf("/");
+            if (lastSlash2 >= 0) {
+              candidates.push(localPath2.slice(0, lastSlash2 + 1).replace(/\//g, "\\"));
+            }
+          }
         }
-        // Fallback via WSH
-        try {
-          var wshTmp = new ActiveXObject("WScript.Shell");
-          var full = wshTmp.ScriptFullName || "";
-          var idx = full.lastIndexOf("\\");
-          return idx >= 0 ? full.slice(0, idx + 1) : "";
-        } catch (e) {
-          return "";
+      } catch (e) {}
+
+      // Candidate 2: WScript.Shell.ScriptFullName
+      try {
+        var wsh = new ActiveXObject("WScript.Shell");
+        var full = wsh.ScriptFullName || "";
+        var idx = full.lastIndexOf("\\");
+        if (idx >= 0) {
+          candidates.push(full.slice(0, idx + 1));
         }
-      } catch (e) {
-        return "";
+      } catch (e) {}
+
+      // Candidate 3: ActiveX Scripting.FileSystemObject on current document
+      try {
+        var fsoTmp = new ActiveXObject("Scripting.FileSystemObject");
+      } catch (e) {}
+
+      // Return first valid candidate, or empty string
+      for (var i = 0; i < candidates.length; i++) {
+        var c = candidates[i];
+        if (c && c.length > 2 && c.match(/^[A-Za-z]:\\/)) {
+          return c;
+        }
       }
+      return "";
     }
 
     var LAUNCHER_DIR = getLauncherDir();
@@ -427,9 +541,7 @@
         entry.textContent = "[" + timeStr + "] " + message;
         container.appendChild(entry);
         container.scrollTop = container.scrollHeight;
-      } catch (e) {
-        // silent fail
-      }
+      } catch (e) {}
     }
 
     // ================================================================
@@ -463,9 +575,15 @@
     // ================================================================
     function init() {
       try {
-        setText("footerVersion", "v" + LOCAL_VERSION);
+        document.getElementById("footerVersion").textContent = "Launcher v" + LOCAL_VERSION + "  •  Game v" + GAME_VERSION;
+        document.getElementById("headerVersion").textContent = "Launcher v" + LOCAL_VERSION;
+
         log("XenoTerra Launcher v" + LOCAL_VERSION + " starting…", "info");
-        log("Launcher directory: " + LAUNCHER_DIR, "info");
+        log("Launcher directory: " + (LAUNCHER_DIR || "(unknown)"), "info");
+
+        if (!LAUNCHER_DIR) {
+          log("CRITICAL: Could not determine launcher directory. File operations may fail.", "error");
+        }
 
         if (!initActiveX()) {
           log("Critical: Cannot access file system.", "error");
@@ -475,8 +593,25 @@
         checkForUpdates();
 
         setInterval(checkForUpdates, CHECK_INTERVAL_MS);
+
+        // F11 for fullscreen
+        document.onkeydown = function(e) {
+          if (e && e.key === "F11") {
+            e.preventDefault();
+            toggleFullscreen();
+          }
+        };
       } catch (e) {
         log("Initialization error: " + (e.message || e), "error");
+      }
+    }
+
+    function toggleFullscreen() {
+      try {
+        var wsh = new ActiveXObject("WScript.Shell");
+        wsh.SendKeys("{F11}");
+      } catch (e) {
+        log("Could not toggle fullscreen: " + (e.message || e), "error");
       }
     }
 
@@ -485,9 +620,9 @@
     // ================================================================
     function refreshStatus() {
       try {
-        setText("launcherVersion", "v" + LOCAL_VERSION);
+        setText("statusLauncher", "v" + LOCAL_VERSION, "status-info");
+        setText("statusLauncherVer", "v" + LOCAL_VERSION, "status-info");
 
-        var gameInstalled = fso && fso.FolderExists(GAME_DIR);
         var gameExeExists = fso && fso.FileExists(GAME_EXE);
         var gameZipExists = fso && fso.FileExists(GAME_ZIP);
 
@@ -495,29 +630,29 @@
         var btnLaunch = $el("btnLaunch");
 
         if (gameExeExists) {
-          setText("gameStatus", "Installed", "status-ok");
-          setText("gamePath", GAME_DIR, "status-ok");
-          setText("gameVersion", GAME_VERSION, "status-ok");
+          setText("statusGame", "Installed", "status-ok");
+          setText("statusPath", GAME_DIR, "status-ok");
+          setText("statusGameVer", GAME_VERSION, "status-ok");
           if (btnInstall) { btnInstall.disabled = true; btnInstall.textContent = "Already Installed"; }
           if (btnLaunch) { btnLaunch.disabled = false; btnLaunch.textContent = "Launch Game"; }
-          log("Game is installed at " + GAME_DIR, "success");
+          log("Game installed at " + GAME_DIR, "success");
         } else if (gameZipExists) {
-          setText("gameStatus", "Ready to Install", "status-warn");
-          setText("gamePath", GAME_ZIP, "status-warn");
-          setText("gameVersion", GAME_VERSION, "status-info");
+          setText("statusGame", "Ready to Install", "status-warn");
+          setText("statusPath", GAME_ZIP, "status-warn");
+          setText("statusGameVer", GAME_VERSION, "status-info");
           if (btnInstall) { btnInstall.disabled = false; btnInstall.textContent = "Install Game"; }
           if (btnLaunch) { btnLaunch.disabled = true; btnLaunch.textContent = "Install First"; }
           log("Game package found. Click Install Game.", "info");
         } else {
-          setText("gameStatus", "Not Installed", "status-error");
-          setText("gamePath", "No package found", "status-error");
-          setText("gameVersion", "—", "status-info");
+          setText("statusGame", "Not Installed", "status-error");
+          setText("statusPath", "No package found", "status-error");
+          setText("statusGameVer", "—", "status-info");
           if (btnInstall) { btnInstall.disabled = true; btnInstall.textContent = "No Package Found"; }
           if (btnLaunch) { btnLaunch.disabled = true; btnLaunch.textContent = "Install First"; }
           log("Place XenoTerra-Game.zip next to this launcher.", "error");
         }
 
-        setText("updateStatus", "Checked", "status-info");
+        setText("statusUpdate", "Checked", "status-info");
       } catch (e) {
         log("Status refresh error: " + (e.message || e), "error");
       }
@@ -528,8 +663,12 @@
     // ================================================================
     function installGame() {
       try {
-        if (!fso || !fso.FileExists(GAME_ZIP)) {
-          log("Cannot install: XenoTerra-Game.zip not found.", "error");
+        if (!fso) {
+          log("Cannot install: file system not available.", "error");
+          return;
+        }
+        if (!fso.FileExists(GAME_ZIP)) {
+          log("Cannot install: XenoTerra-Game.zip not found next to launcher.", "error");
           return;
         }
 
@@ -543,6 +682,12 @@
 
         var shellApp = new ActiveXObject("Shell.Application");
         var zipFile = shellApp.NameSpace(GAME_ZIP);
+        if (!zipFile) {
+          log("Cannot open zip file — it may be corrupted or not a valid archive.", "error");
+          setBtnDisabled("btnInstall", false);
+          setBtnText("btnInstall", "Install Game");
+          return;
+        }
         var destFolder = shellApp.NameSpace(GAME_DIR);
         destFolder.CopyHere(zipFile.Items(), 4); // 4 = no progress dialog
 
@@ -588,7 +733,7 @@
     function checkForUpdates() {
       try {
         log("Checking for launcher updates…", "info");
-        setText("updateStatus", "Checking…", "status-info");
+        setText("statusUpdate", "Checking…", "status-info");
 
         var xhr = new ActiveXObject("MSXML2.XMLHTTP");
         xhr.open("GET", MANIFEST_URL, false);
@@ -603,24 +748,20 @@
 
           if (compareVersions(remoteVersion, LOCAL_VERSION) > 0) {
             log("Update available: v" + remoteVersion, "warn");
-            setText("updateStatus", "Update Available", "status-warn");
-            var banner = $el("updateBanner");
-            if (banner) banner.style.display = "block";
+            setText("statusUpdate", "Update Available", "status-warn");
             window._remoteVersion = remoteVersion;
             window._remoteUrl = remoteUrl;
           } else {
             log("Launcher is up to date.", "success");
-            setText("updateStatus", "Up to Date", "status-ok");
-            var banner = $el("updateBanner");
-            if (banner) banner.style.display = "none";
+            setText("statusUpdate", "Up to Date", "status-ok");
           }
         } else {
           log("Update check failed: HTTP " + xhr.Status, "error");
-          setText("updateStatus", "Check Failed", "status-error");
+          setText("statusUpdate", "Check Failed", "status-error");
         }
       } catch (e) {
         log("Update check error: " + (e.message || e), "error");
-        setText("updateStatus", "Check Failed", "status-error");
+        setText("statusUpdate", "Check Failed", "status-error");
       }
     }
 
@@ -646,8 +787,8 @@
         }
 
         log("Downloading launcher v" + remoteVersion + "…", "info");
-        setBtnDisabled("btnCheckUpdate", true);
-        setBtnText("btnCheckUpdate", "Downloading…");
+        setBtnDisabled("btnUpdate", true);
+        setBtnText("btnUpdate", "Downloading…");
 
         var xhr = new ActiveXObject("MSXML2.XMLHTTP");
         xhr.open("GET", remoteUrl, false);
@@ -655,8 +796,8 @@
 
         if (xhr.Status !== 200) {
           log("Download failed: HTTP " + xhr.Status, "error");
-          setBtnDisabled("btnCheckUpdate", false);
-          setBtnText("btnCheckUpdate", "Check for Updates");
+          setBtnDisabled("btnUpdate", false);
+          setBtnText("btnUpdate", "Check for Updates");
           return;
         }
 
@@ -668,11 +809,12 @@
         stream.SaveToFile(tempFile, 2);
         stream.Close();
 
-        log("Update downloaded.", "success");
+        log("Update downloaded to temp file.", "success");
 
+        // Batch script: wait for HTA to close, then replace and relaunch
         var batContent =
           '@echo off\r\n' +
-          'timeout /t 2 /nobreak >nul\r\n' +
+          'timeout /t 3 /nobreak >nul\r\n' +
           'copy /Y "' + tempFile + '" "' + LAUNCHER_FILE + '"\r\n' +
           'del "' + tempFile + '"\r\n' +
           'start "" "' + LAUNCHER_FILE + '"\r\n';
@@ -687,13 +829,13 @@
         batStream.SaveToFile(batFile, 2);
         batStream.Close();
 
-        log("Applying update and restarting…", "info");
+        log("Applying update and restarting launcher…", "info");
         shell.Run("\"" + batFile + "\"", 0, false);
         window.close();
       } catch (e) {
         log("Update failed: " + (e.message || e), "error");
-        setBtnDisabled("btnCheckUpdate", false);
-        setBtnText("btnCheckUpdate", "Check for Updates");
+        setBtnDisabled("btnUpdate", false);
+        setBtnText("btnUpdate", "Check for Updates");
       }
     }
   </script>

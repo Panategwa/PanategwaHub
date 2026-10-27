@@ -46,7 +46,7 @@ RELEASE_NOTES_FILE = "release_notes.md"
 # whole thing is portable; override with XENOTERRA_INSTALL_DIR.
 INSTALL_DIR = Path(os.environ.get(
     "XENOTERRA_INSTALL_DIR",
-    Path.home() / "AppData" / "Local" / "Panategwa" / "Xenoterra"
+    Path(__file__).resolve().parent.parent / "Game"
 ))
 
 # Where release archives are published. Override with XENOTERRA_RELEASES_URL.

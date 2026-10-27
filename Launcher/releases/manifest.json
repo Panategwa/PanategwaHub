@@ -1,9 +1,0 @@
-{
-  "versions": [
-    {
-      "version": "0.1.0",
-      "archive": "Xenoterra-0.1.0.zip",
-      "notes": "# Xenoterra 0.1.0\n\n- First public build.\n- Basic movement, camera, and inventory.\n- Known issue: pause menu is placeholder.\n"
-    }
-  ]
-}

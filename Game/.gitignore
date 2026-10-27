@@ -1,7 +1,0 @@
-# Local editor state and generated CMake build output
-.vs/
-build/
-out/
-
-# Runtime worlds are player data, not source files.
-worlds/

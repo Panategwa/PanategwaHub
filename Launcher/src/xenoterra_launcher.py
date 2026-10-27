@@ -181,6 +181,11 @@ def download_and_install(version_entry, progress_cb, done_cb):
         # Extract, overwriting anything already there.
         import zipfile
         with zipfile.ZipFile(archive_path) as z:
+            for member in z.namelist():
+                # Prevent path traversal attacks
+                member_path = (INSTALL_DIR / member).resolve()
+                if not str(member_path).startswith(str(INSTALL_DIR.resolve())):
+                    raise RuntimeError(f"Invalid path in archive: {member}")
             z.extractall(INSTALL_DIR)
         archive_path.unlink(missing_ok=True)
 

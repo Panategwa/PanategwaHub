@@ -320,7 +320,7 @@ class Launcher(tk.Tk):
             self.download_btn.config(state="disabled")
         else:
             self.status_label.config(text="Not installed", fg=DANGER)
-            self.version_label.config(text="Version: —")
+            self.version_label.config(text="Version: -")
             self.play_btn.config(state="disabled")
             self.delete_btn.config(state="disabled")
             self.download_btn.config(state="normal")
@@ -460,7 +460,7 @@ class Launcher(tk.Tk):
         if current and latest and current != latest:
             msg += "\n\nAn update is available."
         messagebox.showinfo(APP_NAME + " — Version", msg)
-        log(self.log, "Version check: " + (current or "—") + " / " + (latest or "—"), "info")
+        log(self.log, "Version check: " + (current or "-") + " / " + (latest or "-"), "info")
 
     def view_release_notes(self):
         # Prefer a local copy shipped with the install, then the manifest entry,
